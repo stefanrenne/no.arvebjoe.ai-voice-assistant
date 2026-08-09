@@ -80,34 +80,6 @@ config exposes no other identifying string (no `project:`, no `board:` → `mode
 - [ ] **Replace the stand-in artwork.** `drivers/m5stack-atoms3r/assets/` holds a drawn
       stylised front view, not a product photo. Swap in real images before the store release.
 
-## VoiceAssistantEvent payloads — needs a check on a real PE
-
-Fixed 2026-08-06: `stt_end`, `pipeline_error`, `intent_progress` and
-`stt_vad_end` built their payload as a spread property (`{ text }`), which
-`VoiceAssistantEventResponse` has no field for — protobufjs dropped it silently,
-so the device received the bare event type all along. They now use the repeated
-`data` name/value field like `intent_end`/`tts_start`/`tts_end` already did, and
-`vaEvent()` only accepts that array so the trap can't come back
-(`tests/esp-voice-assistant-events.test.mts` asserts on the encoded bytes).
-
-Also fixed 2026-08-06, found the same way: **a turn nobody spoke into never
-closed.** Server VAD only reports the END of speech, so total silence produced no
-event at all — the mic stayed open indefinitely and, because a turn in
-'listening' arms the duplicate-wake guard, every later wake was dropped: the
-satellite went deaf until it reconnected. A 15 s no-speech timeout (Home
-Assistant's own VoiceCommandSegmenter value) now closes the turn the way an
-empty transcript does — STT_END/RUN_END plus the mic-closed cue, no error event.
-Cleared as soon as VAD hears speech, so a slow talker is unaffected.
-
-- [ ] **Watch one real turn on a PE.** Two triggers that could never fire before
-      now do: `on_stt_end` (the firmware used to bail with "No text in STT_END
-      event") and `on_error` with a real code/message instead of empty strings.
-      Both are expected to be harmless — this is what Home Assistant sends — but
-      it's device-side behaviour we've never actually exercised. Run
-      `homey app run --remote` and check the PE's own log for anything new
-      around STT_END, plus that a wake with no API key still just plays the
-      error sound.
-
 ## Deferred with a deadline
 
 - [ ] **Re-attempt the gpt-realtime-2.1 migration (deadline: before Jan 20, 2027).** The
@@ -304,10 +276,35 @@ un-dropped 2026-07-31** (see "Start a Homey flow by voice" below).
         is needed — the None client satisfies the startup gates without touching the network,
         and `textToSpeech()` throws so the *Say* card reports an error instead of serving
         silence. Shipped alongside `local_llm_provider: 'none'` (forum request 2026-08-07: stop
-        after STT and hand the transcript to a Flow). **Still open:** the same for the three
-        realtime providers — they should be put in an audio→text mode rather than generating
-        speech that gets thrown away; and this is a GLOBAL setting, so it cannot be per-device
-        the way the original request imagined.
+        after STT and hand the transcript to a Flow).
+      - **`local_llm_provider: 'none'` LIVE-VERIFIED on the PE 2026-08-09.** Flow: dump the
+        transcript to the timeline on `assistant-heard`, wait 1 s, then *Say* "yes sir!" —
+        heard on the PE. Confirms both halves: the transcript still reaches the trigger with
+        no LLM in the chain, and the no-reply-audio turn closes itself (the `silent` report
+        from `AudioOutputPipeline` on `reply-done`) instead of hanging waiting for an
+        `announce_finished` that never comes.
+      - **`local_tts_provider: 'none'` LIVE-VERIFIED on the PE 2026-08-09 — this IS the
+        requested feature, working.** "What is the time?" → timeline showed the transcript,
+        then `Using tool get_local_time`, then `It's 11:56 PM.` The full chain runs (STT →
+        LLM → tool call → reply text out on `assistant-thinking`); only speech is removed.
+        The mic-closed "end" tone still plays — it goes out via `playUrl()` from the LAN
+        webserver, nothing to do with the TTS stage — and nothing follows it: no reply
+        audio, no hang. Matches the `noOp` design (the provider skips the stage rather than
+        calling it).
+      - **That test also demonstrated the `type`-token footgun above**, live: the timeline
+        received TWO `assistant-thinking` fires for one turn, `type: 'tool'`
+        ("Using tool get_local_time") and `type: 'reply'`. Harmless in a timeline; a Flow
+        wired to a *Say* card without the filter would speak the tool name out loud first.
+      - **The *Say* card under `local_tts_provider: 'none'` also verified 2026-08-09**, and
+        it behaves as designed: `textToSpeech()` throws at
+        `local-pipeline-provider.mts:887-888` ("TTS backend is set to 'None' — this device
+        cannot speak…"), the driver's run-listener catches it
+        (`voice-assistant-driver.mts:111-113`) and the Flow editor shows the message rather
+        than the card silently succeeding. That test also surfaced the Sentry-noise bug
+        fixed the same evening ([`COMPLETED.md` §15](./COMPLETED.md)).
+      - **Still open:** the same for the three realtime providers — they should be put in an
+        audio→text mode rather than generating speech that gets thrown away; and this is a
+        GLOBAL setting, so it cannot be per-device the way the original request imagined.
       - **Known trade-offs to document for the user** (both confirmed, not guesses):
         follow-up questions stop working, because continue-conversation keys off the device
         finishing its own playback — every turn needs the wake word again; and the external
@@ -388,7 +385,3 @@ their rationale are in [`COMPLETED.md` §6](./COMPLETED.md) in case any come bac
 Add new work here as it comes up. Reference docs that used to feed this list:
 - [`OPENAI_API_IMPROVEMENTS.md`](./OPENAI_API_IMPROVEMENTS.md) — OpenAI Realtime API audit (all items resolved)
 - [`docs/home-assistant-voice-preview-edition/implementation-gap-analysis.md`](./docs/home-assistant-voice-preview-edition/implementation-gap-analysis.md) — ESPHome native-API coverage vs. the PE docs
-
-**Not tracked but worth remembering before a store release:** ~~the README screenshots
-predate the provider-choice settings redesign and are stale~~ (done 2026-07-26 — replaced with
-five current section screenshots under `.resources/settings_*.png`).

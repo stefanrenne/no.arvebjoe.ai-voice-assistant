@@ -1092,6 +1092,9 @@ is archived separately in §11.
          every value a UUID ("Paul - Neutral (EN-US)" …), zero preset names. Piper
          backend correctly falls back to "Piper server voice" when the server has no
          /voices endpoint.
+47. [x] README screenshots refreshed DONE 2026-07-26 — the old ones predated the
+         provider-choice settings redesign. Replaced with five current per-section
+         screenshots under `.resources/settings_*.png`.
 
 ---
 
@@ -1145,3 +1148,97 @@ underlying libflacjs bug is still there, and any `Buffer` from `readFileSync` wi
 **Also worth knowing:** `npm test` has never run in CI — the GitHub workflows only run
 `homey app validate`. This test's only prior verification was a local run on the owner's machine,
 which is why a latent failure could sit unnoticed.
+
+---
+
+## 14. VoiceAssistantEvent payloads + the silent-wake deadlock (2026-08-06, live-verified 2026-08-09)
+
+**Fix 1 — payloads were silently dropped on the wire.** `stt_end`, `pipeline_error`,
+`intent_progress` and `stt_vad_end` built their payload as a spread property (`{ text }`), which
+`VoiceAssistantEventResponse` has no field for — protobufjs drops unknown fields silently, so the
+device received the bare event type all along and the firmware bailed with *"No text in STT_END
+event"*. They now use the repeated `data` name/value field like `intent_end`/`tts_start`/`tts_end`
+already did, and `vaEvent()` **only** accepts that array so the trap can't come back
+(`tests/esp-voice-assistant-events.test.mts` asserts on the encoded bytes). Same family of bug as
+the `mediaId` vs `media_id` gotcha in §1 — with protobufjs, a wrong field name is not an error,
+it's silence.
+
+**Fix 2 — a turn nobody spoke into never closed, and took the satellite deaf with it.** Server VAD
+only reports the END of speech, so total silence produced no event at all: the mic stayed open
+indefinitely, and because a turn in `listening` arms the duplicate-wake guard, **every later wake
+was dropped until the device reconnected**. A 15 s no-speech timeout (Home Assistant's own
+`VoiceCommandSegmenter` value) now closes the turn the way an empty transcript does — STT_END /
+RUN_END plus the mic-closed cue, no error event. Cleared as soon as VAD hears speech, so a slow
+talker is unaffected.
+
+**Live verification on a real PE, 2026-08-09** (Norwegian, `homey app run --remote`) — all three
+cases clean:
+
+- *Normal turn* — `STT_END` carries its text ("Speech recognised as: 'Hvor mye er klokka?'");
+  `intent_progress` (×9) and `stt_vad_end` arrive without warnings. The firmware's `on_stt_end`
+  trigger fired for the first time ever, with no ill effect.
+- *No API key* — `on_error` received a real payload (`Error: agent-not-connected - API key is
+  missing.`) instead of empty strings, played the pre-recorded FLAC, returned to IDLE.
+- *Wake then total silence* — mic opened 23:39:30, `STT_END` at 23:39:45 (the 15 s timeout; **no**
+  `stt_vad_end` anywhere in the turn), mic-closed chime, RUN_END, no error event. The next wake
+  2 s later ran a full turn end to end — the deaf-until-reconnect regression is gone.
+
+**Three log artifacts that look like bugs and are not** — check here before re-investigating:
+
+- `No text in TTS_START event` — deliberate on the announce path. `voice-assistant-device.mts:434`
+  sends a text-less `tts_start()` **so the firmware discards it**; the firmware's own announcement
+  handler fires `tts_start_trigger_` at playback start. Sending text as well double-fired the
+  replying phase (and was the prime suspect in the 2026-07-02 wake-word death). In-band turns take
+  the other branch at `:558` and *do* pass the text — nothing else fires the trigger there.
+- `No url in TTS_END event` — likewise deliberate on the announce path (`:475`): the FLAC already
+  went over as an announcement. Only the in-band path sends `tts_end(url)`.
+- A **doubled** `run_start … run_end` bracket around an error or a chime — `playUrl()` opens its
+  own bracket (`:1256-1265`) after the error bracket at `:321-323`. Two brackets, two intents.
+
+**Minor, not fixed:** the pre-recorded sounds are fetched from `raw.githubusercontent`
+(`sound-urls.mts:12`), so the error clip started ~4 s after the event where LAN-served replies
+start in well under a second. Only affects error paths.
+
+**Related, verified in the same session:** the spurious-retry window fix (clock measured
+mic-open → mic-**close** rather than → transcript arrival). A hesitant utterance held the mic open
+8 s — 3 s of hesitation before VAD speech-start, transcript 5 s later — and produced exactly one
+run_start/run_end pair and one reply. The old arrival-based clock would have called that spurious
+and fired a retry.
+
+---
+
+## 15. Expected configuration errors no longer reach Sentry (2026-08-09)
+
+Found while live-testing the None-TTS backend. Using the *Say* flow card with
+`local_tts_provider: 'none'` throws by design — but the throw was being filed as an **app crash**:
+
+```
+speakText → LocalPipelineProvider.textToSpeech (throws)
+          → driver run-listener catch  (voice-assistant-driver.mts:112)
+          → this.logger.error('Error speaking text:', err)
+          → Logger.error → reportError   (logger.mts:166, UNCONDITIONAL)
+          → homeyLog.captureException    → Sentry
+```
+
+`Logger.error()` reports **every** error it is handed, so a deliberate user setting generated a
+Sentry event for every user who tried the combination. The per-fingerprint 1 h cooldown
+(`logger.mts`) capped the volume — in the live log the identical second failure 0.54 s later
+produced no `captureException` line — but it did not stop the first.
+
+**Fix — flag the error, not the call site.** `expectedError(message)` in `logger.mts` builds an
+Error carrying `expected = true`; `reportError()` bails at the top on `isExpectedError(error)`.
+Chosen over passing a flag through `logger.error()` because it leaves the ~40 existing call sites
+untouched and travels with the error through any number of catch/rethrow layers. The local log,
+the `[err]` output and the Flow-editor message are all unaffected — only Sentry is skipped.
+
+`local-pipeline-provider.mts` now throws the None-TTS error via `expectedError()`. That is the
+only site changed: the None-**LLM** stage does not throw at all (it emits `response.done` /
+`text.done` and lets the device close the run), and no other `noOp` throw exists.
+
+Tests: `tests/logger-sentry-throttle.test.mts` gains two cases (an expected error is not reported
+but *is* still logged via `homey.error`; an ordinary error raised right after one still is), and
+`tests/local-pipeline-provider.test.mts` asserts the Say-card rejection carries the marker. Suite
+green — 752 passed / 15 skipped; build and lint clean.
+
+**If you add another "you switched this off / you haven't configured this" throw, use
+`expectedError()`** — the default path reports it to Sentry.
