@@ -13,6 +13,7 @@ import { WyomingSttClient } from '../src/llm/providers/local/wyoming-stt-client.
 import { WyomingTtsClient } from '../src/llm/providers/local/wyoming-tts-client.mjs';
 import { LmStudioClient } from '../src/llm/providers/local/lmstudio-client.mjs';
 import { settingsManager } from '../src/settings/settings-manager.mjs';
+import { isExpectedError } from '../src/helpers/logger.mjs';
 import { MockHomey } from './mocks/mock-homey.mjs';
 import { fakeToolManager } from './mocks/mock-tool-manager.mjs';
 
@@ -673,6 +674,19 @@ describe('LocalPipelineProvider', () => {
             const p = await makeNoneProvider();
             try {
                 await expect(p.textToSpeech('hei')).rejects.toThrow(/None/);
+            } finally {
+                p.destroy();
+            }
+        });
+
+        // The user chose this setting, so the throw above must not reach Sentry
+        // as a crash — the driver's catch hands it straight to logger.error(),
+        // which reports every unmarked error it is given.
+        it('marks the Say-card failure as an expected configuration error', async () => {
+            const p = await makeNoneProvider();
+            try {
+                const err = await p.textToSpeech('hei').catch(e => e);
+                expect(isExpectedError(err)).toBe(true);
             } finally {
                 p.destroy();
             }

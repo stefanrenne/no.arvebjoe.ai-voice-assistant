@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createLogger } from '../src/helpers/logger.mjs';
+import { createLogger, expectedError } from '../src/helpers/logger.mjs';
 
 // The Sentry report throttle in Logger.reportError: repeats of the same error
 // (same logger + name + code) within the cooldown must not reach
@@ -73,6 +73,37 @@ describe('Logger Sentry throttle', () => {
         loggerB.error('TCP connection error', netError('ECONNREFUSED', 'connect ECONNREFUSED 10.0.0.52:6053'));
 
         expect(homeyLog.captureException).toHaveBeenCalledTimes(3);
+    });
+
+    // expectedError(): outcomes of the user's own configuration (e.g. the "Say"
+    // card with the TTS backend set to "None"). They must still be logged and
+    // still surface to the user, but they are not app faults and must never be
+    // filed as crashes.
+    it('never reports an expected configuration error to Sentry', () => {
+        vi.setSystemTime(new Date('2026-08-09T22:00:00Z'));
+        const homeyLog = mockHomeyLog();
+        const homey = mockHomey();
+        const logger = createLogger('THROTTLE-F');
+        logger.setHomey(homey, homeyLog);
+
+        logger.error('Error speaking text:', expectedError(
+            "TTS backend is set to 'None' — this device cannot speak. Choose a TTS backend in the app settings."));
+
+        expect(homeyLog.captureException).not.toHaveBeenCalled();
+        // ...but the user-facing/local log still happened.
+        expect(homey.error).toHaveBeenCalled();
+    });
+
+    it('still reports ordinary errors raised alongside expected ones', () => {
+        vi.setSystemTime(new Date('2026-08-09T23:00:00Z'));
+        const homeyLog = mockHomeyLog();
+        const logger = createLogger('THROTTLE-G');
+        logger.setHomey(mockHomey(), homeyLog);
+
+        logger.error('Error speaking text:', expectedError('TTS backend is set to None'));
+        logger.error('Error speaking text:', new Error('Piper returned HTTP 500'));
+
+        expect(homeyLog.captureException).toHaveBeenCalledTimes(1);
     });
 
     it('distinguishes code-less errors by log message', () => {

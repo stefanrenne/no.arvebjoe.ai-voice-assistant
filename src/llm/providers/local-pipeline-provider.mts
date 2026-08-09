@@ -1,6 +1,6 @@
 import { EventEmitter } from "events";
 import { TypedEmitter } from "tiny-typed-emitter";
-import { createLogger } from "../../helpers/logger.mjs";
+import { createLogger, expectedError } from "../../helpers/logger.mjs";
 import { ToolManager } from "../tool-manager.mjs";
 import { IVoiceProvider, VoiceProviderEvents, VoiceProviderOptions } from "../voice-provider.mjs";
 import { InstructionState } from "../instruction-state.mjs";
@@ -883,9 +883,10 @@ export class LocalPipelineProvider extends (EventEmitter as new () => TypedEmitt
     async textToSpeech(text: string): Promise<Buffer> {
         // Fail loudly rather than serving a silent file: with the TTS stage off
         // there is nothing that can speak, and the "Say" flow card surfaces this
-        // message to the user in the Flow editor.
+        // message to the user in the Flow editor. expectedError() keeps it out
+        // of Sentry — the user chose this setting, it is not an app fault.
         if (this.tts.noOp) {
-            throw new Error("TTS backend is set to 'None' — this device cannot speak. Choose a TTS backend in the app settings.");
+            throw expectedError("TTS backend is set to 'None' — this device cannot speak. Choose a TTS backend in the app settings.");
         }
         const { pcm, sampleRate } = await this.tts.synthesize(text);
         const pcm24k = resamplePcm16Mono(pcm, sampleRate, OUTPUT_SAMPLE_RATE);

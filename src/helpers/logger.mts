@@ -61,6 +61,31 @@ function maskSecrets(details: any): any {
 }
 
 
+/**
+ * Build an Error that is an EXPECTED consequence of how the user configured the
+ * app, not a fault in it — e.g. using the "Say" flow card while the TTS backend
+ * is set to "None".
+ *
+ * These still throw, still reach the local log, and still surface to the user
+ * (the Flow editor shows the message). What they must NOT do is reach Sentry:
+ * `Logger.error()` reports every error it is handed, so without this marker a
+ * deliberate setting is filed as an app crash — one event per user who tries
+ * the combination. `reportError()` drops anything carrying the flag.
+ */
+export function expectedError(message: string): Error {
+    const err = new Error(message);
+    (err as ExpectedError).expected = true;
+    return err;
+}
+
+type ExpectedError = Error & { expected?: boolean };
+
+/** True for errors built by `expectedError()` (user configuration, not a bug). */
+export function isExpectedError(error: unknown): boolean {
+    return (error as ExpectedError)?.expected === true;
+}
+
+
 class Logger {
     private from: string;
     private disabled: boolean;
@@ -211,6 +236,13 @@ class Logger {
      * costs one Sentry event per hour instead of thousands per day.
      */
     reportError(error: Error, context?: string) {
+        // Configuration outcomes are not crashes — see expectedError(). The
+        // local log and the user-facing message still happen; only Sentry is
+        // skipped.
+        if (isExpectedError(error)) {
+            return;
+        }
+
         const homeyLog = Logger.homeyLog;
         if (!homeyLog || !homeyLog.captureException) {
             return;
