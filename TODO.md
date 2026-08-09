@@ -9,6 +9,24 @@
       files. Centralizing provider lifecycle state was deliberately declined under M7 and
       belongs here if it is ever done.
 
+## Turn robustness — nothing caps how long one utterance may run
+
+- [ ] **Add a maximum-utterance cap to the turn.** `NO_SPEECH_TIMEOUT_MS` (15 s,
+      `voice-assistant-device.mts:132`) is the only clock on an open mic, and it is **cleared
+      outright** the moment the provider's VAD reports speech (`:753`). After that the sole
+      thing that can end the turn is the provider's `silence` event — server VAD has no maximum
+      duration — so a mic feed that never goes quiet enough pins the state machine in
+      `listening` **forever**. The satellite sits on its listening page and stops answering.
+      Found while triaging the M5Stack hang report (2026-08-10); it is not M5Stack-specific,
+      but aggressive on-device AGC (`auto_gain: 31dBFS` + `volume_multiplier: 2.0`) pumping
+      room noise between words is a plausible trigger.
+
+      The fix is to make `speech` lower the net to a floor rather than cancel it. Mind
+      `tests/voice-assistant-device.test.mts` — the case *"stands down once VAD hears speech,
+      however long the user then talks"* asserts today's behaviour deliberately and has to be
+      rewritten alongside. Users now have a manual escape hatch (switching the tile's *Start
+      conversation* off cancels the turn), so this is a robustness item, not an emergency.
+
 ## ReSpeaker XVF3800 driver — needs hardware verification
 
 Driver written 2026-07-28 from the community ESPHome config alone (**no hardware was
@@ -58,27 +76,57 @@ config exposes no other identifying string (no `project:`, no `board:` → `mode
 `esp32-s3-devkitc-1`). Manual entry now accepts an unidentified-but-voice-capable device; see
 [`docs/m5stack-atoms3r/README.md`](./docs/m5stack-atoms3r/README.md#identity-defaults--user-editable).
 
-- [ ] **Pair a real device end to end** — mDNS scan, manual IP, and the encrypted (Noise) path.
-      Encrypted manual entry is the closest to confirmed (everything up to the identity check
-      worked); the **mDNS scan on a stock-named unit is still completely unverified**, as is
-      whether the device works once added.
-- [ ] **Confirm the identity sniff fires** on a device with its **stock** name. We match
-      `atoms3r` / `echo base` / `echo-base` / `m5stack` in HelloResponse/DeviceInfoResponse,
-      ordered after `xiaozhi`. The one field report so far came from a renamed device, so this
-      is still untested — and a renamed device will not appear in the network scan at all.
-- [ ] **Check `voice_assistant_feature_flags`** — TIMERS and ANNOUNCE are certain from the
-      config; START_CONVERSATION is assumed, not verified.
-- [ ] **Verify mic levels with `mic_gain` at 0 (1×).** The config runs on-device
-      `auto_gain: 31dBFS` + `volume_multiplier: 2.0`, so it should be PE-like — but that AGC is
-      aggressive; watch for clipping on close-up speech as well as missed distant speech.
+**Second hardware report, 2026-08-10 — the core loop works.** With `friendly_name` temporarily
+set to *"Mikro EG AtomS3R"* (the workaround for the identity miss above, no longer needed once
+`3020e3d` ships) the tester confirmed: **pairing completes and the device lists correctly**, the
+**wake word → question → spoken reply loop works**, and the **microphone hears him from across
+the room** at `mic_gain` 1× — so the no-`defaultMicGain`-override call was right, and the sniff
+branch does fire on the `atoms3r` token. No clipping reported on close-up speech either.
+
+What he found broken heads the list below. Note how many of them are **"the command seems not to
+arrive"** shaped, and reading M5Stack's YAML against our code found no defect on our side: the
+mute switch really is `mute_microphone` (`scoreMuteCandidate()` scores it 1), the vendored
+`es8311` component does implement `set_volume`, ESPHome applies volume to the *announcement*
+speaker (our playback path) and `volume_min: 0.5`/`volume_max: 0.8` still spans roughly −32 dB
+to +6.5 dB at the DAC. **All of it is blocked on the ESPHome device log** — `logger: level: DEBUG`
+is already on in the stock config and the tester flashes his own firmware, so one log covering a
+mute, a volume change, a timer and a hang settles all four at once. Requested 2026-08-10.
+
+- [ ] **Mute switch does not work** (field report). Wiring looks correct end to end; needs the
+      device log to see whether `SwitchCommandRequest` arrives and whether `microphone.mute`
+      runs. Cosmetic firmware quirk to expect while reading it: `on_announcement` paints the
+      muted page during *any* announcement, so the mic-off icon is not proof of a mute.
+- [ ] **Volume does not work** (field report). Same: needs the log to see whether
+      `MediaPlayerCommandRequest` arrives. The clamp is not the explanation.
+- [ ] **`onoff` appears to do nothing** (field report). It should chime and open the mic
+      (announce + `start_conversation`). ESPHome sets ANNOUNCE **and** START_CONVERSATION
+      whenever the VA has a `media_player:`, and this config does — so if it genuinely does
+      nothing, that is a real bug. The tile is now labelled *"Start conversation"* and off
+      cancels the running turn, which removes the "is this a power switch?" confusion but not
+      the underlying report.
+- [ ] **No timer finish chime** (field report). `on_timer_finished` → `switch.turn_on:
+      timer_ringing` → repeat-plays `timer_finished_sound`, and `set_has_timers(True)` follows
+      from `on_timer_finished` alone, so `FEATURE_TIMERS` *is* advertised and our timer tool
+      registers. First thing to establish: did the assistant **say** it had set the timer? If
+      not this is the Norwegian phrasing miss under "Watch items", not a device problem.
+      **The missing countdown is expected and won't be fixed** — the firmware has no timer UI at
+      all (`voice_assist_timer_finished_phase_id: "20"` is defined but never appears as a `case`
+      in `draw_display`, so it falls through to the idle page).
+- [ ] **Session hangs — "stayed in listening mode and did not exit"** (field report). Prime
+      suspect is the missing max-utterance cap (own section above), which this hardware's
+      `auto_gain: 31dBFS` could plausibly trigger. Firmware-side candidate to rule out from the
+      log: `on_end` contains an **unbounded** `wait_until (not media_player.is_announcing AND
+      not speaker.is_playing)` before it restarts `micro_wake_word` — if that never resolves the
+      device goes deaf with no recovery.
+- [ ] **Confirm the identity sniff on a device with its STOCK name**, and the **mDNS scan** with
+      it. Both field reports came from renamed units, and a renamed device never appears in the
+      network scan — manual IP is the documented route for those.
 - [ ] **Tune `initial_audio_skip` / `followup_audio_skip`** against the wake sound; both
       default to 0 and were never measured on this hardware.
-- [ ] **Confirm the mute switch is `mute_microphone`** ("Mute Microphone" template switch) and
-      that `volume_mute` actually mutes the mic.
-- [ ] **Check the volume clamp.** The media player has `volume_min: 0.5` / `volume_max: 0.8`;
-      verify Homey's 0–1 `volume_set` maps sensibly onto that window.
 - [ ] **Replace the stand-in artwork.** `drivers/m5stack-atoms3r/assets/` holds a drawn
       stylised front view, not a product photo. Swap in real images before the store release.
+- [ ] **Ship a test build carrying `3020e3d`** so the tester can drop the rename workaround.
+      The fix is on `dev` only; the build he tested predates it.
 
 ## Deferred with a deadline
 
