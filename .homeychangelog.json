@@ -46,5 +46,8 @@
   },
   "1.4.9": {
     "en": "Web search now checks its own answer and searches again when it comes back vague, and says \"let me look that up\" while it works. Fixes: a wake word followed by silence could leave the device deaf until it reconnected; the Voice PE now receives the transcript and real error details from the app; and an M5Stack AtomS3R you renamed in ESPHome no longer fails to pair — add it by entering its IP address."
+  },
+  "1.4.10": {
+    "en": "The on/off switch on the device tile is now called \"Start conversation\", because that is what it does: switch it on and the device chimes and listens, so you can speak without saying the wake word. Switching it off now cancels a conversation that is running — useful if the device is stuck listening. In the custom pipeline you can now set the language model or the speech output to \"None\": with no language model the device just sends you what it heard, for your own Flows to answer; with no speech output the answer comes back as text so a Flow can speak it on another speaker."
   }
 }
