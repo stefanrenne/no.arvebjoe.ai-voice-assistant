@@ -12,6 +12,19 @@
     "timer_remaining",
     "timer_name"
   ],
+  "capabilitiesOptions": {
+    "onoff": {
+      "title": {
+        "en": "Start conversation"
+      },
+      "insightsTitleTrue": {
+        "en": "Conversation started"
+      },
+      "insightsTitleFalse": {
+        "en": "Conversation ended"
+      }
+    }
+  },
   "platforms": [
     "local"
   ],

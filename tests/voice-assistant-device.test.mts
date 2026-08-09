@@ -189,6 +189,57 @@ describe('VoiceAssistantDevice (harness)', () => {
         });
     });
 
+    // The tile's quick action is `onoff`, but the satellite has no power state:
+    // on = open the mic without the wake word, off = cancel the running turn.
+    // Off used to be dropped on the floor, which made the control look broken.
+    describe('onoff capability — start / cancel a conversation', () => {
+        it('on opens the mic without the wake word, carrying the listening chime', async () => {
+            const h = await createHarness();
+
+            await (h.device as any).invokeCapabilityListener('onoff', true);
+
+            const reopens = h.esp.calls.filter((c: any) => c.method === 'send_voice_assistant_request');
+            expect(reopens).toHaveLength(1);
+            expect(reopens[0].args[0]).toContain('listening_chime.flac');
+        });
+
+        it('off cancels a turn that is in flight', async () => {
+            const h = await createHarness();
+            startTurn(h);
+            expect((h.device as any).turn.isListening).toBe(true);
+
+            await (h.device as any).invokeCapabilityListener('onoff', false);
+
+            expect((h.device as any).turn.isListening).toBe(false);
+            // The device is told to leave its listening state, and the user asked
+            // for this — so no error chime, unlike a mid-turn failure.
+            expect(h.esp.countOf('pipeline_error')).toBe(1);
+            expect(h.esp.countOf('run_end')).toBe(1);
+            expect(h.esp.countOf('playAudioFromUrl')).toBe(0);
+        });
+
+        it('off on an idle satellite is a silent no-op', async () => {
+            const h = await createHarness();
+
+            await (h.device as any).invokeCapabilityListener('onoff', false);
+
+            expect(h.esp.countOf('pipeline_error')).toBe(0);
+            expect(h.esp.countOf('run_end')).toBe(0);
+        });
+
+        it('accepts a new wake after a cancel (cancel is not wake-death)', async () => {
+            const h = await createHarness();
+            startTurn(h);
+            await (h.device as any).invokeCapabilityListener('onoff', false);
+
+            const runStarts = h.esp.countOf('run_start');
+            startTurn(h);
+
+            expect(h.esp.countOf('run_start')).toBe(runStarts + 1);
+            expect((h.device as any).turn.isListening).toBe(true);
+        });
+    });
+
     describe('M3 — onSettings applies the NEW values', () => {
         it('recomputes audio-skip from newSettings, not the stale getSettings()', async () => {
             const h = await createHarness({ settings: { initial_audio_skip: 300 } });

@@ -9,6 +9,19 @@
     "onoff",
     "volume_mute"
   ],
+  "capabilitiesOptions": {
+    "onoff": {
+      "title": {
+        "en": "Start conversation"
+      },
+      "insightsTitleTrue": {
+        "en": "Conversation started"
+      },
+      "insightsTitleFalse": {
+        "en": "Conversation ended"
+      }
+    }
+  },
   "platforms": [
     "local"
   ],

@@ -1210,14 +1210,32 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
   private RegisterCapabilities() {
 
 
+    // NOT a power switch, despite being the tile's quick action: on = "talk to me
+    // without the wake word" (announce + start_conversation), off = cancel the turn
+    // that is running. Every driver.compose.json retitles it via capabilitiesOptions
+    // — left generic it reads as "power the satellite off", which is exactly how the
+    // first M5Stack tester read it.
+    //
+    // The app also WRITES this capability as a status flag (true on wake, false at
+    // every turn end). setCapabilityValue does not re-enter the listener, so those
+    // writes cannot come back through here as a cancel.
     this.registerCapabilityListener('onoff', async (value: boolean) => {
       this.logger.info(`Capability onoff changed to: ${value}`);
-      if (this.esp && value) {
-        try {
+      if (!this.esp) {
+        return;
+      }
+      try {
+        if (value) {
           this.reopenMic();
-        } catch (error) {
-          this.logger.error('Error sending voice assistant request:', error);
+        } else {
+          // Silent no-op when nothing is in flight (both abort() calls report
+          // wasActive false and nothing is sent to the device), so switching off an
+          // idle satellite costs nothing. playError stays false: the user asked for
+          // this, so the failure chime would be wrong.
+          this.abortCurrentTurn('cancelled from the device tile');
         }
+      } catch (error) {
+        this.logger.error('Error handling the onoff capability:', error);
       }
     });
 

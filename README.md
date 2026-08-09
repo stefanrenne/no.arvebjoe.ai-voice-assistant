@@ -494,9 +494,14 @@ assistant doesn't hear you from a distance; lower it if loud close-up speech get
 
 ### Device tile
 
-Each voice device appears in Homey with on/off (session), **volume** and **mute** controls.
-While a timer runs, the tile also shows the timer's **name** and **time remaining**, counting
-down live.
+Each voice device appears in Homey with a **Start conversation** toggle, **volume** and **mute**
+controls. While a timer runs, the tile also shows the timer's **name** and **time remaining**,
+counting down live.
+
+**Start conversation is not a power switch** — the satellite has no software power state. Switch
+it *on* and the device chimes and opens its microphone, so you can speak without saying the wake
+word. Switch it *off* to cancel a conversation that is already running. It also reflects status:
+it turns itself on whenever the assistant wakes and off again when the turn ends.
 
 ### Flow cards
 
@@ -508,13 +513,14 @@ down live.
 * **Thinking** — the assistant produced a reply or used a tool ("Using tool get_devices"); the
   message is a **text** tag and a **type** tag says whether it was a `tool` call or the final
   `reply`. Combine with *Heard something* to follow a whole conversation on the timeline
-* Plus standard device triggers (turned on/off, volume changed)
+* Plus standard device triggers (*Start conversation* turned on/off — i.e. a conversation
+  started or ended — and volume changed)
 
 **Conditions (And…)**
 
 * Is muted
 * A timer is / is not running
-* Plus the standard "is turned on" condition
+* Plus the standard "is turned on" condition (true while a conversation is running)
 
 **Actions (Then…)**
 
@@ -524,7 +530,8 @@ down live.
 * **Say** something — text-to-speech on the device speaker
 * **Play an audio URL** on the device speaker (must be **.flac**)
 * **Start a timer** / **Cancel the timer**
-* Plus standard device actions (turn on/off, set volume, mute/unmute)
+* Plus standard device actions (*Start conversation* on = open the mic without the wake word,
+  off = cancel the running conversation; set volume; mute/unmute)
 
 > Names may vary slightly as the app evolves — see the in-app Flow picker for the authoritative
 > list.
