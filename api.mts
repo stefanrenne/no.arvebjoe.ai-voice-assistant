@@ -3,6 +3,9 @@ import { testLocalStage, StageTestRequest, StageTestResult } from './src/llm/pro
 import { getLmStudioContext, LmStudioContextResult } from './src/llm/providers/local/lmstudio-context.mjs';
 import { computeFeatureCosts, FeatureCostReport } from './src/settings/feature-costs.mjs';
 import { sendTestLogLine, RemoteLogTestRequest, RemoteLogTestResult } from './src/helpers/remote-log.mjs';
+import { seenDevices, SeenDeviceView } from './src/helpers/seen-devices.mjs';
+import { probeEspDevice } from './src/voice_assistant/esp-probe.mjs';
+import { recordingRegistry, Recording } from './src/helpers/recording-registry.mjs';
 
 /**
  * App Web API — called from the settings page via `Homey.api(...)`.
@@ -73,5 +76,69 @@ export default {
      */
     async testRemoteLog({ body }: { body: RemoteLogTestRequest }): Promise<RemoteLogTestResult> {
         return sendTestLogLine(body);
+    },
+
+    /**
+     * GET /seen-devices — every ESPHome device Homey's mDNS discovery has
+     * surfaced (see DiscoveryWatcher), with the fields the pair flow matches on
+     * and the outcome of the capability probe. Backs the Debug page's
+     * "Last seen devices" list.
+     */
+    async getSeenDevices(): Promise<{ devices: SeenDeviceView[]; now: number }> {
+        return { devices: seenDevices.list(), now: Date.now() };
+    },
+
+    /**
+     * POST /probe-device — re-run the capability probe for one entry in that
+     * list (the "Probe" button), so a device that was booting when the
+     * background probe ran can be re-checked without a pair session. Never
+     * throws: an unreachable device comes back as a probe status.
+     */
+    async probeSeenDevice({ homey, body }: { homey: any; body: { id?: string; encryptionKey?: string } }): Promise<{ ok: boolean; message: string; device?: SeenDeviceView }> {
+        const id = (body?.id ?? '').trim();
+        const entry = id ? seenDevices.get(id) : undefined;
+        if (!entry) {
+            return { ok: false, message: 'Unknown device' };
+        }
+        if (!entry.address) {
+            return { ok: false, message: 'No address known for this device' };
+        }
+
+        const result = await probeEspDevice(homey, {
+            host: entry.address,
+            port: entry.port,
+            encryptionKey: (body?.encryptionKey ?? '').trim() || undefined,
+            timeoutMs: 6000,
+        });
+        seenDevices.recordProbe(id, result, 'manual');
+
+        return {
+            ok: result.status === 'accessible',
+            message: result.message || result.status,
+            device: seenDevices.list().find((d) => d.id === id),
+        };
+    },
+
+    /**
+     * GET /recordings — the retained microphone recordings ("what did I just
+     * say?"), newest first, with what speech-to-text made of each one.
+     */
+    async getRecordings(): Promise<{ recordings: Recording[]; now: number }> {
+        return { recordings: recordingRegistry.list(), now: Date.now() };
+    },
+
+    /**
+     * POST /play-recording — play one retained recording back on the satellite
+     * that recorded it. The settings webview can't play the LAN audio URL
+     * itself (it is served over plain http), so playback goes to the device.
+     */
+    async playRecording({ body }: { body: { id?: string } }): Promise<{ ok: boolean; message: string }> {
+        const id = (body?.id ?? '').trim();
+        const recording = id ? recordingRegistry.get(id) : undefined;
+        if (!recording) {
+            return { ok: false, message: 'That recording is gone (retention window passed)' };
+        }
+        const result = await recordingRegistry.play([recording]);
+        return { ok: result.played > 0, message: result.message };
     },
 };

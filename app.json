@@ -86,6 +86,22 @@
     "testRemoteLog": {
       "method": "POST",
       "path": "/test-remote-log"
+    },
+    "getSeenDevices": {
+      "method": "GET",
+      "path": "/seen-devices"
+    },
+    "probeSeenDevice": {
+      "method": "POST",
+      "path": "/probe-device"
+    },
+    "getRecordings": {
+      "method": "GET",
+      "path": "/recordings"
+    },
+    "playRecording": {
+      "method": "POST",
+      "path": "/play-recording"
     }
   },
   "esm": true,

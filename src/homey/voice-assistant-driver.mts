@@ -1,6 +1,7 @@
 import Homey from 'homey';
-import { EspVoiceAssistantClient } from '../voice_assistant/esp-voice-assistant-client.mjs';
 import { NoiseFrameCodec } from '../voice_assistant/noise-frame-codec.mjs';
+import { probeEspDevice } from '../voice_assistant/esp-probe.mjs';
+import { seenDevices } from '../helpers/seen-devices.mjs';
 import { PairDevice } from '../helpers/interfaces.mjs';
 import VoiceAssistantDevice from './voice-assistant-device.mjs';
 import { createLogger } from '../helpers/logger.mjs';
@@ -148,6 +149,23 @@ export default abstract class VoiceAssistantDriver extends Homey.Driver {
     }
 
     /**
+     * The strategy's current results, recorded in the Debug page's "last seen
+     * devices" list on the way through (a pair session is the one moment we
+     * KNOW discovery is being looked at, so the list is never staler than what
+     * the user just saw in the pair dialog).
+     */
+    private discoveryResults(): any[] {
+        const strategy = this.getDiscoveryStrategy();
+        if (!strategy) {
+            this.logger.info('No discovery strategy configured for this driver');
+            return [];
+        }
+        const results = Object.values(strategy.getDiscoveryResults());
+        for (const r of results) seenDevices.recordDiscovery(r as any);
+        return results;
+    }
+
+    /**
      * Convert a Homey Discovery result to our PairDevice shape.
      */
     private resultToDevice(r: any): PairDevice {
@@ -194,115 +212,63 @@ export default abstract class VoiceAssistantDriver extends Homey.Driver {
     }
 
     /**
-     * Returns enriched device if it supports voice, otherwise null. Ensures
-     * cleanup + timeout. `definitive` tells the caller whether the outcome is
-     * final (the device answered and identified itself — match or mismatch) or
-     * transient (timeout / connection failure — e.g. a satellite whose mDNS is
-     * already up but whose API server is still booting), so background re-scans
-     * can retry transient failures without hammering known-foreign devices.
+     * Returns enriched device if it supports voice, otherwise null. `definitive`
+     * tells the caller whether the outcome is final (the device answered and
+     * identified itself — match or mismatch) or transient (timeout / connection
+     * failure — e.g. a satellite whose mDNS is already up but whose API server
+     * is still booting), so background re-scans can retry transient failures
+     * without hammering known-foreign devices.
+     *
+     * The connection itself is probeEspDevice() — shared with the Debug page's
+     * "last seen devices" list, so its star means exactly what pairing means.
+     * Every outcome is recorded there too.
      */
     private async checkVoiceCapabilities(device: PairDevice, timeoutMs = 5000): Promise<{ device: PairDevice | null; definitive: boolean }> {
+        const result = await probeEspDevice(this.homey, {
+            host: device.store.address,
+            port: device.store.port,
+            timeoutMs,
+        });
+        seenDevices.recordProbe(String(device.data.id), result, 'pairing');
 
-        let client: EspVoiceAssistantClient | null = null;
-        let done = false;
-        let intentionalDisconnect = false;
-        let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+        this.logger.info(`Probed ${device.name}`, undefined, result);
 
-        return new Promise<{ device: PairDevice | null; definitive: boolean }>((resolve) => {
-            const finish = async (result: PairDevice | null, definitive: boolean) => {
-                if (done) return;
-                done = true;
-
-                if (timeoutHandle !== null) {
-                    this.homey.clearTimeout(timeoutHandle);
-                    timeoutHandle = null;
+        switch (result.status) {
+            case 'accessible':
+                if (this.thisAssistantType === result.deviceType) {
+                    this.logger.info(`Found matching device: ${result.deviceType}`);
+                    device.store.deviceType = result.deviceType;
+                    return { device, definitive: true };
                 }
+                // Answered and identified itself as another model — a final no.
+                return { device: null, definitive: true };
 
-                // stop further handlers from flipping the result
-                try {
-                    intentionalDisconnect = true;
-                    client?.off?.('capabilities', onCapabilities as any);
-                    client?.off?.('Unhealthy', onDisconnected as any);
-                    client?.off?.('requires_encryption', onRequiresEncryption as any);
-                } catch { }
-
-                try {
-                    if (client) await client.disconnect();
-                } catch { }
-                client = null;
-
-                resolve({ device: result, definitive });
-            };
-
-            const onCapabilities = async (mediaPlayersCount: number, subscribeVoiceAssistantCount: number, voiceAssistantConfigurationCount: number, deviceType: string | null) => {
-
-                this.logger.info(`Capabilities from ${device.name}`, undefined, {
-                    mediaPlayersCount,
-                    subscribeVoiceAssistantCount,
-                    voiceAssistantConfigurationCount,
-                    deviceType,
-                });
-
-                if (this.thisAssistantType == deviceType && mediaPlayersCount > 0 && subscribeVoiceAssistantCount > 0 && voiceAssistantConfigurationCount > 0) {
-                    this.logger.info(`Found matching device: ${deviceType}`);
-                    device.store.deviceType = deviceType;
-                    await finish(device, true);
-                } else {
-                    // Explicitly reject devices that don't match our type
-                    await finish(null, true);
-                }
-            };
-
-            const onDisconnected = async () => {
-                // Ignore if *we* initiated the disconnect after success/finish
-                if (!intentionalDisconnect && !done) {
-                    await finish(null, false);
-                }
-            };
+            case 'not_a_match':
+                return { device: null, definitive: true };
 
             // The device refuses plaintext (it has an API encryption key set), so
             // its identity can't be probed. Where the pair flow can collect a key
             // (PE/TR), list it anyway — selecting it routes to manual entry with
             // the address prefilled. Otherwise it's a definitive reject.
-            const onRequiresEncryption = async () => {
+            case 'requires_encryption':
                 if (this.supportsEncryptedPairing && this.encryptedResultMatchesDriver(device)) {
                     this.pairLogger.info(`${device.name} has API encryption enabled — listing it; selection routes to manual entry`);
-                    await finish(this.markRequiresEncryption(device), true);
-                    return;
+                    return { device: this.markRequiresEncryption(device), definitive: true };
                 }
                 this.pairLogger.info(`${device.name} has API encryption enabled — add it via manual IP entry with its encryption key`);
-                await finish(null, true);
-            };
+                return { device: null, definitive: true };
 
-            (async () => {
-                try {
-                    client = new EspVoiceAssistantClient(this.homey, {
-                        host: device.store.address,
-                        apiPort: device.store.port,
-                        discoveryMode: true,
-                    });
-
-                    client.on('capabilities', onCapabilities as any);
-                    client.on?.('Unhealthy', onDisconnected as any);
-                    client.on?.('requires_encryption', onRequiresEncryption as any);
-
-                    await client.start();
-
-                    timeoutHandle = this.homey.setTimeout(() => { void finish(null, false); }, timeoutMs);
-                } catch {
-                    // finish() also tears down a half-constructed client (the old
-                    // code resolved here without cleanup and leaked it).
-                    await finish(null, false);
-                }
-            })();
-        });
+            default:
+                // unreachable / timeout / encryption_error — retryable.
+                return { device: null, definitive: false };
+        }
     }
 
     /**
      * Probe a manually-entered IP/port (mDNS-free path). Connects directly, waits
      * for the capabilities handshake, and — if the device answers as this
-     * driver's model, or as no known model at all (see onCapabilities) — builds
-     * a PairDevice from the handshake identity
+     * driver's model, or as no known model at all (see the identity check
+     * below) — builds a PairDevice from the handshake identity
      * (DeviceInfoResponse), deriving a stable id from the MAC so it matches the
      * mDNS discovery id ({{txt.mac}}) and DHCP moves are still tracked if the
      * device later appears over mDNS. Returns null (with a reason) when the host
@@ -313,120 +279,78 @@ export default abstract class VoiceAssistantDriver extends Homey.Driver {
      * plaintext_device, requires_encryption, invalid_key) for the pair view.
      */
     private async probeManualEntry(address: string, port: number, encryptionKey?: string, timeoutMs = 8000): Promise<{ device: PairDevice | null; reason: string }> {
-        let client: EspVoiceAssistantClient | null = null;
-        let done = false;
-
-        return new Promise<{ device: PairDevice | null; reason: string }>((resolve) => {
-            const finish = async (device: PairDevice | null, reason: string) => {
-                if (done) return;
-                done = true;
-                try {
-                    client?.off?.('capabilities', onCapabilities as any);
-                    client?.off?.('Unhealthy', onUnhealthy as any);
-                    client?.off?.('requires_encryption', onRequiresEncryption as any);
-                    client?.off?.('encryption_error', onEncryptionError as any);
-                } catch { }
-                try {
-                    if (client) await client.disconnect();
-                } catch { }
-                client = null;
-                resolve({ device, reason });
-            };
-
-            const onCapabilities = async (mediaPlayersCount: number, subscribeVoiceAssistantCount: number, voiceAssistantConfigurationCount: number, deviceType: string | null) => {
-                // Structural check: does it actually speak the voice-assistant API?
-                // This part is non-negotiable on every path.
-                const isVoiceCapable = mediaPlayersCount > 0
-                    && subscribeVoiceAssistantCount > 0
-                    && voiceAssistantConfigurationCount > 0;
-
-                // Identity check, deliberately laxer here than in discovery. A null
-                // deviceType means the sniff found no product token — which is the
-                // NORMAL outcome for renamed DIY firmware: the M5Stack and ReSpeaker
-                // configs carry no project: block and no board:, so their only
-                // identifying strings are the user-editable name/friendly_name (a
-                // device renamed "Mikro EG" is unidentifiable). Typing an IP into
-                // this view IS the user asserting the model, so accept an
-                // unidentified-but-capable device rather than reject it with a
-                // message the user has no way to act on. A device that positively
-                // identified as a DIFFERENT model is still rejected — that is a real
-                // mismatch (wrong driver), not missing information.
-                // Discovery stays strict: there, listing unidentified devices under
-                // every driver is exactly the confusion the sniff exists to prevent.
-                const identityConflicts = deviceType !== null && deviceType !== this.thisAssistantType;
-
-                if (!isVoiceCapable || identityConflicts) {
-                    this.pairLogger.info(`Manual entry ${address}:${port} answered but is not a matching device`, undefined, { deviceType, mediaPlayersCount, subscribeVoiceAssistantCount, voiceAssistantConfigurationCount });
-                    await finish(null, 'not_a_match');
-                    return;
-                }
-
-                if (deviceType === null) {
-                    this.pairLogger.info(`Manual entry ${address}:${port} carries no recognisable model token — accepting it as '${this.thisAssistantType}' on the user's say-so (voice-capable)`);
-                }
-
-                const mac = client?.getMacAddress() || '';
-                const friendly = client?.getFriendlyName() || '';
-                const device: PairDevice = {
-                    name: friendly || `ESPHome ${address}`,
-                    // Prefer the MAC so the id matches the mDNS discovery id; fall
-                    // back to host:port only when the device withheld its MAC.
-                    data: { id: mac || `${address}:${port}` },
-                    store: {
-                        address,
-                        port,
-                        mac: mac || undefined,
-                        // Record the model the device is paired AS: the sniffed type
-                        // when it identified itself, otherwise the driver the user
-                        // chose. Nothing reads this at runtime today, but a null here
-                        // would be a trap for anything that later does.
-                        deviceType: deviceType ?? this.thisAssistantType,
-                        // The key the probe just succeeded with — every future
-                        // connection to this device needs it.
-                        encryptionKey: encryptionKey || undefined,
-                    },
-                    // Mirror it into the user-editable device setting so it is
-                    // visible/fixable without re-pairing.
-                    settings: encryptionKey ? { encryption_key: encryptionKey } : undefined,
-                };
-                this.pairLogger.info(`Manual entry ${address}:${port} matched: ${device.name} (${device.data.id})${encryptionKey ? ' [encrypted]' : ''}`);
-                await finish(device, 'ok');
-            };
-
-            const onUnhealthy = async () => {
-                await finish(null, 'unreachable');
-            };
-
-            // Plaintext probe against an encrypted device: the key is missing.
-            const onRequiresEncryption = async () => {
-                await finish(null, 'requires_encryption');
-            };
-
-            // Noise-path failures map straight to pair-view reasons:
-            // wrong_key / plaintext_device / mac_mismatch / invalid_key /
-            // protocol_error (see EspVoiceEvents.encryption_error).
-            const onEncryptionError = async (code: string) => {
-                this.pairLogger.info(`Manual probe ${address}:${port} encryption error: ${code}`);
-                await finish(null, code);
-            };
-
-            try {
-                client = new EspVoiceAssistantClient(this.homey, {
-                    host: address,
-                    apiPort: port,
-                    discoveryMode: true,
-                    encryptionKey: encryptionKey || undefined,
-                });
-                client.on('capabilities', onCapabilities as any);
-                client.on?.('Unhealthy', onUnhealthy as any);
-                client.on?.('requires_encryption', onRequiresEncryption as any);
-                client.on?.('encryption_error', onEncryptionError as any);
-                client.start().catch(() => { finish(null, 'unreachable'); });
-                this.homey.setTimeout(() => { if (!done) finish(null, 'timeout'); }, timeoutMs).unref?.();
-            } catch {
-                finish(null, 'unreachable');
-            }
+        const result = await probeEspDevice(this.homey, {
+            host: address,
+            port,
+            encryptionKey,
+            timeoutMs,
         });
+
+        // A manually-probed device belongs in the debug list too — it is exactly
+        // the case where mDNS didn't deliver. Keyed by the same id the pair
+        // result would carry.
+        seenDevices.recordProbe(result.mac || `${address}:${port}`, result, 'pairing');
+
+        // Identity check, deliberately laxer here than in discovery. A null
+        // deviceType means the probe found no product token — which is the
+        // NORMAL outcome for renamed DIY firmware: the M5Stack and ReSpeaker
+        // configs carry no project: block and no board:, so their only
+        // identifying strings are the user-editable name/friendly_name (a
+        // device renamed "Mikro EG" is unidentifiable). Typing an IP into this
+        // view IS the user asserting the model, so accept an
+        // unidentified-but-capable device rather than reject it with a message
+        // the user has no way to act on. A device that positively identified as
+        // a DIFFERENT model is still rejected — that is a real mismatch (wrong
+        // driver), not missing information.
+        // Discovery stays strict: there, listing unidentified devices under
+        // every driver is exactly the confusion the sniff exists to prevent.
+        const identityConflicts = result.deviceType !== null && result.deviceType !== this.thisAssistantType;
+
+        if (result.status === 'accessible' && !identityConflicts) {
+            if (result.deviceType === null) {
+                this.pairLogger.info(`Manual entry ${address}:${port} carries no recognisable model token — accepting it as '${this.thisAssistantType}' on the user's say-so (voice-capable)`);
+            }
+
+            const mac = result.mac;
+            const device: PairDevice = {
+                name: result.friendlyName || `ESPHome ${address}`,
+                // Prefer the MAC so the id matches the mDNS discovery id; fall
+                // back to host:port only when the device withheld its MAC.
+                data: { id: mac || `${address}:${port}` },
+                store: {
+                    address,
+                    port,
+                    mac: mac || undefined,
+                    // Record the model the device is paired AS: the sniffed type
+                    // when it identified itself, otherwise the driver the user
+                    // chose. Nothing reads this at runtime today, but a null here
+                    // would be a trap for anything that later does.
+                    deviceType: result.deviceType ?? this.thisAssistantType,
+                    // The key the probe just succeeded with — every future
+                    // connection to this device needs it.
+                    encryptionKey: encryptionKey || undefined,
+                },
+                // Mirror it into the user-editable device setting so it is
+                // visible/fixable without re-pairing.
+                settings: encryptionKey ? { encryption_key: encryptionKey } : undefined,
+            };
+            this.pairLogger.info(`Manual entry ${address}:${port} matched: ${device.name} (${device.data.id})${encryptionKey ? ' [encrypted]' : ''}`);
+            return { device, reason: 'ok' };
+        }
+
+        // Everything else maps straight to a pair-view reason: 'not_a_match',
+        // 'unreachable', 'timeout', 'requires_encryption', or the precise Noise
+        // failure code (wrong_key / plaintext_device / mac_mismatch /
+        // invalid_key / protocol_error).
+        if (result.status === 'accessible' || result.status === 'not_a_match') {
+            this.pairLogger.info(`Manual entry ${address}:${port} answered but is not a matching device`, undefined, { deviceType: result.deviceType });
+            return { device: null, reason: 'not_a_match' };
+        }
+        if (result.status === 'encryption_error') {
+            this.pairLogger.info(`Manual probe ${address}:${port} encryption error: ${result.code}`);
+            return { device: null, reason: result.code };
+        }
+        return { device: null, reason: result.status };
     }
 
     /**
@@ -486,12 +410,7 @@ export default abstract class VoiceAssistantDriver extends Homey.Driver {
         const capableDevices = () => [...probed.values()].filter((d): d is PairDevice => d !== null);
 
         const listDevicesRound = async (): Promise<PairDevice[]> => {
-            const strategy = this.getDiscoveryStrategy();
-            if (!strategy) {
-                this.logger.info('No discovery strategy configured for this driver');
-                return [];
-            }
-            const candidates = Object.values(strategy.getDiscoveryResults())
+            const candidates = this.discoveryResults()
                 .map((r: any) => this.resultToDevice(r))
                 .filter((d) => !probed.has(String(d.data.id)));
 
@@ -667,14 +586,7 @@ export default abstract class VoiceAssistantDriver extends Homey.Driver {
      * for any SDK path that calls the default hook directly.
      */
     async onPairListDevices() {
-        const strategy = this.getDiscoveryStrategy();
-
-        if (!strategy) {
-            this.logger.info('No discovery strategy configured for this driver');
-            return [];
-        }
-
-        const candidates: PairDevice[] = Object.values(strategy.getDiscoveryResults())
+        const candidates: PairDevice[] = this.discoveryResults()
             .map((r: any) => this.resultToDevice(r));
 
         const { capable } = await this.filterByVoiceCapabilities(candidates, {

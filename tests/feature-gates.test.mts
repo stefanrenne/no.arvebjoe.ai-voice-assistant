@@ -96,6 +96,22 @@ describe('feature gates (weather / web search / timers)', () => {
         expect(toolNames(tm)).toContain('get_current_weather');
     });
 
+    it('the recording-playback debug tool is off by default and follows debug_audio_enabled', () => {
+        const tm = makeToolManager();
+        expect(toolNames(tm)).not.toContain('play_voice_recording');
+        expect(tm.isRecordingPlaybackActive()).toBe(false);
+
+        mockHomey.setMockSetting('debug_audio_enabled', true);
+        settingsManager.refreshGlobals();
+        expect(tm.refreshRecordingPlaybackTools()).toBe(true);
+        expect(toolNames(tm)).toContain('play_voice_recording');
+
+        mockHomey.setMockSetting('debug_audio_enabled', 'false');
+        settingsManager.refreshGlobals();
+        expect(tm.refreshRecordingPlaybackTools()).toBe(false);
+        expect(toolNames(tm)).not.toContain('play_voice_recording');
+    });
+
     it('registerAllToolsForMeasurement registers every optional feature regardless of settings', () => {
         mockHomey.setMockSetting('weather_enabled', false);
         mockHomey.setMockSetting('web_search_provider', 'disabled');

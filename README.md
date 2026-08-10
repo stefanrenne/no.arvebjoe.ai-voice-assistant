@@ -405,7 +405,7 @@ Notes:
 <img src="./.resources/settings_web_search.png" height="440" alt="Web search feature settings" />
 <img src="./.resources/settings_music.png" height="440" alt="Music feature settings" />
 <img src="./.resources/settings_custom_pipeline.png" height="440" alt="Custom pipeline settings" />
-<img src="./.resources/settings_logging.png" height="440" alt="Logging settings" />
+<img src="./.resources/settings_logging.png" height="440" alt="Debug settings" />
 </p>
 
 The settings page is organized by a **section dropdown** at the top: **General**, **Custom
@@ -467,17 +467,36 @@ URL/key/model for each, with Test buttons, and the Ollama context-window size (n
 language-model and speech stages can also be set to **None** to switch them off — see
 [Switching a stage off](#switching-a-stage-off-none).
 
-**Logging** — stream the app's logs to any **syslog** server (RFC 5424 over UDP or TCP):
-rsyslog/syslog-ng, a Synology or QNAP log center, Grafana Alloy/Loki, Papertrail, and so on.
-Enter the server's address and port (default 514), pick UDP or TCP, and choose a level:
-conversation events are logged at **INFO**, while the detailed per-subsystem logs (ESP
-connection, AI provider, tools, webserver, …) — which are normally not written to the app's own
-log at all — go out at **DEBUG**, so a collector can capture everything without making the
-in-app log noisy. Warnings and errors are always included, every line is tagged with its
-subsystem name for filtering, and secret-looking values are masked before they leave the app.
-A **Send test message** button verifies the address before you save. Don't have a syslog
-server? [docs/remote-logging.md](docs/remote-logging.md) has a one-command Docker Compose
-setup (VictoriaLogs, free and open source, with a web UI) plus ready-made queries.
+**Debug** — three tools for working out what is going wrong, none of which cost the AI anything.
+
+* **Last seen devices** — every ESPHome device Homey's discovery has announced, recorded all the
+  time (not just while you pair), with the exact fields pairing matches on: the name it would be
+  listed under, `friendly_name`, the mDNS service name and host, address and port, `mac`,
+  `platform`, the ESPHome version and project, and whether the device has an API encryption key.
+  A **★** marks devices that answered the probe and can serve as a voice satellite; 🔒 means it
+  needs an encryption key, ✕ that it answered but isn't a satellite, ⚠ that it didn't answer, and
+  **?** that it hasn't been probed yet. **Probe** re-checks a device on the spot. If a device you
+  own never shows up in this list at all, the problem is mDNS on your network, not the pairing
+  dialog.
+* **What did I just say?** *(opt-in, off by default)* — keeps the raw microphone audio of each
+  turn for 5 minutes to an hour (your choice; the last 20 recordings are kept and they're deleted
+  automatically). Ask the assistant *"what did I just say?"* and it plays the recording back on
+  the device, or press **Play** next to any recording in the list — each one shows what speech
+  recognition made of it. This is how you tell a microphone problem (muffled, clipped, too quiet)
+  from a speech-recognition problem (the audio is clear but the transcript is wrong). While it is
+  on, recent microphone audio is reachable on your local network like every other clip the device
+  plays, so leave it off when you're not debugging.
+* **Remote logging** — stream the app's logs to any **syslog** server (RFC 5424 over UDP or TCP):
+  rsyslog/syslog-ng, a Synology or QNAP log center, Grafana Alloy/Loki, Papertrail, and so on.
+  Enter the server's address and port (default 514), pick UDP or TCP, and choose a level:
+  conversation events are logged at **INFO**, while the detailed per-subsystem logs (ESP
+  connection, AI provider, tools, webserver, …) — which are normally not written to the app's own
+  log at all — go out at **DEBUG**, so a collector can capture everything without making the
+  in-app log noisy. Warnings and errors are always included, every line is tagged with its
+  subsystem name for filtering, and secret-looking values are masked before they leave the app.
+  A **Send test message** button verifies the address before you save. Don't have a syslog
+  server? [docs/remote-logging.md](docs/remote-logging.md) has a one-command Docker Compose
+  setup (VictoriaLogs, free and open source, with a web UI) plus ready-made queries.
 
 Settings changes apply on the fly — no app restart needed.
 
@@ -576,6 +595,9 @@ entirely on the engine you pick — with the local pipeline, nothing does.
   **needs encryption key** and forwards to manual entry for the key when selected; if it
   doesn't appear at all, add it via **Enter IP address manually** and paste the key there
   (see [Adding a device by IP address](#adding-a-device-by-ip-address-manual-entry)).
+  Settings → **Debug** → **Last seen devices** shows everything discovery has found, so you can
+  tell "Homey never saw it" (a network/mDNS problem) from "Homey saw it but it isn't a
+  satellite" (the probe result is right there).
 * **Scan times out even though the device is reachable:** discovery uses mDNS/multicast, which
   doesn't always reach the Homey (e.g. a Wi-Fi-only Homey Pro, or multicast not forwarded on
   your network). Use **Enter IP address manually** in the pairing wizard to add it directly by
@@ -593,6 +615,9 @@ entirely on the engine you pick — with the local pipeline, nothing does.
   skip* setting slightly.
 * **The device wakes but doesn't hear what you say (or only up close):** raise the device's
   *Microphone gain* setting; if loud close-up speech gets misheard instead, lower it.
+* **The assistant keeps misunderstanding you:** turn on Settings → **Debug** → **What did I just
+  say?**, talk to it again, then ask *"what did I just say?"*. Hearing the actual recording tells
+  you whether the microphone or the speech recognition is at fault.
 * **Flashing/USB issues:** try another USB cable/port; if needed, enter bootloader mode and
   re-flash.
 * **Device not updating OTA:** ensure it's online and reachable; verify hostname/DNS on your LAN.

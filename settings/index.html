@@ -501,6 +501,122 @@
       font-weight: 600;
       white-space: nowrap;
     }
+
+    /* ---- Debug section: seen-devices list + recordings list ---- */
+    .debug-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .debug-empty {
+      font-size: 13px;
+      color: #6c757d;
+      font-style: italic;
+    }
+
+    .debug-row {
+      border: 1px solid #e1e7e3;
+      border-radius: 8px;
+      background: #fbfcfb;
+      padding: 8px 10px;
+    }
+
+    .debug-row>summary {
+      cursor: pointer;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      list-style: none;
+    }
+
+    .debug-row>summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .debug-mark {
+      font-size: 14px;
+      width: 18px;
+      flex: 0 0 auto;
+      text-align: center;
+    }
+
+    .debug-name {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+
+    .debug-sub {
+      font-size: 11.5px;
+      color: #6c757d;
+      white-space: nowrap;
+    }
+
+    .debug-kv {
+      display: grid;
+      grid-template-columns: minmax(88px, auto) 1fr;
+      gap: 3px 10px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #e9ecef;
+      font-size: 12.5px;
+    }
+
+    .debug-kv dt {
+      color: #6c757d;
+    }
+
+    .debug-kv dd {
+      margin: 0;
+      overflow-wrap: anywhere;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .debug-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .debug-legend {
+      font-size: 12px;
+      color: #6c757d;
+      margin-top: 10px;
+    }
+
+    .rec-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid #e1e7e3;
+      border-radius: 8px;
+      background: #fbfcfb;
+      padding: 8px 10px;
+    }
+
+    .rec-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .rec-said {
+      font-size: 13.5px;
+      overflow-wrap: anywhere;
+    }
+
+    .rec-said.empty {
+      color: #6c757d;
+      font-style: italic;
+    }
+
+    .rec-meta {
+      font-size: 11.5px;
+      color: #6c757d;
+      margin-top: 2px;
+    }
   </style>
 </head>
 
@@ -512,7 +628,7 @@
         <optgroup label="Setup">
           <option value="general">General</option>
           <option value="pipeline" id="pipeline_option">Custom pipeline</option>
-          <option value="logging">Logging</option>
+          <option value="debug">Debug</option>
         </optgroup>
         <optgroup label="Features">
           <option value="smart">Smart home control</option>
@@ -1218,8 +1334,71 @@
         </div>
       </section>
 
-      <!-- ============================ Logging ============================ -->
-      <section class="section" data-section="logging">
+      <!-- ============================= Debug ============================= -->
+      <section class="section" data-section="debug">
+
+        <!-- ---- Last seen devices: what mDNS discovery has surfaced ---- -->
+        <div class="card">
+          <div class="feature-head">
+            <div>
+              <div class="feature-title">Last seen devices</div>
+              <div class="feature-sub">ESPHome devices found on your network</div>
+            </div>
+            <button type="button" class="stage-test-btn" id="seen_refresh_btn">Refresh</button>
+          </div>
+          <div class="note">Every ESPHome device Homey's discovery has announced, with the exact fields
+            pairing matches on. Devices are recorded all the time, not just while you pair — so if a
+            satellite never appears here, the problem is on the network (mDNS), not in the pairing
+            dialog. Devices that answered the probe and can serve as a voice satellite are starred.</div>
+          <div class="debug-list" id="seen_devices_list">
+            <div class="debug-empty">Loading…</div>
+          </div>
+          <div class="debug-legend">★ usable voice satellite &nbsp;·&nbsp; 🔒 needs an encryption key
+            &nbsp;·&nbsp; ✕ not a voice satellite &nbsp;·&nbsp; ⚠ did not answer &nbsp;·&nbsp; ? not probed yet
+          </div>
+        </div>
+
+        <!-- ---- What did I just say?: keep + play back the mic recording ---- -->
+        <div class="card">
+          <div class="feature-head">
+            <div>
+              <div class="feature-title">What did I just say?</div>
+              <div class="feature-sub">Keep each turn's microphone audio so you can hear it back</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="debug_audio_enabled" aria-label="Enable microphone recordings" />
+              <span class="knob"></span>
+            </label>
+          </div>
+          <div class="feature-body" data-feature-body="debug_audio">
+            <div class="note">Records exactly what the microphone captured for each turn and keeps it for
+              the retention window below. Use it when the assistant misunderstands: play the recording
+              back and you can tell a bad microphone (muffled, clipped, too quiet) from bad speech
+              recognition (audio is clear, transcript is wrong). Ask the assistant <em>"what did I just
+                say?"</em> and it plays the recording on the device, or use the buttons below. Recordings
+              live on the Homey and are deleted automatically; they are reachable on your local network
+              while they last, so leave this off when you don't need it.</div>
+            <div class="homey-form-group">
+              <label class="homey-form-label" for="debug_audio_retention_min">Keep recordings for</label>
+              <select class="homey-form-input" id="debug_audio_retention_min">
+                <option value="5">5 minutes</option>
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="60">1 hour</option>
+              </select>
+              <div class="help-text">The last 20 recordings are kept, and each is deleted when its
+                retention time is up (or when the app restarts).</div>
+            </div>
+            <div class="feature-head">
+              <div class="feature-sub">Recordings</div>
+              <button type="button" class="stage-test-btn" id="recordings_refresh_btn">Refresh</button>
+            </div>
+            <div class="debug-list" id="recordings_list">
+              <div class="debug-empty">Loading…</div>
+            </div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="feature-head">
             <div>
@@ -1841,6 +2020,260 @@
         if (value) document.getElementById("music_assistant_token").value = value;
       });
 
+      /* ------------------------- Debug: seen devices -------------------------
+         Everything Homey's mDNS discovery has surfaced, with the fields the
+         pair flow matches on and the outcome of the capability probe. */
+
+      var seenDevicesListElement = document.getElementById("seen_devices_list");
+      var seenRefreshBtn = document.getElementById("seen_refresh_btn");
+
+      function ago(ms) {
+        if (!isFinite(ms) || ms < 0) return "";
+        var s = Math.round(ms / 1000);
+        if (s < 60) return s + "s ago";
+        var m = Math.round(s / 60);
+        if (m < 60) return m + " min ago";
+        var h = Math.round(m / 60);
+        if (h < 48) return h + " h ago";
+        return Math.round(h / 24) + " days ago";
+      }
+
+      // The symbol in front of each device — the star means "answered the probe
+      // and can serve as a voice satellite" (exactly what pairing looks for).
+      function deviceMark(d) {
+        if (d.accessible) return { mark: "★", label: "usable voice satellite" };
+        if (d.encrypted || (d.probe && d.probe.status === "requires_encryption")) {
+          return { mark: "🔒", label: "needs an API encryption key" };
+        }
+        if (!d.probe) return { mark: "?", label: "not probed yet" };
+        if (d.probe.status === "not_a_match") return { mark: "✕", label: "not a voice satellite" };
+        if (d.probe.status === "accessible") return { mark: "★", label: "usable voice satellite" };
+        return { mark: "⚠", label: "did not answer the probe" };
+      }
+
+      function probeText(d, now) {
+        if (!d.probe) return "not probed yet";
+        var parts = [d.probe.status];
+        if (d.probe.deviceType) parts.push("model " + d.probe.deviceType);
+        if (d.probe.code) parts.push(d.probe.code);
+        if (d.probe.message) parts.push(d.probe.message);
+        return parts.join(" · ") + " (" + d.probe.by + ", " + ago(now - d.probe.at) + ")";
+      }
+
+      function row(dl, label, value) {
+        if (value === undefined || value === null || value === "") return;
+        var dt = document.createElement("dt");
+        dt.textContent = label;
+        var dd = document.createElement("dd");
+        dd.textContent = String(value);
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      }
+
+      function renderSeenDevices(devices, now) {
+        seenDevicesListElement.innerHTML = "";
+        if (!devices || !devices.length) {
+          var empty = document.createElement("div");
+          empty.className = "debug-empty";
+          empty.textContent = "No ESPHome devices discovered yet. Discovery can take a minute after "
+            + "the app starts; if a device never shows up, mDNS traffic is not reaching your Homey.";
+          seenDevicesListElement.appendChild(empty);
+          return;
+        }
+
+        devices.forEach(function (d) {
+          var mark = deviceMark(d);
+          var details = document.createElement("details");
+          details.className = "debug-row";
+
+          var summary = document.createElement("summary");
+          var markSpan = document.createElement("span");
+          markSpan.className = "debug-mark";
+          markSpan.textContent = mark.mark;
+          markSpan.title = mark.label;
+          var nameSpan = document.createElement("span");
+          nameSpan.className = "debug-name";
+          nameSpan.textContent = d.pairName || d.name || d.id;
+          var subSpan = document.createElement("span");
+          subSpan.className = "debug-sub";
+          subSpan.textContent = (d.paired ? "paired · " : "") + ago(now - d.lastSeen);
+          summary.appendChild(markSpan);
+          summary.appendChild(nameSpan);
+          summary.appendChild(subSpan);
+          details.appendChild(summary);
+
+          // The mDNS fields pairing reads: the name it lists the device under,
+          // the platform the discovery filter matches, and the address it
+          // connects to.
+          var dl = document.createElement("dl");
+          dl.className = "debug-kv";
+          row(dl, "Shown as", d.pairName);
+          row(dl, "friendly_name", d.friendlyName);
+          row(dl, "Service name", d.name);
+          row(dl, "Host", d.host);
+          row(dl, "Address", d.address ? d.address + ":" + d.port : "");
+          row(dl, "mac (id)", d.mac || d.id);
+          row(dl, "platform", d.platform);
+          row(dl, "ESPHome", d.version);
+          row(dl, "project", d.project);
+          row(dl, "board", d.board);
+          row(dl, "network", d.network);
+          row(dl, "api_encryption", d.encrypted ? "yes" : "");
+          row(dl, "Status", mark.label);
+          row(dl, "Probe", probeText(d, now));
+          if (d.paired) {
+            row(dl, "Paired as", d.pairedName || "(this app)");
+            row(dl, "Connected", d.available === null ? "unknown" : (d.available ? "yes" : "no"));
+          }
+          row(dl, "First seen", ago(now - d.firstSeen));
+          row(dl, "Seen", d.seenCount + "x");
+          details.appendChild(dl);
+
+          var actions = document.createElement("div");
+          actions.className = "debug-actions";
+          var probeBtn = document.createElement("button");
+          probeBtn.type = "button";
+          probeBtn.className = "stage-test-btn";
+          probeBtn.textContent = "Probe";
+          var probeResult = document.createElement("span");
+          probeResult.className = "stage-test-result";
+          probeBtn.addEventListener("click", function () {
+            probeBtn.disabled = true;
+            probeResult.className = "stage-test-result";
+            probeResult.textContent = "Probing…";
+            Homey.api("POST", "/probe-device", { id: d.id }, function (err, res) {
+              probeBtn.disabled = false;
+              if (err || !res) {
+                probeResult.className = "stage-test-result fail";
+                probeResult.textContent = "✗ " + (err || "No response from the app");
+                return;
+              }
+              probeResult.className = "stage-test-result " + (res.ok ? "ok" : "fail");
+              probeResult.textContent = (res.ok ? "✓ " : "✗ ") + res.message;
+              loadSeenDevices();
+            });
+          });
+          actions.appendChild(probeBtn);
+          actions.appendChild(probeResult);
+          details.appendChild(actions);
+
+          seenDevicesListElement.appendChild(details);
+        });
+      }
+
+      function loadSeenDevices() {
+        Homey.api("GET", "/seen-devices", null, function (err, res) {
+          if (err || !res) {
+            seenDevicesListElement.innerHTML = "";
+            var fail = document.createElement("div");
+            fail.className = "debug-empty";
+            fail.textContent = "Could not read the device list: " + (err || "no response");
+            seenDevicesListElement.appendChild(fail);
+            return;
+          }
+          renderSeenDevices(res.devices, res.now);
+        });
+      }
+      seenRefreshBtn.addEventListener("click", loadSeenDevices);
+
+      /* --------------------- Debug: "what did I just say?" -------------------
+         The recordings are only produced while debug_audio_enabled is on; the
+         list plays them back on the satellite that recorded them (the settings
+         page can't play the LAN audio URL itself). */
+
+      var debugAudioEnabledElement = document.getElementById("debug_audio_enabled");
+      var recordingsListElement = document.getElementById("recordings_list");
+      var recordingsRefreshBtn = document.getElementById("recordings_refresh_btn");
+
+      function refreshDebugAudioVisibility() {
+        document.querySelector('[data-feature-body="debug_audio"]')
+          .classList.toggle("off", !debugAudioEnabledElement.checked);
+      }
+      debugAudioEnabledElement.addEventListener("change", refreshDebugAudioVisibility);
+
+      Homey.get("debug_audio_enabled", function (err, enabled) {
+        if (err) return Homey.alert(err);
+        debugAudioEnabledElement.checked = enabled === true || enabled === "true";
+        refreshDebugAudioVisibility();
+      });
+      Homey.get("debug_audio_retention_min", function (err, value) {
+        if (err) return Homey.alert(err);
+        document.getElementById("debug_audio_retention_min").value = String(value || 15);
+      });
+
+      function renderRecordings(recordings, now) {
+        recordingsListElement.innerHTML = "";
+        if (!recordings || !recordings.length) {
+          var empty = document.createElement("div");
+          empty.className = "debug-empty";
+          empty.textContent = debugAudioEnabledElement.checked
+            ? "No recordings yet — say something to the assistant and refresh."
+            : "Turn this on and save, then talk to the assistant.";
+          recordingsListElement.appendChild(empty);
+          return;
+        }
+
+        recordings.forEach(function (r) {
+          var wrap = document.createElement("div");
+          wrap.className = "rec-row";
+
+          var main = document.createElement("div");
+          main.className = "rec-main";
+          var said = document.createElement("div");
+          said.className = "rec-said" + (r.transcript ? "" : " empty");
+          said.textContent = r.transcript || "(nothing recognized)";
+          var meta = document.createElement("div");
+          meta.className = "rec-meta";
+          meta.textContent = ago(now - r.at) + " · " + (r.durationMs / 1000).toFixed(1) + "s · " + r.deviceName;
+          main.appendChild(said);
+          main.appendChild(meta);
+
+          var playBtn = document.createElement("button");
+          playBtn.type = "button";
+          playBtn.className = "stage-test-btn";
+          playBtn.textContent = "Play";
+          playBtn.addEventListener("click", function () {
+            playBtn.disabled = true;
+            Homey.api("POST", "/play-recording", { id: r.id }, function (err, res) {
+              playBtn.disabled = false;
+              if (err || !res || !res.ok) {
+                Homey.alert((res && res.message) || err || "Could not play that recording");
+              }
+            });
+          });
+
+          wrap.appendChild(main);
+          wrap.appendChild(playBtn);
+          recordingsListElement.appendChild(wrap);
+        });
+      }
+
+      function loadRecordings() {
+        Homey.api("GET", "/recordings", null, function (err, res) {
+          if (err || !res) {
+            recordingsListElement.innerHTML = "";
+            var fail = document.createElement("div");
+            fail.className = "debug-empty";
+            fail.textContent = "Could not read the recordings: " + (err || "no response");
+            recordingsListElement.appendChild(fail);
+            return;
+          }
+          renderRecordings(res.recordings, res.now);
+        });
+      }
+      recordingsRefreshBtn.addEventListener("click", loadRecordings);
+
+      // Both lists are read live from the app; load them when the Debug section
+      // is opened (and once at startup, so a direct link is never empty).
+      sectionSelectElement.addEventListener("change", function () {
+        if (sectionSelectElement.value === "debug") {
+          loadSeenDevices();
+          loadRecordings();
+        }
+      });
+      loadSeenDevices();
+      loadRecordings();
+
       // Remote syslog logging (no token cost — not part of the budget meter).
       var remoteLogEnabledElement = document.getElementById("remote_log_enabled");
       function refreshRemoteLogVisibility() {
@@ -2029,6 +2462,9 @@
           ["remote_log_port", parseInt(document.getElementById("remote_log_port").value, 10) || 514],
           ["remote_log_protocol", document.getElementById("remote_log_protocol").value],
           ["remote_log_level", document.getElementById("remote_log_level").value],
+          // Debug: keep each turn's microphone recording ("what did I just say?")
+          ["debug_audio_enabled", debugAudioEnabledElement.checked],
+          ["debug_audio_retention_min", parseInt(document.getElementById("debug_audio_retention_min").value, 10) || 15],
           // Selected AI provider
           ["voice_provider", providerSelectElement.value],
           ["selected_language_name", selectedText],

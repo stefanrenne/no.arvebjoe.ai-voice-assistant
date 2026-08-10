@@ -9,6 +9,8 @@ import { AppServices } from './src/helpers/app-services.mjs';
 import { settingsManager } from './src/settings/settings-manager.mjs';
 import { createLogger } from './src/helpers/logger.mjs';
 import { configureRemoteLogFromSettings } from './src/helpers/remote-log.mjs';
+import { recordingRegistry } from './src/helpers/recording-registry.mjs';
+import { DiscoveryWatcher } from './src/helpers/discovery-watcher.mjs';
 import homeyLogPkg from 'homey-log'; // requires "esModuleInterop": true in tsconfig
 const { Log } = homeyLogPkg;
 
@@ -23,6 +25,8 @@ export default class AiVoiceAssistantApp extends Homey.App implements AppService
   public weatherHelper!: WeatherHelper;
 
   private apiHelper: ApiHelper | undefined;
+  // Always-on mDNS observer behind the Debug page's "last seen devices" list.
+  private discoveryWatcher: DiscoveryWatcher | undefined;
   private logger = createLogger('APP');
   private homeyLog: any;
   // Teardown bookkeeping (code_review_2 L5): every listener registered on
@@ -57,6 +61,13 @@ export default class AiVoiceAssistantApp extends Homey.App implements AppService
     // unawaited cleanup could delete a just-written file, leaving the satellite
     // a valid URL that 404s (code_review_2 M4).
     await initAudioFolder();
+
+    // Debug tools (settings page → Debug). Both are passive until used: the
+    // recording registry only holds entries while `debug_audio_enabled` is on,
+    // and the watcher just reads the discovery results Homey already collects.
+    recordingRegistry.init(this.homey);
+    this.discoveryWatcher = new DiscoveryWatcher(this.homey);
+    this.discoveryWatcher.start();
 
     this.geoHelper = new GeoHelper(this.homey);
     await this.geoHelper.init();    
@@ -93,6 +104,9 @@ export default class AiVoiceAssistantApp extends Homey.App implements AppService
       this.unsubscribeRemoteLog();
       this.unsubscribeRemoteLog = null;
     }
+
+    this.discoveryWatcher?.stop();
+    this.discoveryWatcher = undefined;
 
     this.geoHelper?.dispose();
     // DeviceManager before ApiHelper: its dispose() unregisters through

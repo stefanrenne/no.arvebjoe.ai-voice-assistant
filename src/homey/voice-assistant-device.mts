@@ -17,6 +17,8 @@ import { createLogger } from '../helpers/logger.mjs';
 import { SOUND_URLS } from '../helpers/sound-urls.mjs';
 import { ensureListeningChime, ensureMicClosedChime, appendChimeToPcm } from '../helpers/listening-chime.mjs';
 import { scheduleAudioFileDeletion } from '../helpers/file-helper.mjs';
+import { recordingRegistry, retentionMsFromSetting, Recording } from '../helpers/recording-registry.mjs';
+import { seenDevices } from '../helpers/seen-devices.mjs';
 import { Pcm16kTo24k } from '../helpers/Pcm16kTo24k.mjs';
 import { GeoHelper } from '../helpers/geo-helper.mjs';
 import { WeatherHelper } from '../helpers/weather-helper.mjs';
@@ -101,13 +103,25 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
   readonly defaultMicGain: number = 1;
   private micGain: number = 1;
 
-  // Captures raw mic input and serves it back as a playback URL for debugging.
+  // Captures raw mic input and plays it back immediately, before the reply.
   // Emulator-only: the `input_buffer_debug` setting is honored solely when the
   // process carries the HE_EMULATOR marker, so on a real Homey the flag can
   // never expose recorded microphone audio on the unauthenticated LAN URL.
   private inputBufferDebug: boolean = false;
+  // "What did I just say?" (`debug_audio_enabled`, Debug settings section): the
+  // same capture, but the recording is KEPT for the retention window instead of
+  // played back at once, so the user can ask for it later (play_voice_recording)
+  // or play it from the Debug page. Opt-in and off by default — while it is on,
+  // recent microphone audio is reachable on the LAN audio URL like every other
+  // clip the satellite plays.
+  private micRecordingEnabled: boolean = false;
+  private recordingRetentionMs: number = retentionMsFromSetting(undefined);
   private inputBuffer: Buffer[] = [];
   private inputPlaybackUrl?: FileInfo | null = null;
+  // The recording of the turn currently in flight, so transcript.done can label
+  // it with what speech-to-text heard.
+  private currentRecordingId: string | null = null;
+  private unregisterRecordingPlayer?: () => void;
 
   private isAgentHealthy: boolean = false;
   private isEspClientHealthy: boolean = false;
@@ -146,6 +160,24 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
 
     this.inputBufferDebug = process.env.HE_EMULATOR === '1'
       && settingsManager.getGlobal('input_buffer_debug') === true;
+    this.applyMicRecordingSettings();
+
+    // Debug page: this satellite is one of ours, so the "last seen devices"
+    // list can tell it apart from a stranger on the network. Availability is
+    // pushed from updateAvailable() as the ESP/agent health changes.
+    seenDevices.markPaired(String(this.getData().id), {
+      name: this.getName(),
+      address: store.address,
+      port: store.port,
+      mac: store.mac,
+      available: this.getAvailable() === true,
+    });
+
+    // How "play what I just said" reaches this satellite (see RecordingRegistry).
+    this.unregisterRecordingPlayer = recordingRegistry.registerPlayer(
+      String(this.getData().id),
+      (recordings) => this.playRecordings(recordings),
+    );
 
     // Subscribe to global settings changes to update agent on the fly.
     // Serialized through a promise queue: handleSettingsChange rebuilds/restarts
@@ -264,6 +296,10 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
       deviceName: this.getName(),
       zone: this.currentZone,
     }));
+    // "What did I just say?": the playback tool only ever reaches for THIS
+    // satellite's recordings (it is registered only while debug_audio_enabled).
+    this.toolManager.setRecordingDeviceId(String(this.getData().id));
+
     // Slow-command acknowledgement ("Putting on X, one moment") — spoken on
     // this satellite while a play_media is still resolving server-side.
     this.toolManager.setInterimSpeak((text) => {
@@ -394,8 +430,9 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
       const frames: Buffer[] = this.reSampler ? (this.reSampler.push(trimmed) as Buffer[]) : [trimmed];
       for (const chunk of frames) {
 
-        if (this.inputBufferDebug) {
-          // Add chunk to input buffer, used for debugging.
+        if (this.isCapturingMic()) {
+          // Add chunk to input buffer (emulator playback and/or "what did I
+          // just say?" recording).
           this.inputBuffer.push(chunk);
         }
 
@@ -418,7 +455,14 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
     this.audioOutput.on('segment', ({ fileInfo, action }) => {
       // If we have an input buffer to play, do that first (debugging only).
       if (this.inputBufferDebug && this.inputPlaybackUrl) {
-        this.playUrlByFileInfo(this.inputPlaybackUrl, false);
+        if (this.micRecordingEnabled) {
+          // The recording registry owns this file's lifetime (retention window)
+          // — playUrlByFileInfo would schedule the short 30 s TTL on top and
+          // delete it out from under the Debug page.
+          this.esp.playAudioFromUrl(this.inputPlaybackUrl.url, false);
+        } else {
+          this.playUrlByFileInfo(this.inputPlaybackUrl, false);
+        }
         this.inputPlaybackUrl = null;
       }
 
@@ -765,8 +809,9 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
       this.esp.closeMic();
       this.reSampler?.reset();
       this.esp.stt_vad_end('');
-      // Save input buffer to file, used for debugging to hear what was captured
-      if (this.inputBufferDebug) {
+      // Save input buffer to file, so what the mic actually captured can be
+      // heard back (emulator auto-playback and/or the retained recording).
+      if (this.isCapturingMic()) {
         await this.saveInputBuffer();
       }
 
@@ -801,6 +846,14 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
       this.logger.info('Final transcript: '+ transcript, "transcript");
 
       transcript = (transcript ?? '').trim();
+
+      // Label this turn's recording with what STT made of it — the whole point
+      // of "what did I just say?" is comparing the two.
+      if (this.currentRecordingId) {
+        recordingRegistry.setTranscript(this.currentRecordingId, transcript);
+        this.currentRecordingId = null;
+      }
+
       const decision = this.turn.transcriptDone(transcript);
 
       // Spurious follow-up turn: the PE reopens its mic at the very end of its own
@@ -1174,6 +1227,15 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
         needRestart = true;
       }
 
+      // "What did I just say?": capture + retention apply to the next turn, but
+      // the playback tool is part of the tool list, so a flip needs a restart.
+      this.applyMicRecordingSettings();
+      const recordingToolsActive = this.toolManager.isRecordingPlaybackActive();
+      if (this.toolManager.refreshRecordingPlaybackTools() !== recordingToolsActive) {
+        this.logger.info(`Recording playback ${!recordingToolsActive ? 'enabled' : 'disabled'}, updating agent.`);
+        needRestart = true;
+      }
+
       // Timers gate: tools follow the setting; the instruction block needs the
       // device's firmware support too (same AND as the 'capabilities' handler).
       const timerToolsActive = this.toolManager.refreshTimerTools();
@@ -1505,6 +1567,17 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
   }
 
 
+  /** Is this turn's mic audio being captured (emulator playback or recording)? */
+  private isCapturingMic(): boolean {
+    return this.inputBufferDebug || this.micRecordingEnabled;
+  }
+
+  /**
+   * Encode the turn's captured mic audio to FLAC and serve it over the LAN.
+   * The emulator plays it back immediately (inputPlaybackUrl); with
+   * `debug_audio_enabled` on it is also registered as a recording, which keeps
+   * the file alive for the retention window and lets the user ask for it later.
+   */
   private async saveInputBuffer() {
 
     if (!this.inputBuffer || this.inputBuffer.length === 0) {
@@ -1512,8 +1585,13 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
       return;
     }
 
-    const flac = await pcmToFlacBuffer(Buffer.concat(this.inputBuffer), {
-      sampleRate: 24000,
+    const pcm = Buffer.concat(this.inputBuffer);
+    // The capture is whatever the provider is fed, so it carries the provider's
+    // input rate (24 kHz for OpenAI, 16 kHz for a passthrough provider). Writing
+    // a fixed 24 kHz header played a 16 kHz capture 1.5x too fast.
+    const sampleRate = this.provider?.inputSampleRate ?? 24000;
+    const flac = await pcmToFlacBuffer(pcm, {
+      sampleRate,
       channels: 1,
       bitsPerSample: 16
     });
@@ -1524,7 +1602,72 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
       prefix: 'rx'
     };
 
-    this.inputPlaybackUrl = await this.webServer.buildStream(inputData);
+    const fileInfo = await this.webServer.buildStream(inputData);
+    const durationMs = Math.round((pcm.length / 2) / sampleRate * 1000);
+    fileInfo.playbackMs = durationMs;
+
+    if (this.inputBufferDebug) {
+      this.inputPlaybackUrl = fileInfo;
+    }
+
+    if (this.micRecordingEnabled) {
+      const recording = recordingRegistry.add({
+        file: fileInfo,
+        deviceId: String(this.getData().id),
+        deviceName: this.getName(),
+        durationMs,
+        retentionMs: this.recordingRetentionMs,
+      });
+      this.currentRecordingId = recording.id;
+      this.convo.info(`Recorded ${(durationMs / 1000).toFixed(1)}s of microphone audio (debug playback is on)`, 'MIC');
+    }
+  }
+
+  /**
+   * Play recordings back on this satellite, one after the other. Each clip is
+   * awaited for its own length (plus a short gap) because the ESP announce
+   * queue gives no per-clip completion we can trust mid-turn — and awaiting
+   * matters: the tool call that triggered this only returns afterwards, so the
+   * assistant's spoken reply lands after the playback instead of over it.
+   */
+  private async playRecordings(recordings: Recording[]): Promise<void> {
+    const GAP_MS = 400;
+    // Bound the total wait so a long selection can't hold a tool call open.
+    const MAX_TOTAL_MS = 60_000;
+    let spent = 0;
+
+    for (const recording of recordings) {
+      if (!this.esp) return;
+      this.convo.info(`Playing back recorded microphone audio (${(recording.durationMs / 1000).toFixed(1)}s)`, 'DEBUG');
+      if (this.turn.state === 'idle') {
+        // Played from the Debug page with no conversation running: the clip
+        // needs its own run around it, like any other stand-alone playback.
+        this.playUrl(recording.url);
+      } else {
+        // Mid-turn (the play_voice_recording tool): a bare announce, the same
+        // way the slow-command acknowledgement plays inside a run.
+        this.esp.playAudioFromUrl(recording.url, false);
+      }
+
+      const wait = Math.min(recording.durationMs + GAP_MS, MAX_TOTAL_MS - spent);
+      if (wait <= 0) return;
+      spent += wait;
+      await new Promise<void>((resolve) => {
+        this.homey.setTimeout(resolve, wait);
+      });
+      if (spent >= MAX_TOTAL_MS) return;
+    }
+  }
+
+  /**
+   * Read the "what did I just say?" settings (`debug_audio_enabled` +
+   * `debug_audio_retention_min`) into their live fields.
+   */
+  private applyMicRecordingSettings(): void {
+    const enabled = settingsManager.getGlobal<any>('debug_audio_enabled', false);
+    this.micRecordingEnabled = enabled === true || enabled === 'true';
+    this.recordingRetentionMs = retentionMsFromSetting(
+      settingsManager.getGlobal('debug_audio_retention_min'));
   }
 
 
@@ -1538,6 +1681,15 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
     } else if (current === true) {
       this.setUnavailable();
     }
+
+    // Keep the Debug page's "last seen devices" star in sync: for a paired
+    // satellite, its live connection is a better accessibility signal than an
+    // old discovery probe.
+    seenDevices.markPaired(String(this.getData().id), {
+      name: this.getName(),
+      address: this.getStoreValue('address'),
+      available: this.isAgentHealthy && this.isEspClientHealthy,
+    });
   }
 
 
@@ -1727,6 +1879,14 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
       this.settingsUnsubscribe();
       this.settingsUnsubscribe = undefined;
     }
+
+    // Debug surfaces: stop offering this satellite as a playback target and
+    // drop it from the "last seen devices" paired set.
+    if (this.unregisterRecordingPlayer) {
+      this.unregisterRecordingPlayer();
+      this.unregisterRecordingPlayer = undefined;
+    }
+    seenDevices.markUnpaired(String(this.getData().id));
 
     // Safely disconnect ESP client
     try {

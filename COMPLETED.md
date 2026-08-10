@@ -1242,3 +1242,52 @@ green — 752 passed / 15 skipped; build and lint clean.
 
 **If you add another "you switched this off / you haven't configured this" throw, use
 `expectedError()`** — the default path reports it to Sentry.
+---
+
+## 16. Debug tools: last seen devices + "what did I just say?" (2026-08-10)
+
+The settings page's **Logging** section became **Debug** and now holds three tools. Both new ones
+exist to answer a support question the logs alone could not:
+
+**Last seen devices** — *"why doesn't my satellite show up when I pair?"* Homey runs the
+`esphome` discovery strategy continuously (it is what keeps paired devices' IPs current), but
+nothing looked at its results outside a pair session. `src/helpers/discovery-watcher.mts` polls
+the strategy from the app every 60 s, records every result in `src/helpers/seen-devices.mts`
+(bounded at 30, oldest un-paired evicted first, paired devices never evicted) and probes devices
+it has never probed — 3 per round, one at a time, never encrypted ones (the handshake cannot
+succeed without the key) and never paired ones (their live connection is the better signal and
+the probe would spend one of the satellite's API slots). The registry stores exactly the fields
+pairing matches on (`friendly_name` / service name / host / address:port / `mac` / `platform` /
+version / project / `api_encryption`), so the list explains a non-appearing device instead of
+just omitting it. The star means "answered the probe and has the voice-assistant capabilities" —
+the same test pairing applies.
+
+To keep that promise literally true, the probe itself was extracted to
+`src/voice_assistant/esp-probe.mts` and **both** driver probe paths now use it
+(`checkVoiceCapabilities` and `probeManualEntry` shrank from ~90 promise-wrapped lines each to a
+status switch). Its statuses map 1:1 onto the pair-view reasons that already existed
+(`not_a_match`, `requires_encryption`, `unreachable`, `timeout`, and the Noise codes), so pairing
+behaviour is unchanged. `createClient` is a test seam — `tests/esp-probe.test.mts` drives it with
+a fake emitter.
+
+**What did I just say?** — *"is the microphone bad, or is speech-to-text bad?"* The `rx_*` capture
+already existed but was emulator-only and played back immediately. It is now also driven by the
+`debug_audio_enabled` global setting (off by default) and, when on, the FLAC is registered in
+`src/helpers/recording-registry.mts` instead: kept for `debug_audio_retention_min` (5–60 min,
+last 20), labelled with the transcript STT produced, and playable either from the Debug page
+("Play on device" — the settings webview can't play the plain-http LAN URL itself) or by voice
+through the gated `play_voice_recording` tool. The tool **awaits** playback (each clip's own
+length + 400 ms), so the model's spoken reply lands after the audio instead of over it, and each
+device registers a player callback in the registry so neither the tool nor the API has to look
+devices up through the driver.
+
+Two bugs found on the way:
+- `saveInputBuffer()` hardcoded a 24 kHz FLAC header, so a capture from a 16 kHz-input provider
+  (Gemini, and the local pipeline) played back 1.5× too fast. It now uses
+  `provider.inputSampleRate`.
+- Registry eviction popped the entry before calling `remove()`, which looks the entry up to find
+  its path — so the file of an evicted recording was never unlinked. Caught by
+  `tests/recording-registry.test.mts`.
+
+New tests: `esp-probe`, `seen-devices`, `discovery-watcher`, `recording-registry`, `debug-api`,
+plus a `play_voice_recording` case in `feature-gates`. Suite: 802 passed / 15 skipped.

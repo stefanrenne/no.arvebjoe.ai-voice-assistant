@@ -183,7 +183,10 @@ export class SettingsManager {
       // LM Studio desktop app (OpenAI dialect, port 1234, model optional)
       'lmstudio_host', 'lmstudio_port', 'lmstudio_model',
       // Remote syslog logging (third-party log collectors)
-      'remote_log_enabled', 'remote_log_host', 'remote_log_port', 'remote_log_protocol', 'remote_log_level'];
+      'remote_log_enabled', 'remote_log_host', 'remote_log_port', 'remote_log_protocol', 'remote_log_level',
+      // Debug: "what did I just say?" — keep each turn's microphone recording
+      // for a while so it can be played back (settings page or by voice)
+      'debug_audio_enabled', 'debug_audio_retention_min'];
 
     for (const k of knownKeys) {
       this.globals[k] = this.homey.settings.get(k);
