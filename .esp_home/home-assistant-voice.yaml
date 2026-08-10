@@ -42,6 +42,11 @@ esphome:
   on_boot:
     priority: 375
     then:
+      # Build the shared rainbow palette once, before anything can draw with it.
+      - lambda: |-
+          for (uint16_t h = 0; h < 256; h++) {
+            id(led_rainbow_lut)[h] = ESPHSVColor((uint8_t) h, 255, 255).to_rgb();
+          }
       # Run the script to refresh the LED status
       - script.execute: control_leds
       - delay: 1s
@@ -140,20 +145,23 @@ globals:
     type: int
     restore_value: no
     initial_value: '0'
-  # Shared rotation for the rainbow voice-phase effects (Waiting/Voice/Thinking/Reply Rainbow).
-  # Kept global so the rainbow keeps its position across phase changes: Waiting shows it dark and
-  # static, Listening spins it, Thinking freezes it and fades to white, Reply keeps it stationary
-  # (a white pulse travels instead) — so the next Waiting picks up the exact same position.
-  - id: led_rainbow_rotation
+  # Shared rainbow palette for the voice-phase effects (Waiting/Voice/Thinking/Reply Rainbow):
+  # 256 RGB entries, hue 0-255 at full saturation and value. Built ONCE in on_boot (below) so the
+  # effects never do HSV math per frame and all four are guaranteed to use the identical palette.
+  - id: led_rainbow_lut
+    type: Color[256]
+    restore_value: no
+  # Which LED (0-11) the lit dot currently sits on, and where in the palette its color is taken
+  # from. Both are global so a phase change never restarts the animation: the dot keeps its
+  # position and its color, and only the movement (speed / direction / stopped) changes.
+  - id: led_dot_pos
     type: uint8_t
     restore_value: no
     initial_value: '0'
-  # White level the Thinking effect is currently breathing at (0.6 - 1.0). Reply Rainbow reads it
-  # on entry so its fade back to the rainbow starts from the exact white the ring is showing.
-  - id: led_white_level
-    type: float
+  - id: led_color_index
+    type: uint8_t
     restore_value: no
-    initial_value: '1.0'
+    initial_value: '0'
   # Global initialization variable. Initialized to true and set to false once everything is connected. Only used to have a smooth "plugging" experience
   - id: init_in_progress
     type: bool
@@ -717,119 +725,93 @@ light:
             }
       - addressable_lambda:
           name: "Waiting Rainbow"
-          update_interval: 50ms
+          update_interval: 100ms
           lambda: |-
-            // Waiting phase: dark, NON-rotating rainbow at the shared rotation, so the ring
-            // sits in exactly the position Reply Rainbow (also stationary) left it in.
-            // Eases down from full brightness to the dark level for a smooth entry.
-            static float level = 1.0f;
-            if (initial_run) {
-              level = 1.0f;
-            }
-            const float dark_level = 0.75f;
+            // Waiting phase: a lit dot with a short comet trail walks the ring, colored from the
+            // shared palette. Slow: 1 LED per 100ms frame => 1.2s per lap.
+            // dir = direction of travel; the two trail LEDs sit behind it.
+            const int8_t dir = 1;
+            Color c = id(led_rainbow_lut)[id(led_color_index)];
             for (uint8_t i = 0; i < 12; i++) {
-              uint8_t hue = (uint8_t)((i * 256 / 12) + id(led_rainbow_rotation));
-              ESPHSVColor hsv(hue, 255, (uint8_t)(255.0f * level));
-              it[i] = hsv.to_rgb();
+              if (i == id(led_dot_pos)) {
+                it[i] = c;
+              } else if (i == (id(led_dot_pos) + 12 - dir) % 12) {
+                it[i] = c * 96;
+              } else if (i == (id(led_dot_pos) + 12 - 2 * dir) % 12) {
+                it[i] = c * 32;
+              } else {
+                it[i] = Color::BLACK;
+              }
             }
-            // 0.05 per 50ms frame => ~0.65s fade from full down to the dark level.
-            if (level > dark_level) {
-              level -= 0.05f;
-              if (level < dark_level) level = dark_level;
-            }
+            id(led_dot_pos) = (id(led_dot_pos) + 1) % 12;
+            // +6 per 100ms frame is the same hue rate as the +3 per 50ms the other phases use, so
+            // the color cycles at one constant ~4.3s real-time rate no matter which phase is up.
+            id(led_color_index) += 6;
       - addressable_lambda:
           name: "Voice Rainbow"
           update_interval: 50ms
           lambda: |-
-            // Listening phase: full-brightness rainbow rotating clockwise. No reset on entry —
-            // it continues from the shared rotation the dark Waiting ring is already showing,
-            // and spinning advances that shared value for the phases that follow.
+            // Listening phase: the same comet as Waiting, twice as fast — 1 LED per 50ms frame
+            // => 0.6s per lap. No reset on entry: it picks the dot up at the position and color
+            // Waiting left it at.
+            const int8_t dir = 1;
+            Color c = id(led_rainbow_lut)[id(led_color_index)];
             for (uint8_t i = 0; i < 12; i++) {
-              uint8_t hue = (uint8_t)((i * 256 / 12) + id(led_rainbow_rotation));
-              ESPHSVColor hsv(hue, 255, 255);
-              it[i] = hsv.to_rgb();
+              if (i == id(led_dot_pos)) {
+                it[i] = c;
+              } else if (i == (id(led_dot_pos) + 12 - dir) % 12) {
+                it[i] = c * 96;
+              } else if (i == (id(led_dot_pos) + 12 - 2 * dir) % 12) {
+                it[i] = c * 32;
+              } else {
+                it[i] = Color::BLACK;
+              }
             }
-            // Decrement = clockwise; 6 per 50ms frame = ~2.1s per full turn.
-            id(led_rainbow_rotation) = id(led_rainbow_rotation) - 6;
+            id(led_dot_pos) = (id(led_dot_pos) + 1) % 12;
+            id(led_color_index) += 3;
       - addressable_lambda:
           name: "Thinking Rainbow"
           update_interval: 50ms
           lambda: |-
-            // Thinking phase: the rotation stops (led_rainbow_rotation is left untouched), the
-            // frozen rainbow fades up to full white, then the white breathes 100% -> 60% -> 100%.
-            // The current white level is published to led_white_level for Reply Rainbow.
-            static float blend = 0.0f;   // 0 = rainbow, 1 = white
-            static float level = 1.0f;   // breathing level once fully white
-            static bool dimming = true;
-            if (initial_run) {
-              blend = 0.0f;
-              level = 1.0f;
-              dimming = true;
-            }
+            // Thinking phase: the comet STOPS where it is (led_dot_pos is left untouched) and only
+            // its color keeps walking the palette — dot and trail cycle the rainbow in place.
+            // dir stays +1 so the frozen trail keeps pointing back the way Listening came.
+            const int8_t dir = 1;
+            Color c = id(led_rainbow_lut)[id(led_color_index)];
             for (uint8_t i = 0; i < 12; i++) {
-              uint8_t hue = (uint8_t)((i * 256 / 12) + id(led_rainbow_rotation));
-              Color rgb = ESPHSVColor(hue, 255, 255).to_rgb();
-              float r = rgb.r + (255.0f - rgb.r) * blend;
-              float g = rgb.g + (255.0f - rgb.g) * blend;
-              float b = rgb.b + (255.0f - rgb.b) * blend;
-              it[i] = Color((uint8_t)(r * level), (uint8_t)(g * level), (uint8_t)(b * level));
+              if (i == id(led_dot_pos)) {
+                it[i] = c;
+              } else if (i == (id(led_dot_pos) + 12 - dir) % 12) {
+                it[i] = c * 96;
+              } else if (i == (id(led_dot_pos) + 12 - 2 * dir) % 12) {
+                it[i] = c * 32;
+              } else {
+                it[i] = Color::BLACK;
+              }
             }
-            if (blend < 1.0f) {
-              // Fade-to-white: 0.08 per 50ms frame => ~0.65s.
-              blend += 0.08f;
-              if (blend > 1.0f) blend = 1.0f;
-            } else if (dimming) {
-              // Breathe: 0.02 per frame => 100% -> 60% -> 100% in ~2s.
-              level -= 0.02f;
-              if (level <= 0.6f) { level = 0.6f; dimming = false; }
-            } else {
-              level += 0.02f;
-              if (level >= 1.0f) { level = 1.0f; dimming = true; }
-            }
-            id(led_white_level) = blend < 1.0f ? 1.0f : level;
+            id(led_color_index) += 3;
       - addressable_lambda:
           name: "Reply Rainbow"
           update_interval: 50ms
           lambda: |-
-            // Reply phase: fade from the white Thinking is currently showing (led_white_level)
-            // back to the full rainbow, held STATIONARY at the shared rotation. Once the rainbow
-            // is back, a white pulse travels counter-clockwise around the stationary ring.
-            // led_rainbow_rotation is never advanced here, so the Waiting phase that follows
-            // shows the ring in this exact position.
-            static float blend = 1.0f;      // 1 = white, 0 = rainbow
-            static float white_start = 1.0f;
-            static float pulse_pos = 0.0f;  // LED index of the white pulse
-            if (initial_run) {
-              blend = 1.0f;
-              white_start = id(led_white_level);
-              pulse_pos = 0.0f;
-            }
+            // Reply phase: the comet moves again at the Listening speed, but BACKWARDS — it unwinds
+            // from wherever Thinking parked it. (+11 % 12 is -1 without going negative on a uint8_t.)
+            // dir = -1 flips the trail to the other side, so it still follows the dot.
+            const int8_t dir = -1;
+            Color c = id(led_rainbow_lut)[id(led_color_index)];
             for (uint8_t i = 0; i < 12; i++) {
-              uint8_t hue = (uint8_t)((i * 256 / 12) + id(led_rainbow_rotation));
-              Color rgb = ESPHSVColor(hue, 255, 255).to_rgb();
-              float whiteness = blend;
-              if (blend <= 0.0f) {
-                // Circular distance (0..6 LEDs) between this LED and the pulse position.
-                float d = fabsf(fmodf((float)i - pulse_pos + 18.0f, 12.0f) - 6.0f);
-                if (d < 2.0f) {
-                  whiteness = (1.0f - d / 2.0f) * 0.9f;
-                }
+              if (i == id(led_dot_pos)) {
+                it[i] = c;
+              } else if (i == (id(led_dot_pos) + 12 - dir) % 12) {
+                it[i] = c * 96;
+              } else if (i == (id(led_dot_pos) + 12 - 2 * dir) % 12) {
+                it[i] = c * 32;
+              } else {
+                it[i] = Color::BLACK;
               }
-              // Blend toward white at the level the fade started from (matches Thinking's breath).
-              float wl = 255.0f * (blend > 0.0f ? white_start : 1.0f);
-              it[i] = Color((uint8_t)(rgb.r + (wl - rgb.r) * whiteness),
-                            (uint8_t)(rgb.g + (wl - rgb.g) * whiteness),
-                            (uint8_t)(rgb.b + (wl - rgb.b) * whiteness));
             }
-            if (blend > 0.0f) {
-              // Fade-to-rainbow: 0.08 per 50ms frame => ~0.65s.
-              blend -= 0.08f;
-              if (blend < 0.0f) blend = 0.0f;
-            } else {
-              // Voice Rainbow's decrement reads as clockwise, so decreasing the LED index
-              // moves the pulse the other way; 0.35 LEDs per frame = ~1.7s per lap.
-              pulse_pos = fmodf(pulse_pos - 0.35f + 12.0f, 12.0f);
-            }
+            id(led_dot_pos) = (id(led_dot_pos) + 11) % 12;
+            id(led_color_index) += 3;
       - addressable_lambda:
           name: "Debug Waiting"
           update_interval: 250ms

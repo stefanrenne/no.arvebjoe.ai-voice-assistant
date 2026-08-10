@@ -177,37 +177,58 @@ before assuming the model is bad.** (Current shipped value: **`0.98`**.)
 
 ---
 
-## Change 2 — Shared rainbow rotation + white-level globals
+## Change 2 — Shared rainbow palette + dot-position globals
 
-The four rainbow voice-phase effects (Waiting / Listening / Thinking / Reply) share a single rotation
-value so the rainbow keeps its position across phase changes — Waiting shows it dark and static,
-Listening spins it, Thinking freezes it and fades to white, Reply keeps it stationary (a white pulse
-travels around it instead), and the next Waiting picks up the exact same position. This only works if
-the rotation lives in a **global** instead of each effect's own `static` variable. A second global
-hands the current white brightness from Thinking to Reply so the white→rainbow fade starts from the
-exact white the ring is showing.
+All four rainbow voice-phase effects (Waiting / Listening / Thinking / Reply) draw the **same thing**:
+a single lit LED walking the ring, colored from a **256-entry rainbow palette built once at boot**.
+The effects differ only in how that dot moves — slow, fast, stopped, or backwards.
+
+Three globals carry it:
+
+- `led_rainbow_lut` — the palette, `Color[256]`, hue 0–255 at full saturation/value. Built once so no
+  effect does HSV math per frame and all four are guaranteed to use an identical palette.
+- `led_dot_pos` — which LED (0–11) the dot is on.
+- `led_color_index` — where in the palette its color comes from.
+
+Position and color are **global, not per-effect `static`s**: that is what makes a phase change
+seamless. The dot never jumps or restarts — it keeps its exact LED and color, and only the movement
+changes.
 
 In the **`globals:`** section, add these entries (next to `global_led_animation_index` is fine):
 
 ```yaml
-  # Shared rotation for the rainbow voice-phase effects (Waiting/Voice/Thinking/Reply Rainbow).
-  # Kept global so the rainbow keeps its position across phase changes: Waiting shows it dark and
-  # static, Listening spins it, Thinking freezes it and fades to white, Reply keeps it stationary
-  # (a white pulse travels instead) — so the next Waiting picks up the exact same position.
-  - id: led_rainbow_rotation
+  - id: led_rainbow_lut
+    type: Color[256]
+    restore_value: no
+  - id: led_dot_pos
     type: uint8_t
     restore_value: no
     initial_value: '0'
-  # White level the Thinking effect is currently breathing at (0.6 - 1.0). Reply Rainbow reads it
-  # on entry so its fade back to the rainbow starts from the exact white the ring is showing.
-  - id: led_white_level
-    type: float
+  - id: led_color_index
+    type: uint8_t
     restore_value: no
-    initial_value: '1.0'
+    initial_value: '0'
 ```
 
-> `uint8_t` matters: it wraps 0→255 automatically, so `rotation - 6` stays valid without any modulo.
-> The hue math (`i * 256 / 12 + rotation`) assumes this 0–255 range.
+> `uint8_t` for `led_color_index` matters: it wraps 255→0 by itself, so `+= 3` never needs a modulo
+> and the palette walk is seamless. `Color[256]` is a legitimate global type — ESPHome's
+> `GlobalsComponent` handles array types explicitly (`std::remove_extent`).
+
+Fill the palette in the **`esphome:` → `on_boot:`** block, **before** `script.execute: control_leds`:
+
+```yaml
+  on_boot:
+    priority: 375
+    then:
+      # Build the shared rainbow palette once, before anything can draw with it.
+      - lambda: |-
+          for (uint16_t h = 0; h < 256; h++) {
+            id(led_rainbow_lut)[h] = ESPHSVColor((uint8_t) h, 255, 255).to_rgb();
+          }
+      - script.execute: control_leds
+```
+
+> The loop counter is `uint16_t` on purpose — a `uint8_t h` would wrap to 0 at 256 and loop forever.
 
 ---
 
@@ -217,36 +238,61 @@ In the **`light:`** section, under the `voice_assistant_leds` partition light's 
 effects below. Insert them anywhere in the list — next to the existing `"Replying"` / `"Muted or Silent"`
 effects is fine.
 
-All four effects read `id(led_rainbow_rotation)` (Change 2), but only `Voice Rainbow` advances it —
-`Waiting Rainbow`, `Thinking Rainbow` and `Reply Rainbow` deliberately leave it untouched, which is
-what makes the ring position carry over from phase to phase. **The four lambdas are long — copy them
-from the `effects:` list in this repo's `home-assistant-voice.yaml`** (search for the effect names)
-rather than from this doc. What each one does:
+All four draw the **same comet** — a lit dot plus two dimmed LEDs trailing behind it — and then move
+it and advance the color. They differ only in `update_interval`, in `dir`, and in the two step values.
+Copy them from the `effects:` list in this repo's `home-assistant-voice.yaml` (search for the effect
+names). The body every one of them shares:
 
-| Effect             | Phase     | Behavior |
-|--------------------|-----------|----------|
-| `Waiting Rainbow`  | Waiting   | Dark (35%) rainbow, **not rotating**, at the shared rotation; eases down from full brightness on entry. |
-| `Voice Rainbow`    | Listening | Full rainbow rotating clockwise (`rotation - 6` per 50ms ≈ 2.1s/turn). No reset on entry — continues from the shared rotation. |
-| `Thinking Rainbow` | Thinking  | Rotation stops; the frozen rainbow fades up to full white (~0.65s), then the white breathes 100% → 60% → 100% (~2s). Publishes its current level to `led_white_level`. |
-| `Reply Rainbow`    | Replying  | Fades from the white Thinking was showing back to the full rainbow, held **stationary**; then a white pulse travels **counter-clockwise** around the ring (~1.7s/lap). |
+```yaml
+            const int8_t dir = 1;   // direction of travel; the trail sits behind it
+            Color c = id(led_rainbow_lut)[id(led_color_index)];
+            for (uint8_t i = 0; i < 12; i++) {
+              if (i == id(led_dot_pos)) {
+                it[i] = c;
+              } else if (i == (id(led_dot_pos) + 12 - dir) % 12) {
+                it[i] = c * 96;
+              } else if (i == (id(led_dot_pos) + 12 - 2 * dir) % 12) {
+                it[i] = c * 32;
+              } else {
+                it[i] = Color::BLACK;
+              }
+            }
+```
 
-Because Reply never advances the rotation, the Waiting phase that follows shows the ring in exactly
-the position Reply had — every transition is seamless while each phase stays visually distinct.
+> The `+ 12 -` keeps the index non-negative before the `%`, for **both** values of `dir`: with
+> `dir = -1` the two trail terms evaluate to `pos + 1` and `pos + 2`, i.e. the trail flips to the
+> other side of the dot so it still follows rather than leads.
 
-> The older **Cold Rainbow** / **Warm Rainbow** (hue-band rings) and **Thinking White** effects were
-> superseded by this design and have been removed from the YAML. They still exist in
-> `home-assistant-voice-debug.yaml` if you want them back.
+| Effect             | Phase     | Interval | Dot movement                | `dir` | Behavior |
+|--------------------|-----------|----------|-----------------------------|-------|----------|
+| `Waiting Rainbow`  | Waiting   | 100ms    | `+1` → 1.2s/lap             | `1`   | Slow walk around the ring. |
+| `Voice Rainbow`    | Listening | 50ms     | `+1` → 0.6s/lap             | `1`   | Same walk, twice as fast. |
+| `Thinking Rainbow` | Thinking  | 50ms     | **none** (`led_dot_pos` untouched) | `1` | The comet stops dead; only its color keeps cycling the palette in place. `dir` stays `1` so the frozen trail keeps pointing back the way Listening came. |
+| `Reply Rainbow`    | Replying  | 50ms     | `+11 % 12` → −1, 0.6s/lap   | `-1`  | Listening speed, running backwards, trail flipped to follow. |
+
+The color step is `+6` at 100ms and `+3` at 50ms — deliberately the same hue rate in wall-clock time,
+so the palette walk takes ~4.3s per full cycle in **every** phase and only the movement distinguishes
+them. Because position and color live in globals, each phase picks the dot up exactly where the
+previous one left it: no jump, no restart, one continuous animation across the whole conversation.
+
+> The older **Cold Rainbow** / **Warm Rainbow** (hue-band rings) and **Thinking White** effects, and
+> the earlier full-ring rotating-rainbow + fade-to-white design that used `led_rainbow_rotation` /
+> `led_white_level`, were all superseded by this one and removed from the YAML. The full-ring version
+> still exists in `home-assistant-voice-debug.yaml` if you want it back.
 
 ### Tuning knobs
-- **Rotation speed / direction:** the `id(led_rainbow_rotation) - 6` line in `Voice Rainbow`
-  (step `6` per 50ms ≈ 2.1s/turn). Higher step = faster; flip to `+` if it spins the wrong way on
+- **Speed:** `update_interval` (how often the dot steps) — 100ms Waiting, 50ms the rest. The ring's
+  `max_refresh_rate` is 15ms, so don't go below ~16ms.
+- **Direction:** `+ 1` vs `+ 11` in the `id(led_dot_pos) = ... % 12` line — and flip that effect's
+  `dir` to match, or the trail ends up leading the dot. Swap both if the comet runs the wrong way on
   your unit (CW/CCW depends on the physical wiring).
-- **Waiting darkness:** `dark_level` in `Waiting Rainbow` (0.35 = 35%); the `0.05f` step sets how
-  fast it eases down.
-- **Thinking breath:** the `0.02f` step and `0.6f` floor in `Thinking Rainbow` set breathing speed
-  and how dim the white dips; the `0.08f` blend step sets the initial fade-to-white speed.
-- **Reply pulse:** `0.35f` per frame is the pulse's travel speed (≈1.7s/lap; negate it to reverse
-  direction), `d < 2.0f` its width (LEDs each side), and `* 0.9f` its whiteness strength.
+- **Color cycle speed:** the `id(led_color_index) += N` step. Keep the 2:1 ratio between the 100ms and
+  50ms effects to keep the hue rate constant across phases; raise both to cycle faster.
+- **Trail length / falloff:** the `c * 96` and `c * 32` scales (out of 255 ≈ 38% and 12%). Raise them
+  for a longer-looking smear, lower for a crisper dot; add a third `else if` at `- 3 * dir` with a
+  smaller scale for one more tail LED. All 12 LEDs lit means no visible motion, so keep it short.
+- **Palette:** the `on_boot` fill (Change 2). Narrow the hue range or drop saturation there and every
+  effect follows, since they all index the one array.
 
 ---
 
@@ -277,14 +323,15 @@ Each edit is just the one `effect:` line, e.g.:
 > left defined in the `effects:` list — they just become unused, which makes reverting easy.
 
 ### Resulting behavior
-The shared rotation makes the whole conversation one continuous animation:
-- **Waiting** → dark rainbow, **not rotating**
-- **Listening** → the same rainbow at full brightness, spinning clockwise
-- **Thinking** (processing) → rotation stops, the frozen rainbow fades to white, the white breathes
-  between 100% and 60%
-- **Replying** (speaking the answer) → the white fades back to the full rainbow, which stays
-  **stationary** while a white pulse travels **counter-clockwise** around it
-- back to **Waiting** → the ring just dims, keeping the exact position Reply had
+One comet — a lit dot with a two-LED trail, colored from the shared palette — is the whole conversation:
+- **Waiting** → it walks the ring slowly (1.2s/lap)
+- **Listening** → the same walk at double speed (0.6s/lap)
+- **Thinking** (processing) → it stops where it is and cycles colors in place
+- **Replying** (speaking the answer) → it moves again at Listening speed, **backwards**
+- back to **Waiting** → it just slows down again
+
+The color keeps cycling at the same rate throughout, and position/color are globals, so nothing ever
+resets at a phase boundary — the transitions are seamless while each phase reads differently.
 
 Error / muted / timer states are left untouched (error = red pulse, etc.).
 
