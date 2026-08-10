@@ -10,12 +10,13 @@ import { FileInfo } from './interfaces.mjs';
  * together with what speech-to-text made of it. The files normally live ~30 s
  * (they are served to the satellite and deleted); a recording instead lives for
  * the retention window the user picked, so it can still be played back
- * afterwards — by voice (the `play_voice_recording` tool) or from the Debug
- * page ("Play on device").
+ * afterwards from the Debug page ("Play on device"). That page is the only way
+ * in — the assistant has no tool for it, since asking "what did I just say?"
+ * out loud only ever got the question itself read back.
  *
  * Playback goes to the satellite that recorded it: each device registers a
- * player callback here on init, so neither the tool nor the settings API needs
- * to look devices up through the driver.
+ * player callback here on init, so the settings API never has to look devices
+ * up through the driver.
  */
 
 /** How many recordings are kept in the list (per app, newest first). */

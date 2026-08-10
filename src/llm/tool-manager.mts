@@ -11,7 +11,6 @@ import { BringClient } from "../helpers/bring-client.mjs";
 import { MusicAssistantClient, getMusicAssistantClient, MaPlayer, MaMediaItem, MaQueueCommand } from "../helpers/music-assistant-client.mjs";
 import { getPlayAcknowledgement } from "./instructions/music-instructions.mjs";
 import { getSearchAcknowledgement } from "./instructions/search-instructions.mjs";
-import { recordingRegistry } from "../helpers/recording-registry.mjs";
 
 type ToolHandler = (args: any) => Promise<any> | any;
 
@@ -67,9 +66,6 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
     // artist on MA 2.9) says "Putting on X, one moment" instead of dead air.
     private interimSpeak?: (text: string) => void;
     private static readonly PLAY_ACK_DELAY_MS = 4_000;
-    // Which satellite's microphone recordings play_voice_recording plays back
-    // (set by the device; unset means "any device's").
-    private recordingDeviceId?: string;
 
     // Weather / web search / timers are gated the same way (docs/cost-of-growth.md
     // rule 1: every optional feature has an on/off gate so disabled features cost
@@ -82,11 +78,6 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
     ];
     private static readonly TIMER_TOOL_NAMES = ['set_timer', 'cancel_timer', 'get_timer'];
     private static readonly WEB_SEARCH_TOOL_NAMES = ['web_search'];
-    // "What did I just say?" (Debug settings section, `debug_audio_enabled`).
-    // A debug aid, not a feature: it is only registered while recording is on,
-    // so it costs nothing in the normal configuration.
-    private recordingPlaybackActive = false;
-    private static readonly RECORDING_TOOL_NAMES = ['play_voice_recording'];
 
     /** Tool names per optional feature — the settings cost endpoint groups by this. */
     static readonly FEATURE_TOOLS: Record<string, readonly string[]> = {
@@ -264,7 +255,6 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
         this.refreshTimerTools();
         this.refreshShoppingListTools();
         this.refreshMusicTools();
-        this.refreshRecordingPlaybackTools();
     }
 
     /** Whether the weather tools are currently registered. */
@@ -338,29 +328,6 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
         return active;
     }
 
-    /** Whether the recording-playback debug tool is currently registered. */
-    isRecordingPlaybackActive(): boolean {
-        return this.recordingPlaybackActive;
-    }
-
-    /**
-     * Reconcile the recording-playback tool with the `debug_audio_enabled`
-     * setting (default off). Same contract as the other gates: returns the new
-     * active state so the device can restart the provider when it flips.
-     */
-    refreshRecordingPlaybackTools(): boolean {
-        const active = ToolManager.boolSetting('debug_audio_enabled', false);
-        if (active === this.recordingPlaybackActive) return active;
-        if (active) {
-            this.registerRecordingPlaybackTool();
-        } else {
-            for (const name of ToolManager.RECORDING_TOOL_NAMES) this.unregisterTool(name);
-        }
-        this.recordingPlaybackActive = active;
-        this.logger.info(`Recording playback tool ${active ? 'registered' : 'removed'}`);
-        return active;
-    }
-
     /**
      * Cost measurement ONLY (settings page budget panel): register every
      * optional feature's tools regardless of settings, credentials or device
@@ -398,15 +365,6 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
     /** Register the device's speak path for mid-tool-call acknowledgements. */
     setInterimSpeak(speak: (text: string) => void): void {
         this.interimSpeak = speak;
-    }
-
-    /**
-     * Which satellite's recordings play_voice_recording works with — the one
-     * this ToolManager belongs to, so "what did I just say?" never plays a
-     * recording made in another room.
-     */
-    setRecordingDeviceId(deviceId: string): void {
-        this.recordingDeviceId = deviceId;
     }
 
     /**
@@ -689,68 +647,6 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
                             "and answer general questions conversationally.",
                         tools
                     }
-                };
-            }
-        });
-    }
-
-    /**
-     * "What did I just say?" — play the raw microphone recording of a previous
-     * turn back on the satellite. Registered only while `debug_audio_enabled`
-     * is on (the recordings only exist then), so it costs nothing otherwise.
-     *
-     * The handler awaits playback, so the model's spoken reply lands after the
-     * clip instead of on top of it.
-     */
-    private registerRecordingPlaybackTool(): void {
-        this.registerTool({
-            type: "function",
-            name: "play_voice_recording",
-            description: "Play back the raw microphone recording of what the user actually said, on this device's speaker. " +
-                "Call this when the user asks to hear what they just said, or wants to check whether the microphone or the speech recognition got it right " +
-                "(e.g. \"what did I just say?\", \"play back what you heard\", \"did you hear me correctly?\"). " +
-                "Returns what speech-to-text made of each recording. The audio has already been played when this returns — keep the spoken reply after it very short.",
-            parameters: {
-                type: "object",
-                properties: {
-                    count: {
-                        type: "integer",
-                        description: "How many of the most recent recordings to play, oldest of those first. Defaults to 1 (the last thing the user said). Use a higher number when the user asks for several or for everything.",
-                    },
-                },
-                required: [],
-                additionalProperties: false
-            },
-            handler: async (args: any) => {
-                const requested = Number(args?.count);
-                const count = Number.isFinite(requested) && requested > 0 ? Math.min(10, Math.round(requested)) : 1;
-                this.logger.info(`play_voice_recording count=${count}`, 'TOOL');
-
-                // The current turn's own recording is only saved when the mic
-                // closes, so the newest entry IS "what I just said".
-                const newestFirst = recordingRegistry.list(this.recordingDeviceId).slice(0, count);
-                if (!newestFirst.length) {
-                    return {
-                        ok: false,
-                        code: 'NO_RECORDINGS',
-                        message: "There are no recordings to play back. They are kept for a limited time after each turn.",
-                    };
-                }
-
-                // Oldest first, so a multi-clip playback follows the conversation.
-                const ordered = [...newestFirst].reverse();
-                const result = await recordingRegistry.play(ordered);
-                const now = Date.now();
-
-                return {
-                    ok: result.played > 0,
-                    message: result.message,
-                    played: result.played,
-                    recordings: ordered.map((r) => ({
-                        seconds_ago: Math.round((now - r.at) / 1000),
-                        duration_seconds: Math.round(r.durationMs / 100) / 10,
-                        heard_as: r.transcript || '(no transcript)',
-                    })),
                 };
             }
         });

@@ -1291,3 +1291,13 @@ Two bugs found on the way:
 
 New tests: `esp-probe`, `seen-devices`, `discovery-watcher`, `recording-registry`, `debug-api`,
 plus a `play_voice_recording` case in `feature-gates`. Suite: 802 passed / 15 skipped.
+
+**Follow-up (2026-08-10): the `play_voice_recording` tool was removed again.** Tested on the real
+device, asking *"hva var det jeg akkurat sa?"* plays back exactly that question — the recording of
+the turn that triggered the tool is the newest one, so the answer is always the question itself.
+The Debug page is where you actually compare audio against the transcript, and it is enough. Gone
+with it: `RECORDING_TOOL_NAMES`, `recordingPlaybackActive`, `refreshRecordingPlaybackTools()`,
+`isRecordingPlaybackActive()`, `setRecordingDeviceId()` and the `debug_audio_enabled` provider
+restart in `handleSettingsChange`. The registry, the player callback and `playRecordings()` stay —
+they serve `POST /play-recording`. The `feature-gates` case now asserts the tool is *never*
+registered, even with `debug_audio_enabled` on.

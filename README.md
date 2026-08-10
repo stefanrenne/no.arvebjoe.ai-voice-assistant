@@ -480,9 +480,9 @@ language-model and speech stages can also be set to **None** to switch them off 
   dialog.
 * **What did I just say?** *(opt-in, off by default)* — keeps the raw microphone audio of each
   turn for 5 minutes to an hour (your choice; the last 20 recordings are kept and they're deleted
-  automatically). Ask the assistant *"what did I just say?"* and it plays the recording back on
-  the device, or press **Play** next to any recording in the list — each one shows what speech
-  recognition made of it. This is how you tell a microphone problem (muffled, clipped, too quiet)
+  automatically). Press **Play** next to any recording in the list and it plays back on the
+  device — each one shows what speech recognition made of it. This is how you tell a microphone
+  problem (muffled, clipped, too quiet)
   from a speech-recognition problem (the audio is clear but the transcript is wrong). While it is
   on, recent microphone audio is reachable on your local network like every other clip the device
   plays, so leave it off when you're not debugging.
@@ -641,8 +641,8 @@ entirely on the engine you pick — with the local pipeline, nothing does.
 * **The device wakes but doesn't hear what you say (or only up close):** raise the device's
   *Microphone gain* setting; if loud close-up speech gets misheard instead, lower it.
 * **The assistant keeps misunderstanding you:** turn on Settings → **Debug** → **What did I just
-  say?**, talk to it again, then ask *"what did I just say?"*. Hearing the actual recording tells
-  you whether the microphone or the speech recognition is at fault.
+  say?**, talk to it again, then play the recording from that same page. Hearing the actual
+  recording tells you whether the microphone or the speech recognition is at fault.
 * **Flashing/USB issues:** try another USB cable/port; if needed, enter bootloader mode and
   re-flash.
 * **Device not updating OTA:** ensure it's online and reachable; verify hostname/DNS on your LAN.

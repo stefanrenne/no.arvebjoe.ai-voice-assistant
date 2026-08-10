@@ -96,19 +96,14 @@ describe('feature gates (weather / web search / timers)', () => {
         expect(toolNames(tm)).toContain('get_current_weather');
     });
 
-    it('the recording-playback debug tool is off by default and follows debug_audio_enabled', () => {
-        const tm = makeToolManager();
-        expect(toolNames(tm)).not.toContain('play_voice_recording');
-        expect(tm.isRecordingPlaybackActive()).toBe(false);
-
+    it('exposes no recording-playback tool, even with debug_audio_enabled on', () => {
+        // "What did I just say?" is a Debug-page-only feature: asking by voice
+        // used to just get the question itself played back, so the tool is gone.
         mockHomey.setMockSetting('debug_audio_enabled', true);
         settingsManager.refreshGlobals();
-        expect(tm.refreshRecordingPlaybackTools()).toBe(true);
-        expect(toolNames(tm)).toContain('play_voice_recording');
-
-        mockHomey.setMockSetting('debug_audio_enabled', 'false');
-        settingsManager.refreshGlobals();
-        expect(tm.refreshRecordingPlaybackTools()).toBe(false);
+        const tm = makeToolManager();
+        expect(toolNames(tm)).not.toContain('play_voice_recording');
+        tm.registerAllToolsForMeasurement();
         expect(toolNames(tm)).not.toContain('play_voice_recording');
     });
 

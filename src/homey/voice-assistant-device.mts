@@ -125,10 +125,11 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
   private inputBufferDebug: boolean = false;
   // "What did I just say?" (`debug_audio_enabled`, Debug settings section): the
   // same capture, but the recording is KEPT for the retention window instead of
-  // played back at once, so the user can ask for it later (play_voice_recording)
-  // or play it from the Debug page. Opt-in and off by default — while it is on,
-  // recent microphone audio is reachable on the LAN audio URL like every other
-  // clip the satellite plays.
+  // played back at once, so the user can play it from the Debug page afterwards.
+  // Deliberately NOT reachable by voice — the assistant has no tool for it, so
+  // asking out loud just gets the phrase repeated back at you. Opt-in and off by
+  // default — while it is on, recent microphone audio is reachable on the LAN
+  // audio URL like every other clip the satellite plays.
   private micRecordingEnabled: boolean = false;
   private recordingRetentionMs: number = retentionMsFromSetting(undefined);
   private inputBuffer: Buffer[] = [];
@@ -312,10 +313,6 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
       deviceName: this.getName(),
       zone: this.currentZone,
     }));
-    // "What did I just say?": the playback tool only ever reaches for THIS
-    // satellite's recordings (it is registered only while debug_audio_enabled).
-    this.toolManager.setRecordingDeviceId(String(this.getData().id));
-
     // Slow-command acknowledgement ("Putting on X, one moment") — spoken on
     // this satellite while a play_media is still resolving server-side.
     this.toolManager.setInterimSpeak((text) => {
@@ -1289,14 +1286,9 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
         needRestart = true;
       }
 
-      // "What did I just say?": capture + retention apply to the next turn, but
-      // the playback tool is part of the tool list, so a flip needs a restart.
+      // "What did I just say?": capture + retention apply to the next turn, and
+      // nothing about them reaches the provider, so no restart is needed.
       this.applyMicRecordingSettings();
-      const recordingToolsActive = this.toolManager.isRecordingPlaybackActive();
-      if (this.toolManager.refreshRecordingPlaybackTools() !== recordingToolsActive) {
-        this.logger.info(`Recording playback ${!recordingToolsActive ? 'enabled' : 'disabled'}, updating agent.`);
-        needRestart = true;
-      }
 
       // Timers gate: tools follow the setting; the instruction block needs the
       // device's firmware support too (same AND as the 'capabilities' handler).
@@ -1694,15 +1686,15 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
   }
 
   /**
-   * Play recordings back on this satellite, one after the other. Each clip is
-   * awaited for its own length (plus a short gap) because the ESP announce
-   * queue gives no per-clip completion we can trust mid-turn — and awaiting
-   * matters: the tool call that triggered this only returns afterwards, so the
-   * assistant's spoken reply lands after the playback instead of over it.
+   * Play recordings back on this satellite, one after the other. Driven by the
+   * Debug settings page (`/recordings/play`); each clip is awaited for its own
+   * length (plus a short gap) because the ESP announce queue gives no per-clip
+   * completion we can trust, so without the wait a multi-clip selection would
+   * fire every announce at once.
    */
   private async playRecordings(recordings: Recording[]): Promise<void> {
     const GAP_MS = 400;
-    // Bound the total wait so a long selection can't hold a tool call open.
+    // Bound the total wait so a long selection can't hold the API call open.
     const MAX_TOTAL_MS = 60_000;
     let spent = 0;
 
@@ -1714,8 +1706,9 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
         // needs its own run around it, like any other stand-alone playback.
         this.playUrl(recording.url);
       } else {
-        // Mid-turn (the play_voice_recording tool): a bare announce, the same
-        // way the slow-command acknowledgement plays inside a run.
+        // Played from the Debug page while a conversation happens to be running:
+        // a bare announce, the same way the slow-command acknowledgement plays
+        // inside a run.
         this.esp.playAudioFromUrl(recording.url, false);
       }
 
