@@ -1,5 +1,61 @@
 # TODO — single source of truth
 
+## Audio URLs can advertise the container's Docker address (all drivers)
+
+- [ ] **`getLanIP()` can return the app container's Docker-bridge address, making every reply
+      URL unreachable from the satellite.** Found in the ReSpeaker tester's log 2026-08-10
+      (forum post #60) — the device tried to fetch
+      `http://172.17.0.2/app/no.arvebjoe.ai-voice-assistant/userdata/audio/tx_….flac` and got
+      `esp-tls: [sock=58] select() timeout` → `ESP_ERR_HTTP_CONNECT`. `172.17.0.0/16` is
+      Docker's default bridge; a later run of the same device on the same app used
+      `192.168.1.107` and played fine, so this is **intermittent, not device-specific, and
+      affects every driver**.
+
+      Cause is `webserver.mts:69-79`: the loop returns on the **first** non-internal IPv4
+      whose interface name matches `/^(eth|en|enx)/i`. Inside the app container the Docker
+      veth is `eth0`, so it matches and short-circuits before the real LAN interface is ever
+      considered. Which interface enumerates first is a startup race — hence the intermittency.
+      (The tester self-diagnosed it as "related to using a custom pipeline"; it is not, the
+      pipeline switch merely coincided with an app restart that lost the race.)
+
+      Preferred fix: derive the advertised host from the **local address of the TCP socket
+      already connected to the ESP device** (`socket.localAddress`) — routable back by
+      construction, no heuristics. Keep `getLanIP()` as the fallback for the no-device-connected
+      case and teach it to skip `172.16.0.0/12` alongside the existing `169.254.` skip.
+
+      Downstream symptom worth recognising in future reports: an unreachable announce URL puts
+      the satellite in a **~2 s retry loop** — the firmware's hardcoded `start_playback_timeout_`
+      ends the announce as "finished", our `announce_finished` handler
+      (`voice-assistant-device.mts:432`) dequeues the next segment, repeat. On the ReSpeaker
+      that surfaces as an endless `Beam lock released` / `activate_stop_word_once is already
+      running` churn, which looks like a firmware fault and is not one.
+
+## ESPHome native-API protocol correctness
+
+- [ ] **`stt_end()`, `stt_vad_end()` and `intent_progress()` never transmit their text.** All
+      three pass a spread `{ text }` to `vaEvent()`
+      (`esp-voice-assistant-client.mts:963`, `:1020`, `:968`), but `VoiceAssistantEventResponse`
+      has only `event_type` and repeated `data` (`api.proto:1728-1735`) — protobufjs silently
+      drops the unknown key. The device logs `No text in STT_END event`, confirmed in the
+      ReSpeaker log 2026-08-10. Convert to the `data: [{name, value}]` form that `intent_end()`
+      and `tts_end()` already use; the trap is documented in those two methods' comments and
+      these three simply never got converted.
+- [ ] **We never subscribe to Home Assistant actions/events.** The client sends
+      `SubscribeVoiceAssistantRequest` + `SubscribeStatesRequest` at
+      `esp-voice-assistant-client.mts:727-731` but never
+      `SubscribeHomeassistantServicesRequest` (id 34, defined at `api.proto:735`, unused). Every
+      event a device fires at us is dropped with `client has not subscribed to actions (yet)` —
+      on the ReSpeaker that is `esphome.tts_uri`, `esphome.stt_text` and
+      `esphome.wake_word_detected`, several per turn. **Nothing is broken by this today** (we
+      consume none of them), so it is log-noise reduction plus an opening for a real
+      wake-word-detected signal. Must stay off the discovery-probe path like the other
+      subscribes.
+- [ ] **Consider advertising a newer API version.** We send `apiVersionMajor: 1,
+      apiVersionMinor: 6` (`esp-voice-assistant-client.mts:336-337`); current firmware logs
+      `'ai-voice-assistant' using outdated API 1.6, update to 1.14+`. Cosmetic today — but check
+      what 1.7-1.14 gate before bumping, since the handshake compatibility notes in CLAUDE.md
+      depend on the current behaviour.
+
 ## Code quality — long-term (not a release gate)
 
 - [ ] **L1 — split oversized classes / reduce `any` at trust boundaries.** The last open item
@@ -41,6 +97,33 @@ reply handed to a Sonos speaker as a URL instead (see *Reply audio as a URL for 
 devices* under "High value, more work"). Ask him explicitly about mic levels at `mic_gain` 0,
 the listed device name, the mute switch, and whether his unit carries an API encryption key.
 
+**Second report 2026-08-10 (forum post #60), with full app + ESPHome logs.** Two of the three
+problems he reported are now root-caused and have their own sections above — the `Beam lock
+released` loop is the **Docker-bridge audio URL** bug, and the `client has not subscribed to
+actions` spam plus `No text in STT_END event` are the **protocol correctness** items. Neither is
+ReSpeaker-specific and neither is caused by the custom pipeline he suspected. His config is the
+stock [`respeaker-xvf-satellite-example.yaml`](https://github.com/formatBCE/Respeaker-XVF3800-ESPHome-integration/blob/main/config/respeaker-xvf-satellite-example.yaml)
+with only the device name changed. What remains open and ReSpeaker-shaped:
+
+- [ ] **Device stops reacting to a follow-up question** (field report 2026-08-10, **root cause
+      not established** — do not fix blind). In his 21:10 log the reply plays correctly
+      (`Streaming …tx_79e63413….flac (FLAC)`, `Decode finished`), then `micro_wake_word` fires
+      **four** times (`21:10:45`, `:47`, `:52`, `:58`) and nothing follows — no new
+      `VoiceAssistantRequest`, no STT. So detection works and the device simply never asks us to
+      start a run, which points at it being stuck in conversation/announce state instead of
+      returning to idle. Corroborating: a doubled `Beam lock released` at `:41.038`/`:41.040`,
+      and `micro_wake_word: Wake word detection is already running` in the earlier log. Our side
+      of that state is the sticky `continue_conversation` flag on `intent_end(text,
+      continueConversation)` (`esp-voice-assistant-client.mts:~990`) — worth auditing what we
+      send for this device, but the YAML's `on_end` also does an **unbounded** `wait_until` before
+      restarting `micro_wake_word`, exactly like the M5Stack hang candidate above. Needs a
+      reproduction or a DEBUG-level device log covering one good turn plus one ignored wake word.
+- [ ] **`No text in TTS_START event` — the replying phase never engages on this hardware.**
+      We deliberately omit the text on the announce path (`voice-assistant-device.mts:412`)
+      because the PE firmware fires `tts_start_trigger_` itself for announcements. The ReSpeaker
+      YAML's `on_tts_start` does not, so its LED/beam "replying" phase is skipped. Sending the
+      text unconditionally is probably right, but verify it does not double-fire the phase on
+      the PE before changing it.
 - [ ] **Pair a real device end to end** — mDNS scan, manual IP, and the encrypted (Noise) path.
       Confirm it lists as *"reSpeaker XVF3800 Assistant"* (that name is derived from the YAML,
       not observed).
@@ -246,6 +329,11 @@ un-dropped 2026-07-31** (see "Start a Homey flow by voice" below).
       Distinct from (and much easier than) the voice-input-only entry below: he still wants
       **our** TTS — our voice, our language — so none of the `LocalPipelineProvider`
       TTS-optional work applies and this can ship independently.
+      **Re-asked 2026-08-10 (post #60), now with a workaround in hand:** he has a flow piping the
+      reply *text* to his Sonos and finds the Sonos TTS voice poor — "but I can also play a url on
+      sonos, would it be possible to have the output available as a url?". Confirms the design
+      below is what he wants and that the `assistant-thinking`-to-Sonos-*Say* path works today, so
+      shipping the new card is additive and breaks nothing for him.
       Findings from a full code read 2026-08-07 (all line refs verified, not guesses):
       - **The unchunked path already exists — do not build a third one.** He asked whether
         chunking could be made optional; `AudioOutputPipeline` has had two reply modes since
