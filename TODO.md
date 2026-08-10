@@ -1,13 +1,5 @@
 # TODO — single source of truth
 
-## ESPHome native-API protocol correctness
-
-- [ ] **Consider advertising a newer API version.** We send `apiVersionMajor: 1,
-      apiVersionMinor: 6` (`esp-voice-assistant-client.mts:343-344`); current firmware logs
-      `'ai-voice-assistant' using outdated API 1.6, update to 1.14+`. Cosmetic today — but check
-      what 1.7-1.14 gate before bumping, since the handshake compatibility notes in CLAUDE.md
-      depend on the current behaviour.
-
 ## Code quality — long-term (not a release gate)
 
 - [ ] **L1 — split oversized classes / reduce `any` at trust boundaries.** The last open item

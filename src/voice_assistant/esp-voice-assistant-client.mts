@@ -3,6 +3,7 @@ import net from 'node:net';
 import { TypedEmitter } from "tiny-typed-emitter";
 import { encodeFrame, decodeFrame, encodeBody, decodeBody, VA_EVENT } from './esp-messages.mjs';
 import { NoiseFrameCodec } from './noise-frame-codec.mjs';
+import { resolveEntityObjectId } from './entity-object-id.mjs';
 import { createLogger } from '../helpers/logger.mjs';
 
 
@@ -163,6 +164,10 @@ class EspVoiceAssistantClient extends (EventEmitter as new () => TypedEmitter<Es
   // scoreMuteCandidate). Reset with entityKeys on every re-listing so a
   // reconnect can't keep a stale winner.
   private muteEntityScore: number = 0;
+
+  // Whether this listing already reported that the device omits object_id (see
+  // resolveObjectId) — one line per connection, not one per entity.
+  private derivedObjectIdLogged: boolean = false;
 
   // Track device state
   private currentVolume: number = 0.5;
@@ -337,11 +342,19 @@ class EspVoiceAssistantClient extends (EventEmitter as new () => TypedEmitter<Es
   }
 
   private sendHello(): void {
+    // API 1.14 is what current firmware expects (2026.3+ logs "'ai-voice-assistant'
+    // using outdated API 1.6, update to 1.14+" for anything older). The ONLY
+    // behaviour the server keys off this number that concerns us is object_id:
+    // 2026.1.0-2026.6.x omit it for 1.14+ clients, and 2026.7.0+ omit it for
+    // everyone. resolveObjectId() derives it either way, so advertising 1.14 is
+    // safe on every firmware — but do NOT raise this again without checking the
+    // `client_supports_api_version` call sites in ESPHome's api_connection.cpp,
+    // which is where any future gate will appear.
     this.send('HelloRequest',
       {
         clientInfo: 'ai-voice-assistant',
         apiVersionMajor: 1,
-        apiVersionMinor: 6
+        apiVersionMinor: 14
       });
   }
 
@@ -652,23 +665,30 @@ class EspVoiceAssistantClient extends (EventEmitter as new () => TypedEmitter<Es
 
     else if (name === 'ListEntitiesMediaPlayerResponse') {
       this.mediaPlayersCount++;
-      if (message.objectId && message.key) {
-        this.entityKeys[message.objectId] = message.key;
+      const objectId = this.resolveObjectId(message);
+      if (message.key) {
+        if (objectId) {
+          this.entityKeys[objectId] = message.key;
+        }
 
-        // Store the first media player key as our default media_player entity for volume control
+        // Store the first media player key as our default media_player entity for
+        // volume control. Keyed on the key ALONE, deliberately: a media player
+        // declared `name: None` has no name to derive an object_id from, and it is
+        // still the entity we play through.
         if (!this.entityKeys['media_player']) {
           this.entityKeys['media_player'] = message.key;
-          this.logger.info(`Registered media player: ${message.objectId} with key ${message.key} (primary)`);
+          this.logger.info(`Registered media player: ${objectId || '(unnamed)'} with key ${message.key} (primary)`);
         } else {
-          this.logger.info(`Registered media player: ${message.objectId} with key ${message.key}`);
+          this.logger.info(`Registered media player: ${objectId || '(unnamed)'} with key ${message.key}`);
         }
       }
     }
 
     else if (name === 'ListEntitiesSwitchResponse') {
-      if (message.objectId && message.key) {
-        this.entityKeys[message.objectId] = message.key;
-        this.logger.info(`Registered switch: ${message.objectId} with key ${message.key}`);
+      const objectId = this.resolveObjectId(message);
+      if (objectId && message.key) {
+        this.entityKeys[objectId] = message.key;
+        this.logger.info(`Registered switch: ${objectId} with key ${message.key}`);
 
         // setMute() reads entityKeys['mute']. The PE and TR name their mic-mute
         // switch exactly "Mute" (object_id `mute`), but that is a convention,
@@ -679,55 +699,60 @@ class EspVoiceAssistantClient extends (EventEmitter as new () => TypedEmitter<Es
         // Deliberately NOT a bare `includes('mute')` — the ReSpeaker also has a
         // `mute_sound` switch (whether to play the mute chime), which such a
         // match would happily mistake for the mic mute.
-        const score = this.scoreMuteCandidate(message.objectId);
+        const score = this.scoreMuteCandidate(objectId);
         if (score > this.muteEntityScore) {
           this.muteEntityScore = score;
           this.entityKeys['mute'] = message.key;
-          this.logger.info(`Using switch '${message.objectId}' as the mute control (score ${score})`);
+          this.logger.info(`Using switch '${objectId}' as the mute control (score ${score})`);
         }
       }
     }
 
     else if (name === 'ListEntitiesNumberResponse') {
-      if (message.objectId && message.key) {
-        this.entityKeys[message.objectId] = message.key;
-        this.logger.info(`Registered number: ${message.objectId} with key ${message.key}`);
+      const objectId = this.resolveObjectId(message);
+      if (objectId && message.key) {
+        this.entityKeys[objectId] = message.key;
+        this.logger.info(`Registered number: ${objectId} with key ${message.key}`);
 
         // Check if this might be a volume control entity
-        const objectIdLower = message.objectId.toLowerCase();
+        const objectIdLower = objectId.toLowerCase();
         if (objectIdLower.includes('volume')) {
           this.entityKeys['volume'] = message.key;
-          this.logger.info(`Found potential volume control number entity: ${message.objectId}`);
+          this.logger.info(`Found potential volume control number entity: ${objectId}`);
         }
       }
     }
 
     else if (name === 'ListEntitiesSelectResponse') {
-      if (message.objectId && message.key) {
-        this.entityKeys[message.objectId] = message.key;
-        this.logger.info(`Registered select: ${message.objectId} with key ${message.key}`);
+      const objectId = this.resolveObjectId(message);
+      if (objectId && message.key) {
+        this.entityKeys[objectId] = message.key;
+        this.logger.info(`Registered select: ${objectId} with key ${message.key}`);
       }
     }
 
     else if (name === 'ListEntitiesSensorResponse') {
-      if (message.objectId && message.key) {
-        this.entityKeys[message.objectId] = message.key;
-        this.logger.info(`Registered sensor: ${message.objectId} with key ${message.key}`);
+      const objectId = this.resolveObjectId(message);
+      if (objectId && message.key) {
+        this.entityKeys[objectId] = message.key;
+        this.logger.info(`Registered sensor: ${objectId} with key ${message.key}`);
       }
     }
 
     else if (name === 'ListEntitiesBinarySensorResponse') {
-      if (message.objectId && message.key) {
-        this.entityKeys[message.objectId] = message.key;
-        this.logger.info(`Registered binary sensor: ${message.objectId} with key ${message.key}`);
+      const objectId = this.resolveObjectId(message);
+      if (objectId && message.key) {
+        this.entityKeys[objectId] = message.key;
+        this.logger.info(`Registered binary sensor: ${objectId} with key ${message.key}`);
       }
     }
 
     else if (name === 'ListEntitiesEventResponse') {
-      if (message.objectId && message.key) {
-        this.entityKeys[message.objectId] = message.key;
-        this.eventEntityIds.set(message.key, message.objectId);
-        this.logger.info(`Registered event entity: ${message.objectId} with key ${message.key} (types: ${(message.eventTypes ?? []).join(', ') || 'none'})`);
+      const objectId = this.resolveObjectId(message);
+      if (objectId && message.key) {
+        this.entityKeys[objectId] = message.key;
+        this.eventEntityIds.set(message.key, objectId);
+        this.logger.info(`Registered event entity: ${objectId} with key ${message.key} (types: ${(message.eventTypes ?? []).join(', ') || 'none'})`);
       }
     }
 
@@ -955,6 +980,7 @@ class EspVoiceAssistantClient extends (EventEmitter as new () => TypedEmitter<Es
     this.entityKeys = {};
     this.eventEntityIds.clear();
     this.muteEntityScore = 0;
+    this.derivedObjectIdLogged = false;
 
     // Stream the device's own ESPHome logs over this same connection (opt-in).
     // Sent before ListEntities so we capture the device-side view from the start.
@@ -1261,6 +1287,26 @@ class EspVoiceAssistantClient extends (EventEmitter as new () => TypedEmitter<Es
     } catch (error) {
       this.logger.error('Error sending volume command:', error);
     }
+  }
+
+  /**
+   * The object_id of one ListEntities*Response entity — as sent, or derived from
+   * the entity name when the device omits it.
+   *
+   * ESPHome 2026.7.0+ NEVER sends object_id (and 2026.1-2026.6 skip it for
+   * clients advertising API >= 1.14, which we now do), so every entity lookup
+   * here — the mute switch, the volume number, the media player — depends on the
+   * derivation in entity-object-id.mts. See that file for the version timeline.
+   */
+  private resolveObjectId(message: any): string {
+    const objectId = resolveEntityObjectId(message);
+
+    if (objectId && !message?.objectId && !this.derivedObjectIdLogged) {
+      this.derivedObjectIdLogged = true;
+      this.logger.info(`Device omits object_id (ESPHome 2026.7.0+); deriving from entity names, e.g. '${message.name}' -> '${objectId}'`);
+    }
+
+    return objectId;
   }
 
   /**

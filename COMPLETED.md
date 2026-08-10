@@ -1347,3 +1347,62 @@ the discovery-probe path like the other subscribes. Tests:
 
 The third item from that report — `No text in STT_END event` — needed no work: it was already fixed
 on `dev` by `198ce16` (§14) and his log came from a `main` build.
+
+## 18. `object_id` is gone from the ESPHome entity list — API 1.14 (2026-08-10)
+
+Started as the TODO's cosmetic "consider advertising a newer API version" (current firmware logs
+`'ai-voice-assistant' using outdated API 1.6, update to 1.14+`) and turned out to be a **live bug in
+the opposite direction**: bumping the number is the *safe* half, and the thing that number gates was
+about to break us regardless.
+
+**What the client's advertised version actually gates.** Exactly one server behaviour that concerns
+us — `object_id` on every `ListEntities*Response`. Verified by reading every
+`client_supports_api_version` call site in ESPHome (`api_connection.cpp`/`.h`, tags 2025.7.0 →
+2026.7.4 → dev): the only others are the 24-vs-34 initial batch size and BLE 16/32-bit UUIDs
+(`bluetooth_proxy.h`, 1.12), neither of which touches us. Everything else that moved between 1.6 and
+1.14 (1.7 `legacy_data`→`data`, 1.9 BT flags, 1.10 voice-assistant feature flags, 1.11 media-player
+feature flags, 1.13 climate) is **client-side interpretation** keyed on the *server's* version, and
+we already read the modern fields (`voiceAssistantFeatureFlags`, field 17).
+
+**The timeline that matters:**
+
+| ESPHome | advertises | sends `object_id`? |
+|---|---|---|
+| ≤ 2025.12 | 1.10–1.13 | always |
+| 2026.1.0 – 2026.6.x | 1.14 | **only to clients advertising < 1.14** |
+| 2026.7.0+ | 1.14 | **never, to anyone** — the backward-compat block was deleted |
+
+The field is declared `(force) = true`, so it still arrives on the wire **as an empty string**. Every
+`if (message.objectId && message.key)` guard therefore goes quietly false, `entityKeys` stays empty,
+and **volume, mute and the media-player key all go dead** with no error anywhere. Nobody had hit it
+yet only because stock PE firmware is still 26.6.0 (ESPHome 2026.6.x, `min_version: 2026.5.0`) — but
+2026.7.4 is the current release, so anyone self-compiling, including ReSpeaker/M5Stack/XiaoZhi users
+following our own `.esp_home/INSTALL.md` and its `pip install -U esphome`, gets it today. It also
+means advertising 1.6 was what *kept* the field flowing on 2026.1–2026.6: bumping to 1.14 without
+the derivation would have been a regression on every currently-shipping PE.
+
+**Fix:** `src/voice_assistant/entity-object-id.mts` reconstructs the id the way the firmware does —
+`to_sanitized_char(to_snake_case_char(c))` per **UTF-8 byte** of the entity name, from
+`EntityBase::write_object_id_to()` (`esphome/core/entity_base.cpp` + `helpers.h`), truncated at 127
+bytes. Per byte, not per character: the firmware turns each byte of `温度` into its own `_` (six),
+where Home Assistant's `aioesphomeapi` iterates Python characters and produces two — the firmware is
+the authority on what it *would* have sent. `resolveObjectId()` in the client uses what the device
+sent and derives only when it is empty, so one code path is correct on every firmware from 2024 to
+dev and no version negotiation is involved. Then the Hello bump to 1.14, which is now free.
+
+Reproduces every id we key on: `Mute` → `mute`, `Media Player` → `media_player`, ReSpeaker's
+`Microphone Mute` → `microphone_mute`, M5Stack's `Mute Microphone` → `mute_microphone` — so
+`scoreMuteCandidate` and the `includes('volume')` number match are unchanged. Two deliberate
+non-generalisations: **no device-name fallback** for entities declared `name: None` (the firmware
+would use the device/sub-device name there, which no lookup in this client keys on, and
+`DeviceInfoResponse` arrives 500 ms *after* the entity list anyway), and the **primary media player
+is now keyed on the entity key alone** so a nameless media player still plays. Tests:
+`tests/entity-object-id.test.mts`.
+
+**Also found while diffing our vendored `api.proto` against 2026.7.4, no action needed:**
+`ConnectRequest` was renamed `AuthenticationRequest` (ids 3/4 deprecated and reserved; message 3
+lands in `default: break;`, i.e. silently ignored — the existing handshake handling and the CLAUDE.md
+note are correct as written). `VoiceAssistantAudio` gained `data2 = 3`, a **second microphone
+channel** for dual-mic configs, not a continuation of `data` — ignoring it is right and it must not
+be concatenated. `VoiceAssistantConfigurationRequest` gained `external_wake_words` (client→server,
+optional). No renumbering or removals affecting anything we send or read.

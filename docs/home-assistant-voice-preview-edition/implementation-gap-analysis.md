@@ -241,7 +241,8 @@ the noise protocol handshake before the Hello exchange.
 ### 11. ~~`HelloRequest` Version Negotiation~~ ✅ DONE
 
 **Documentation:** The Hello exchange negotiates API version compatibility. The current
-implementation sends `apiVersionMajor: 1, apiVersionMinor: 6`.
+implementation sends `apiVersionMajor: 1, apiVersionMinor: 14` (it advertised 1.6 until
+2026-08-10; see COMPLETED.md §18 for what that number actually gates — `object_id`).
 
 **Current implementation:** Sends the version but doesn't validate the `HelloResponse` to check
 if the firmware supports the features being used (e.g., VoiceAssistantAnnounceRequest requires
