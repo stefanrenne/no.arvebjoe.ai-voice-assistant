@@ -1,53 +1,7 @@
 # TODO — single source of truth
 
-## Audio URLs can advertise the container's Docker address (all drivers)
-
-- [ ] **`getLanIP()` can return the app container's Docker-bridge address, making every reply
-      URL unreachable from the satellite.** Found in the ReSpeaker tester's log 2026-08-10
-      (forum post #60) — the device tried to fetch
-      `http://172.17.0.2/app/no.arvebjoe.ai-voice-assistant/userdata/audio/tx_….flac` and got
-      `esp-tls: [sock=58] select() timeout` → `ESP_ERR_HTTP_CONNECT`. `172.17.0.0/16` is
-      Docker's default bridge; a later run of the same device on the same app used
-      `192.168.1.107` and played fine, so this is **intermittent, not device-specific, and
-      affects every driver**.
-
-      Cause is `webserver.mts:69-79`: the loop returns on the **first** non-internal IPv4
-      whose interface name matches `/^(eth|en|enx)/i`. Inside the app container the Docker
-      veth is `eth0`, so it matches and short-circuits before the real LAN interface is ever
-      considered. Which interface enumerates first is a startup race — hence the intermittency.
-      (The tester self-diagnosed it as "related to using a custom pipeline"; it is not, the
-      pipeline switch merely coincided with an app restart that lost the race.)
-
-      Preferred fix: derive the advertised host from the **local address of the TCP socket
-      already connected to the ESP device** (`socket.localAddress`) — routable back by
-      construction, no heuristics. Keep `getLanIP()` as the fallback for the no-device-connected
-      case and teach it to skip `172.16.0.0/12` alongside the existing `169.254.` skip.
-
-      Downstream symptom worth recognising in future reports: an unreachable announce URL puts
-      the satellite in a **~2 s retry loop** — the firmware's hardcoded `start_playback_timeout_`
-      ends the announce as "finished", our `announce_finished` handler
-      (`voice-assistant-device.mts:447`) dequeues the next segment, repeat. On the ReSpeaker
-      that surfaces as an endless `Beam lock released` / `activate_stop_word_once is already
-      running` churn, which looks like a firmware fault and is not one.
-
 ## ESPHome native-API protocol correctness
 
-- [x] **`stt_end()`/`stt_vad_end()`/`intent_progress()` dropped their text** — already fixed on
-      `dev` by `198ce16` (2026-08-06), which tightened `vaEvent()` to take `VaEventData[]` so a
-      spread `{ text }` can no longer compile. The `No text in STT_END event` warnings in the
-      tester's log are real but come from a **`main` build**, which does not carry the fix. Not a
-      new bug — it ships the moment `dev` merges down. Nothing to do here beyond noting that
-      field reports against released builds will keep showing it until then.
-- [ ] **We never subscribe to Home Assistant actions/events.** The client sends
-      `SubscribeVoiceAssistantRequest` + `SubscribeStatesRequest` at
-      `esp-voice-assistant-client.mts:747-751` but never
-      `SubscribeHomeassistantServicesRequest` (id 34, defined at `api.proto:735`, unused). Every
-      event a device fires at us is dropped with `client has not subscribed to actions (yet)` —
-      on the ReSpeaker that is `esphome.tts_uri`, `esphome.stt_text` and
-      `esphome.wake_word_detected`, several per turn. **Nothing is broken by this today** (we
-      consume none of them), so it is log-noise reduction plus an opening for a real
-      wake-word-detected signal. Must stay off the discovery-probe path like the other
-      subscribes.
 - [ ] **Consider advertising a newer API version.** We send `apiVersionMajor: 1,
       apiVersionMinor: 6` (`esp-voice-assistant-client.mts:343-344`); current firmware logs
       `'ai-voice-assistant' using outdated API 1.6, update to 1.14+`. Cosmetic today — but check
@@ -95,11 +49,13 @@ reply handed to a Sonos speaker as a URL instead (see *Reply audio as a URL for 
 devices* under "High value, more work"). Ask him explicitly about mic levels at `mic_gain` 0,
 the listed device name, the mute switch, and whether his unit carries an API encryption key.
 
-**Second report 2026-08-10 (forum post #60), with full app + ESPHome logs.** Two of the three
-problems he reported are now root-caused and have their own sections above — the `Beam lock
-released` loop is the **Docker-bridge audio URL** bug, and the `client has not subscribed to
-actions` spam plus `No text in STT_END event` are the **protocol correctness** items. Neither is
-ReSpeaker-specific and neither is caused by the custom pipeline he suspected. His config is the
+**Second report 2026-08-10 (forum post #60), with full app + ESPHome logs.** Three of the four
+problems he reported are **fixed** — the `Beam lock released` loop was the Docker-bridge audio URL
+bug and the `client has not subscribed to actions` spam was the missing
+`SubscribeHomeassistantServicesRequest` (both archived in [`COMPLETED.md`](./COMPLETED.md) §17),
+while `No text in STT_END event` was already fixed on `dev` by `198ce16` (§14) and only showed up
+because his build came from `main`. None was ReSpeaker-specific and none was caused by the custom
+pipeline he suspected. His config is the
 stock [`respeaker-xvf-satellite-example.yaml`](https://github.com/formatBCE/Respeaker-XVF3800-ESPHome-integration/blob/main/config/respeaker-xvf-satellite-example.yaml)
 with only the device name changed. What remains open and ReSpeaker-shaped:
 

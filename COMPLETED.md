@@ -1301,3 +1301,49 @@ with it: `RECORDING_TOOL_NAMES`, `recordingPlaybackActive`, `refreshRecordingPla
 restart in `handleSettingsChange`. The registry, the player callback and `playRecordings()` stay —
 they serve `POST /play-recording`. The `feature-gates` case now asserts the tool is *never*
 registered, even with `debug_audio_enabled` on.
+
+---
+
+## 17. Audio URLs on the Docker bridge + the unsubscribed device events (2026-08-10)
+
+Both came out of the **ReSpeaker tester's second report** (forum post #60, 2026-08-10, full app +
+ESPHome logs), and neither turned out to be ReSpeaker-specific or caused by the custom pipeline he
+suspected. Landed on the `claude/respeaker-audio-clarity` branch, merged to `dev` as `8dc5291`.
+
+**Audio URLs could advertise the app container's Docker address** (`fbb5cf5`). The device fetched
+`http://172.17.0.2/app/no.arvebjoe.ai-voice-assistant/userdata/audio/tx_….flac` and got
+`esp-tls: [sock=58] select() timeout` → `ESP_ERR_HTTP_CONNECT`; a later run of the *same* device on
+the *same* app used `192.168.1.107` and played fine. Cause: `getLanIP()` returned on the first
+non-internal IPv4 whose interface name matched `/^(eth|en|enx)/i`, and the app container's veth is
+also `eth0` — so it short-circuited before the real LAN interface was ever considered. Which
+interface enumerates first is a startup race, hence the intermittency, and it affected **every
+driver**.
+
+Fix: take the advertised host from the **local end of the TCP socket the satellite is already
+connected on** (`socket.localAddress` → `WebServer.reportReachableIp()`), which is routable back by
+construction — no heuristics. Shared across devices (they all sit on Homey's LAN) and re-reported on
+every reconnect, so a DHCP lease change corrects itself. Interface sniffing stays as the
+no-device-connected fallback and now *demotes* container-bridge-shaped addresses (172.17–172.31)
+instead of returning them; if every candidate looks like a bridge it still returns one, because
+Homey could genuinely sit on 172.16/12 and a wrong-but-plausible address beats `127.0.0.1`, which is
+wrong for certain. Tests: `tests/webserver-lan-ip.test.mts`.
+
+**Worth recognising in future reports:** an unreachable announce URL puts the satellite in a ~2 s
+retry loop — the firmware's hardcoded `start_playback_timeout_` ends the announce as "finished", our
+`announce_finished` handler dequeues the next segment, repeat. On the ReSpeaker that surfaced as
+endless `Beam lock released` / `activate_stop_word_once is already running` churn, which looks like a
+firmware fault and is not one.
+
+**We never subscribed to the device's Home Assistant events** (`9c478fc`). The client sent
+`SubscribeVoiceAssistantRequest` + `SubscribeStatesRequest` but never
+`SubscribeHomeassistantServicesRequest` (id 34), so the firmware discarded every event a device fired
+at us with `client has not subscribed to actions (yet)` — on the ReSpeaker that is `esphome.tts_uri`,
+`esphome.stt_text` and `esphome.wake_word_detected`, several lines per turn. Nothing was broken by
+it (we consume none of them); subscribing is log-noise reduction plus the opening for a real
+wake-word-detected signal. `HomeassistantServiceResponse` is now logged; note its data is
+`{key, value}`, **not** the `{name, value}` shape `VoiceAssistantEventResponse.data` uses. Kept off
+the discovery-probe path like the other subscribes. Tests:
+`tests/esp-homeassistant-services.test.mts`.
+
+The third item from that report — `No text in STT_END event` — needed no work: it was already fixed
+on `dev` by `198ce16` (§14) and his log came from a `main` build.
