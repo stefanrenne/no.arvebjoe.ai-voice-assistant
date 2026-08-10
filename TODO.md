@@ -26,23 +26,21 @@
       Downstream symptom worth recognising in future reports: an unreachable announce URL puts
       the satellite in a **~2 s retry loop** — the firmware's hardcoded `start_playback_timeout_`
       ends the announce as "finished", our `announce_finished` handler
-      (`voice-assistant-device.mts:432`) dequeues the next segment, repeat. On the ReSpeaker
+      (`voice-assistant-device.mts:447`) dequeues the next segment, repeat. On the ReSpeaker
       that surfaces as an endless `Beam lock released` / `activate_stop_word_once is already
       running` churn, which looks like a firmware fault and is not one.
 
 ## ESPHome native-API protocol correctness
 
-- [ ] **`stt_end()`, `stt_vad_end()` and `intent_progress()` never transmit their text.** All
-      three pass a spread `{ text }` to `vaEvent()`
-      (`esp-voice-assistant-client.mts:963`, `:1020`, `:968`), but `VoiceAssistantEventResponse`
-      has only `event_type` and repeated `data` (`api.proto:1728-1735`) — protobufjs silently
-      drops the unknown key. The device logs `No text in STT_END event`, confirmed in the
-      ReSpeaker log 2026-08-10. Convert to the `data: [{name, value}]` form that `intent_end()`
-      and `tts_end()` already use; the trap is documented in those two methods' comments and
-      these three simply never got converted.
+- [x] **`stt_end()`/`stt_vad_end()`/`intent_progress()` dropped their text** — already fixed on
+      `dev` by `198ce16` (2026-08-06), which tightened `vaEvent()` to take `VaEventData[]` so a
+      spread `{ text }` can no longer compile. The `No text in STT_END event` warnings in the
+      tester's log are real but come from a **`main` build**, which does not carry the fix. Not a
+      new bug — it ships the moment `dev` merges down. Nothing to do here beyond noting that
+      field reports against released builds will keep showing it until then.
 - [ ] **We never subscribe to Home Assistant actions/events.** The client sends
       `SubscribeVoiceAssistantRequest` + `SubscribeStatesRequest` at
-      `esp-voice-assistant-client.mts:727-731` but never
+      `esp-voice-assistant-client.mts:747-751` but never
       `SubscribeHomeassistantServicesRequest` (id 34, defined at `api.proto:735`, unused). Every
       event a device fires at us is dropped with `client has not subscribed to actions (yet)` —
       on the ReSpeaker that is `esphome.tts_uri`, `esphome.stt_text` and
@@ -51,7 +49,7 @@
       wake-word-detected signal. Must stay off the discovery-probe path like the other
       subscribes.
 - [ ] **Consider advertising a newer API version.** We send `apiVersionMajor: 1,
-      apiVersionMinor: 6` (`esp-voice-assistant-client.mts:336-337`); current firmware logs
+      apiVersionMinor: 6` (`esp-voice-assistant-client.mts:343-344`); current firmware logs
       `'ai-voice-assistant' using outdated API 1.6, update to 1.14+`. Cosmetic today — but check
       what 1.7-1.14 gate before bumping, since the handshake compatibility notes in CLAUDE.md
       depend on the current behaviour.
@@ -114,12 +112,12 @@ with only the device name changed. What remains open and ReSpeaker-shaped:
       returning to idle. Corroborating: a doubled `Beam lock released` at `:41.038`/`:41.040`,
       and `micro_wake_word: Wake word detection is already running` in the earlier log. Our side
       of that state is the sticky `continue_conversation` flag on `intent_end(text,
-      continueConversation)` (`esp-voice-assistant-client.mts:~990`) — worth auditing what we
+      continueConversation)` (`esp-voice-assistant-client.mts:1037`) — worth auditing what we
       send for this device, but the YAML's `on_end` also does an **unbounded** `wait_until` before
       restarting `micro_wake_word`, exactly like the M5Stack hang candidate above. Needs a
       reproduction or a DEBUG-level device log covering one good turn plus one ignored wake word.
 - [ ] **`No text in TTS_START event` — the replying phase never engages on this hardware.**
-      We deliberately omit the text on the announce path (`voice-assistant-device.mts:412`)
+      We deliberately omit the text on the announce path (`voice-assistant-device.mts:434`)
       because the PE firmware fires `tts_start_trigger_` itself for announcements. The ReSpeaker
       YAML's `on_tts_start` does not, so its LED/beam "replying" phase is skipped. Sending the
       text unconditionally is probably right, but verify it does not double-fire the phase on
