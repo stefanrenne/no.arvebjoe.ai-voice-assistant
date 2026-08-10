@@ -6,6 +6,33 @@ below to get back to the customized behavior.
 
 All line numbers are approximate — search for the anchor text instead.
 
+## Base version
+
+`home-assistant-voice.yaml` is based on **`esphome/home-assistant-voice-pe` `dev` @ commit
+[`7c6eb245`](https://github.com/esphome/home-assistant-voice-pe/commit/7c6eb245b1d5253ee8672fbbdb604767e59a8ee9)**
+(2026-06-18, *"Bump min version to 2026.6.0"* #601) — `dev` a couple of commits after release tag
+**26.6.0** (`772f2b9`, which is an ancestor of the base). Downloaded 2026-06-22.
+
+The stock config carries **no version marker of its own** (upstream's plain `home-assistant-voice.yaml`
+has no `project:` block), so record the commit here whenever the stock file is refreshed. To re-derive
+it after the fact, diff the local file against candidate upstream revisions — the base is the one where
+the only differences left are the changes documented below:
+
+```bash
+curl -sfL -o /tmp/up.yaml \
+  https://raw.githubusercontent.com/esphome/home-assistant-voice-pe/<sha-or-tag>/home-assistant-voice.yaml
+diff -u /tmp/up.yaml home-assistant-voice.yaml
+```
+
+Indirect markers that corroborate the base: `min_version: 2026.6.0`, XMOS `voice_kit` firmware
+`v1.3.1`, and `external_components` pinned to `ref: dev` (so component *code* floats to whatever `dev`
+is at build time, regardless of this file's age).
+
+**Known upstream drift** (as of 2026-08-10, upstream `dev` HEAD `0579e7b`): a single commit touches
+this YAML since the base — **#428 "Switch to lock buttons"** (2026-07-08), which adds a
+`disable_buttons` template switch (*Disable physical controls*, `disabled_by_default: true`) and gates
+the center/volume button handlers on it. Purely additive; not applied here.
+
 ---
 
 ## Change 1 — Custom "Hey Homey" wake word
