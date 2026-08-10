@@ -745,4 +745,118 @@ describe('VoiceAssistantDevice (harness)', () => {
             expect(h.provider.calls).not.toContain('restart');
         });
     });
+
+    /**
+     * reply_audio_output = 'flow_url': the device plays nothing itself and hands
+     * the reply's URL to Flows, so a speaker with no ESPHome involvement (Sonos)
+     * can play it. Requested by the ReSpeaker tester, whose board has no speaker.
+     */
+    describe('reply audio sent to Flows as a URL', () => {
+        const flowUrl = () => createHarness({ settings: { reply_audio_output: 'flow_url' } });
+
+        /** One plain wake turn whose reply would normally take the announce path. */
+        async function runWakeTurn(h: Harness, reply = 'Det er 21 grader.') {
+            h.esp.emit('starting');
+            h.provider.emit('silence', 'server');
+            h.provider.emit('transcript.done', 'hvordan er været?');
+            h.provider.emit('transcript.delta', reply);
+            const seg = (h.device as any).audioOutput.segmenter;
+            seg.emit('chunk', Buffer.alloc(4800, 7));
+            await h.settle(5);
+            h.provider.emit('response.done');
+            await h.settle(20);
+        }
+
+        it('fires reply-audio-ready with the URL, text and duration', async () => {
+            const h = await flowUrl();
+            await runWakeTurn(h);
+
+            const fired = h.triggers.filter(t => t.cardId === 'reply-audio-ready');
+            expect(fired).toHaveLength(1);
+            expect(fired[0].tokens.url).toMatch(/^http:\/\/x\//);
+            expect(fired[0].tokens.text).toBe('Det er 21 grader.');
+            // 4800 bytes of 24 kHz mono PCM16 = 100 ms, rounded to whole seconds.
+            expect(fired[0].tokens.duration).toBe(0);
+        });
+
+        it('never hands the device a URL to play', async () => {
+            const h = await flowUrl();
+            await runWakeTurn(h);
+
+            // Nothing may play locally — not as an announce, and not on TTS_END.
+            expect(h.esp.countOf('playAudioFromUrl')).toBe(0);
+            const ttsEnds = h.esp.calls.filter(c => c.method === 'tts_end');
+            expect(ttsEnds[ttsEnds.length - 1].args[0]).toBeUndefined();
+        });
+
+        it('still closes the run so the device leaves its replying phase', async () => {
+            const h = await flowUrl();
+            await runWakeTurn(h);
+
+            // The announce path would wait for an announce_finished ack that can
+            // never arrive with nothing playing; in-band needs no ack.
+            expect(h.esp.countOf('run_end')).toBe(1);
+            expect((h.device as any).turn.state).toBe('idle');
+        });
+
+        it('does not reopen the mic even when the reply is a question', async () => {
+            const h = await flowUrl();
+            await runWakeTurn(h, 'Vil du høre mer?');
+
+            // Reopening would open the mic while the other speaker is still
+            // talking — the assistant would hear itself.
+            expect(h.esp.countOf('send_voice_assistant_request')).toBe(0);
+            const intentEnds = h.esp.calls.filter(c => c.method === 'intent_end');
+            expect(intentEnds[intentEnds.length - 1].args[1]).toBe(false);
+            expect((h.device as any).turn.peConversationActive).toBe(false);
+        });
+
+        it('encodes at 48 kHz and appends no listening chime', async () => {
+            const h = await flowUrl();
+            await runWakeTurn(h, 'Vil du høre mer?');
+
+            // 4800 bytes in at 24 kHz -> 9600 out at 48 kHz. A chime would add
+            // more on top, and it is precisely what must NOT be there: nothing
+            // is reopening, so a "speak now" beep on the Sonos would mislead.
+            const sent = h.buildStreamCalls[h.buildStreamCalls.length - 1];
+            expect(sent.length).toBe(9600);
+        });
+
+        it('routes a Flow "ask" through the same path instead of hanging on announce', async () => {
+            const h = await flowUrl();
+            await h.device.askAgentOutputToSpeaker('les opp handlelisten');
+            h.provider.emit('transcript.delta', 'Melk og brød.');
+            const seg = (h.device as any).audioOutput.segmenter;
+            seg.emit('chunk', Buffer.alloc(4800, 7));
+            await h.settle(5);
+            h.provider.emit('response.done');
+            await h.settle(20);
+
+            // askAgentOutputToSpeaker calls cancelInband(), which selects the
+            // announce path — the one that waits for an ack that never comes.
+            expect(h.triggers.filter(t => t.cardId === 'reply-audio-ready')).toHaveLength(1);
+            expect(h.esp.countOf('playAudioFromUrl')).toBe(0);
+        });
+
+        it('plays on the device when the setting is left at its default', async () => {
+            const h = await createHarness();
+            await runWakeTurn(h);
+
+            expect(h.triggers.filter(t => t.cardId === 'reply-audio-ready')).toHaveLength(0);
+            expect(h.esp.countOf('playAudioFromUrl')).toBe(1);
+        });
+
+        it('picks up a settings change on the next turn', async () => {
+            const h = await createHarness();
+            await (h.device as any).onSettings({
+                oldSettings: { reply_audio_output: 'device' },
+                newSettings: { reply_audio_output: 'flow_url' },
+                changedKeys: ['reply_audio_output'],
+            });
+            await runWakeTurn(h);
+
+            expect(h.triggers.filter(t => t.cardId === 'reply-audio-ready')).toHaveLength(1);
+            expect(h.esp.countOf('playAudioFromUrl')).toBe(0);
+        });
+    });
 });

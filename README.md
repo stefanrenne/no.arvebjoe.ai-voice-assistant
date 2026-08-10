@@ -506,6 +506,28 @@ noise, should you ever hear the assistant react to itself. *Microphone gain* boo
 microphone audio in software before speech recognition — 0 means automatic (each device model's
 tuned default; the ThirdReality's quiet mic gets 4×, the Voice PE, ReSpeaker and AtomS3R need none). Raise it if the
 assistant doesn't hear you from a distance; lower it if loud close-up speech gets misheard.
+*Reply audio* chooses whether the answer is spoken by the device itself or handed to a Flow — see
+below.
+
+### Playing the reply on another speaker
+
+Some voice devices have no speaker at all (a bare ReSpeaker board, an AtomS3R without its Echo
+Base), and sometimes there is simply a better speaker in the room. Set the device's **Reply audio**
+setting to **Send to a Flow as a URL** and the assistant will not speak on the device. Instead it
+fires the **Reply audio is ready** Flow trigger with a **url** tag pointing at the rendered answer,
+which you can hand to anything that plays a URL — the Sonos app's *Play a URL* action, for
+instance. You still get the app's own voice and language, unlike piping the **text** tag to a
+speaker's own text-to-speech.
+
+Worth knowing before you switch it on:
+
+* The audio is FLAC, 48 kHz mono, served from Homey on your LAN. The link is valid for about two
+  minutes — play it straight away rather than storing it.
+* The reply is not sent until it is **fully generated**, so a long answer starts later than it
+  would on the device's own speaker.
+* **Follow-up questions need the wake word again.** Normally the device reopens its microphone
+  when a reply ends in a question, but it has no way to know when another speaker finished
+  talking — reopening on time would just let it hear itself.
 
 ---
 
@@ -532,6 +554,9 @@ it turns itself on whenever the assistant wakes and off again when the turn ends
 * **Thinking** — the assistant produced a reply or used a tool ("Using tool get_devices"); the
   message is a **text** tag and a **type** tag says whether it was a `tool` call or the final
   `reply`. Combine with *Heard something* to follow a whole conversation on the timeline
+* **Reply audio is ready** — the spoken reply has been rendered to a file, with **url**, **text**
+  and **duration** tags. Only fires on devices whose *Reply audio* setting is set to send the reply
+  to a Flow (see [Playing the reply on another speaker](#playing-the-reply-on-another-speaker))
 * Plus standard device triggers (*Start conversation* turned on/off — i.e. a conversation
   started or ended — and volume changed)
 

@@ -749,6 +749,14 @@ class EspVoiceAssistantClient extends (EventEmitter as new () => TypedEmitter<Es
         // Subscribe to all entity state updates (standard ESPHome flow)
         // This delivers MediaPlayerStateResponse, SwitchStateResponse, NumberStateResponse, etc.
         this.send('SubscribeStatesRequest', {});
+
+        // Custom events the device fires at its API client — `homeassistant.event`
+        // actions in the YAML, e.g. the ReSpeaker's esphome.tts_uri /
+        // esphome.stt_text / esphome.wake_word_detected. Without this the firmware
+        // discards each one and logs "dropped; client has not subscribed to actions
+        // (yet)", several lines per turn. We act on none of them today; subscribing
+        // keeps the device log readable and is what makes them available at all.
+        this.send('SubscribeHomeassistantServicesRequest', {});
       }
 
       this.homey.setTimeout(() => {
@@ -891,9 +899,40 @@ class EspVoiceAssistantClient extends (EventEmitter as new () => TypedEmitter<Es
         this.deviceLogger.info(line);
       }
 
+    } else if (name === 'HomeassistantServiceResponse') {
+      // A custom event/action the device fired at us (see the subscribe call).
+      // Nothing consumes these yet — logged so a device's own signalling is
+      // visible when diagnosing a field report, rather than silently discarded
+      // the way the firmware discarded them before we subscribed.
+      // HomeassistantServiceMap is {key, value} — NOT the {name, value} shape
+      // VoiceAssistantEventResponse.data uses.
+      const data = (message?.data ?? [])
+        .map((d: { key: string, value: string }) => `${d.key}=${d.value}`)
+        .join(' ');
+      this.logger.info(`Device ${message?.isEvent ? 'event' : 'action'}: ${message?.service ?? '(unnamed)'}${data ? ` ${data}` : ''}`, 'RX');
+
     } else if (name === 'PingRequest') {
       this.send('PingResponse', {});
     }
+  }
+
+  /**
+   * Our own IPv4 address on the socket carrying this device's API connection —
+   * i.e. the address the satellite is demonstrably able to reach us on. The
+   * WebServer prefers it over interface sniffing when building audio URLs,
+   * because interface names alone cannot distinguish Homey's LAN address from
+   * the app container's Docker-bridge address (both present as `eth0`).
+   *
+   * Null while disconnected, and for IPv6 sockets — the audio URLs are built as
+   * bare `http://<host>/…`, which an IPv6 literal would need brackets for, and
+   * no satellite has ever connected over IPv6.
+   */
+  get localAddress(): string | null {
+    const addr = this.tcp?.localAddress;
+    if (!addr || this.tcp?.localFamily !== 'IPv4') {
+      return null;
+    }
+    return addr;
   }
 
   /**

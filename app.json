@@ -212,6 +212,55 @@
       },
       {
         "title": {
+          "en": "Reply audio is ready"
+        },
+        "hint": {
+          "en": "Fires when the assistant's spoken reply has been rendered to an audio file, with a link a speaker can play. Only fires when the device's \"Reply audio\" setting is set to send the reply to a Flow — use it to play the assistant's own voice on a Sonos or any other speaker that can play a URL. The link is only valid for a couple of minutes, so play it right away rather than storing it."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "title": {
+              "en": "Device"
+            },
+            "filter": "driver_id=home-assistant-voice-preview-edition|xiaozhi-ai|thirdreality-voice--music-assistant|respeaker-xvf3800|m5stack-atoms3r"
+          }
+        ],
+        "tokens": [
+          {
+            "name": "url",
+            "type": "string",
+            "title": {
+              "en": "Audio URL"
+            },
+            "example": {
+              "en": "http://192.168.1.10/app/no.arvebjoe.ai-voice-assistant/userdata/audio/tx_1a2b.flac"
+            }
+          },
+          {
+            "name": "text",
+            "type": "string",
+            "title": {
+              "en": "Text"
+            },
+            "example": {
+              "en": "It is 21 degrees and sunny."
+            }
+          },
+          {
+            "name": "duration",
+            "type": "number",
+            "title": {
+              "en": "Duration"
+            },
+            "example": 4
+          }
+        ],
+        "id": "reply-audio-ready"
+      },
+      {
+        "title": {
           "en": "Timer cancelled"
         },
         "hint": {
@@ -722,6 +771,31 @@
           "hint": {
             "en": "The device's ESPHome API encryption key (the 32-byte base64 string from its YAML configuration). Required when the device has API encryption enabled — e.g. after being adopted by Home Assistant. Leave empty for unencrypted devices (or to keep using the key entered during pairing)."
           }
+        },
+        {
+          "id": "reply_audio_output",
+          "type": "dropdown",
+          "label": {
+            "en": "Reply audio"
+          },
+          "value": "device",
+          "hint": {
+            "en": "Where the assistant's spoken reply is played. \"Play on this device\" uses the built-in speaker. \"Send to a Flow as a URL\" plays nothing here and instead fires the \"Reply audio is ready\" Flow trigger with a link to the audio, so another speaker can play it — useful when this device has no speaker, or when a better one is in the room. The reply is not spoken until it is fully generated, so expect a little more delay than playing it here."
+          },
+          "values": [
+            {
+              "id": "device",
+              "label": {
+                "en": "Play on this device"
+              }
+            },
+            {
+              "id": "flow_url",
+              "label": {
+                "en": "Send to a Flow as a URL"
+              }
+            }
+          ]
         }
       ]
     },
@@ -869,6 +943,31 @@
           "hint": {
             "en": "The device's ESPHome API encryption key (the 32-byte base64 string from its YAML configuration). Required when the device has API encryption enabled — e.g. after being adopted by Home Assistant. Leave empty for unencrypted devices (or to keep using the key entered during pairing)."
           }
+        },
+        {
+          "id": "reply_audio_output",
+          "type": "dropdown",
+          "label": {
+            "en": "Reply audio"
+          },
+          "value": "device",
+          "hint": {
+            "en": "Where the assistant's spoken reply is played. \"Play on this device\" uses the built-in speaker. \"Send to a Flow as a URL\" plays nothing here and instead fires the \"Reply audio is ready\" Flow trigger with a link to the audio, so another speaker can play it — useful when this device has no speaker, or when a better one is in the room. The reply is not spoken until it is fully generated, so expect a little more delay than playing it here."
+          },
+          "values": [
+            {
+              "id": "device",
+              "label": {
+                "en": "Play on this device"
+              }
+            },
+            {
+              "id": "flow_url",
+              "label": {
+                "en": "Send to a Flow as a URL"
+              }
+            }
+          ]
         }
       ]
     },
@@ -1016,6 +1115,31 @@
           "hint": {
             "en": "The device's ESPHome API encryption key (the 32-byte base64 string from its YAML configuration). Required when the device has API encryption enabled — e.g. after being adopted by Home Assistant. Leave empty for unencrypted devices (or to keep using the key entered during pairing)."
           }
+        },
+        {
+          "id": "reply_audio_output",
+          "type": "dropdown",
+          "label": {
+            "en": "Reply audio"
+          },
+          "value": "device",
+          "hint": {
+            "en": "Where the assistant's spoken reply is played. \"Play on this device\" uses the built-in speaker. \"Send to a Flow as a URL\" plays nothing here and instead fires the \"Reply audio is ready\" Flow trigger with a link to the audio, so another speaker can play it — useful when this device has no speaker, or when a better one is in the room. The reply is not spoken until it is fully generated, so expect a little more delay than playing it here."
+          },
+          "values": [
+            {
+              "id": "device",
+              "label": {
+                "en": "Play on this device"
+              }
+            },
+            {
+              "id": "flow_url",
+              "label": {
+                "en": "Send to a Flow as a URL"
+              }
+            }
+          ]
         }
       ]
     },
@@ -1169,6 +1293,31 @@
           "hint": {
             "en": "The device's ESPHome API encryption key (the 32-byte base64 string from its YAML configuration). Required when the device has API encryption enabled — e.g. after being adopted by Home Assistant. Leave empty for unencrypted devices (or to keep using the key entered during pairing)."
           }
+        },
+        {
+          "id": "reply_audio_output",
+          "type": "dropdown",
+          "label": {
+            "en": "Reply audio"
+          },
+          "value": "device",
+          "hint": {
+            "en": "Where the assistant's spoken reply is played. \"Play on this device\" uses the built-in speaker. \"Send to a Flow as a URL\" plays nothing here and instead fires the \"Reply audio is ready\" Flow trigger with a link to the audio, so another speaker can play it — useful when this device has no speaker, or when a better one is in the room. The reply is not spoken until it is fully generated, so expect a little more delay than playing it here."
+          },
+          "values": [
+            {
+              "id": "device",
+              "label": {
+                "en": "Play on this device"
+              }
+            },
+            {
+              "id": "flow_url",
+              "label": {
+                "en": "Send to a Flow as a URL"
+              }
+            }
+          ]
         }
       ]
     },
@@ -1223,7 +1372,34 @@
           "template": "add_devices"
         }
       ],
-      "id": "xiaozhi-ai"
+      "id": "xiaozhi-ai",
+      "settings": [
+        {
+          "id": "reply_audio_output",
+          "type": "dropdown",
+          "label": {
+            "en": "Reply audio"
+          },
+          "value": "device",
+          "hint": {
+            "en": "Where the assistant's spoken reply is played. \"Play on this device\" uses the built-in speaker. \"Send to a Flow as a URL\" plays nothing here and instead fires the \"Reply audio is ready\" Flow trigger with a link to the audio, so another speaker can play it — useful when this device has no speaker, or when a better one is in the room. The reply is not spoken until it is fully generated, so expect a little more delay than playing it here."
+          },
+          "values": [
+            {
+              "id": "device",
+              "label": {
+                "en": "Play on this device"
+              }
+            },
+            {
+              "id": "flow_url",
+              "label": {
+                "en": "Send to a Flow as a URL"
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "capabilities": {
