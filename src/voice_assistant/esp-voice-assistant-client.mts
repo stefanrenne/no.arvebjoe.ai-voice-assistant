@@ -897,6 +897,25 @@ class EspVoiceAssistantClient extends (EventEmitter as new () => TypedEmitter<Es
   }
 
   /**
+   * Our own IPv4 address on the socket carrying this device's API connection —
+   * i.e. the address the satellite is demonstrably able to reach us on. The
+   * WebServer prefers it over interface sniffing when building audio URLs,
+   * because interface names alone cannot distinguish Homey's LAN address from
+   * the app container's Docker-bridge address (both present as `eth0`).
+   *
+   * Null while disconnected, and for IPv6 sockets — the audio URLs are built as
+   * bare `http://<host>/…`, which an IPv6 literal would need brackets for, and
+   * no satellite has ever connected over IPv6.
+   */
+  get localAddress(): string | null {
+    const addr = this.tcp?.localAddress;
+    if (!addr || this.tcp?.localFamily !== 'IPv4') {
+      return null;
+    }
+    return addr;
+  }
+
+  /**
    * Marks the connection as ready and kicks off entity discovery. Invoked right
    * after HelloResponse (and the backward-compat ConnectRequest), without
    * waiting for a ConnectResponse - ESPHome 2026.1.0+ no longer sends one.

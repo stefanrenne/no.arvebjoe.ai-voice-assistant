@@ -619,6 +619,11 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
     this.esp.on('Healthy', async () => {
       this.logger.info('ESP Voice Client healthy');
       this.isEspClientHealthy = true;
+      // Teach the WebServer which of our addresses this device can actually
+      // reach, so reply URLs never advertise the app container's Docker-bridge
+      // address (which the satellite cannot route to, and which then stalls
+      // playback into the firmware's 2 s announce-timeout retry loop).
+      this.webServer.reportReachableIp(this.esp.localAddress);
       this.updateAvailable();
     });
 
