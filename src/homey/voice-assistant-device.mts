@@ -23,6 +23,17 @@ import { WeatherHelper } from '../helpers/weather-helper.mjs';
 import { getAppServices } from '../helpers/app-services.mjs';
 
 
+// Reply files handed to a Flow are encoded at 48 kHz rather than our native
+// 24 kHz: Sonos documents FLAC support "up to 48 kHz" but is only actually
+// tested at 44.1/48, and other network players are similarly fussy. 48 kHz is an
+// exact 2x upsample, so there is no resampling quality question.
+const FLOW_URL_SAMPLE_RATE = 48_000;
+
+// Extra grace on top of playback length before the file is deleted. Our own
+// playback starts in milliseconds; a Flow may group speakers, save and restore a
+// queue or ramp volume before it ever fetches the URL.
+const FLOW_URL_GRACE_MS = 120_000;
+
 export default abstract class VoiceAssistantDevice extends Homey.Device {
   private esp!: EspVoiceAssistantClient;
   private webServer!: WebServer;
@@ -100,6 +111,10 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
   // device setting overrides it at runtime (0/unset = use this default).
   readonly defaultMicGain: number = 1;
   private micGain: number = 1;
+
+  // `reply_audio_output` = 'flow_url': play nothing here, hand the reply's URL to
+  // Flows instead (Sonos and friends). See deliverReplyToFlow().
+  private replyToFlowUrl: boolean = false;
 
   // Captures raw mic input and serves it back as a playback URL for debugging.
   // Emulator-only: the `input_buffer_debug` setting is honored solely when the
@@ -193,6 +208,7 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
     }
 
     this.micGain = this.resolveMicGain(settings.mic_gain);
+    this.replyToFlowUrl = settings.reply_audio_output === 'flow_url';
 
     // Follow-up burst-skip: use the setting if present, else the small default. Unlike the
     // wake skip this defaults to a non-zero value so the mic-open burst is always swallowed.
@@ -347,7 +363,14 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
       // Inside the PE's start_conversation session every reply goes in-band on
       // TTS_END (standalone announces get dropped mid-conversation); a plain
       // say/wake turn uses the announce path (which fires the first reopen).
-      this.audioOutput.beginTurn(started.followUp ? 'inband' : 'announce');
+      //
+      // Flow-URL replies must ALWAYS take the in-band path, even on a wake turn.
+      // The announce path ends its turn on the device's announce_finished ack,
+      // and with nothing playing locally that ack never arrives — the run would
+      // hang in 'speaking'. In-band waits for no ack, and it yields the whole
+      // reply as one file rather than per-segment chunks, which is what a Flow
+      // wants anyway (it fires once, with one URL).
+      this.audioOutput.beginTurn(started.followUp || this.replyToFlowUrl ? 'inband' : 'announce');
 
       this.convo.info(started.followUp
         ? 'Turn started (follow-up — conversation open), listening…'
@@ -550,7 +573,14 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
         // '0' -> IDLE. The firmware's flag is sticky, so without this it stays true
         // from the original startConversation announce and the PE reopens after every
         // reply — a goodbye ("...bare si fra.") would keep the conversation open forever.
-        const { keepOpen, replyText } = this.turn.beginInbandDelivery();
+        const { keepOpen: wantsKeepOpen, replyText } = this.turn.beginInbandDelivery();
+
+        // A Flow-URL reply never keeps the conversation open. We hand the URL
+        // off and return immediately, so "end of playback" here is send time,
+        // not when the other speaker actually stops — reopening the mic on that
+        // signal would open it while the reply is still being spoken elsewhere
+        // and the assistant would hear itself. Follow-ups need the wake word.
+        const keepOpen = wantsKeepOpen && !this.replyToFlowUrl;
         this.esp.intent_end('', keepOpen);
         // Must carry the reply text: the firmware discards a text-less TTS_START,
         // and in-band replies have no announcement to fire tts_start_trigger_ for
@@ -564,8 +594,35 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
         const pcm = keepOpen && d.pcm.length > 0 ? appendChimeToPcm(d.pcm) : d.pcm;
 
         // Encode + serve + schedule deletion (TTL extended by playback length) —
-        // the pipeline owns the file mechanics.
-        const file = pcm.length > 0 ? await this.audioOutput.buildReplyFile(pcm) : null;
+        // the pipeline owns the file mechanics. Flow-URL replies are encoded at
+        // 48 kHz and given a wider deletion window; see buildReplyFile.
+        const file = pcm.length > 0
+          ? await this.audioOutput.buildReplyFile(pcm, this.replyToFlowUrl
+            ? { sampleRate: FLOW_URL_SAMPLE_RATE, extraGraceMs: FLOW_URL_GRACE_MS }
+            : {})
+          : null;
+
+        if (this.replyToFlowUrl) {
+          // Nothing plays here: the device still needs TTS_END + RUN_END to leave
+          // its replying phase, but WITHOUT a URL — handing it one would make it
+          // play the reply on the speaker the user just told us not to use.
+          if (file) {
+            this.convo.info('Reply audio ready — sent to Flows as a URL', 'TTS');
+            this.logger.info(`Flow reply URL: ${file.url}`);
+            this.fireDeviceTrigger('reply-audio-ready', {
+              url: file.url,
+              text: replyText,
+              duration: Math.round(file.playbackMs / 1000),
+            });
+          } else {
+            this.convo.info('Turn ended with no reply audio', 'END');
+          }
+          this.esp.tts_end();
+          this.esp.run_end();
+          this.turn.finishInbandDelivery(false, 0);
+          this.setCapabilityValue('onoff', false);
+          return;
+        }
 
         if (file) {
           this.convo.info(keepOpen
@@ -1337,6 +1394,14 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
     this.turn.resetSession();
     this.audioOutput.cancelInband();
 
+    // …except when the reply belongs to a Flow: cancelInband() just selected the
+    // announce path, which ends its turn on an announce_finished ack that never
+    // comes when nothing plays locally. Put it back on the in-band path, which
+    // needs no ack. (beginTurn also clears the stale PCM cancelInband dropped.)
+    if (this.replyToFlowUrl) {
+      this.audioOutput.beginTurn('inband');
+    }
+
     if (this.provider && this.provider.sendTextForAudioResponse) {
       await this.deviceManager.fetchData();
       this.provider.sendTextForAudioResponse(question);
@@ -1665,6 +1730,12 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
     if (changedKeys.includes('mic_gain')) {
       this.micGain = this.resolveMicGain(newSettings.mic_gain);
       this.logger.info(`Mic gain set to ${this.micGain}x${Number(newSettings.mic_gain) > 0 ? '' : ` (automatic — driver default)`}`);
+    }
+
+    // Takes effect on the next turn — the reply route is decided at mic-open.
+    if (changedKeys.includes('reply_audio_output')) {
+      this.replyToFlowUrl = newSettings.reply_audio_output === 'flow_url';
+      this.logger.info(`Reply audio: ${this.replyToFlowUrl ? 'sent to Flows as a URL' : 'played on this device'}`);
     }
 
     // Wake-word change: resolve the typed name/id against what the satellite

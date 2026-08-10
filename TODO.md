@@ -321,7 +321,19 @@ un-dropped 2026-07-31** (see "Start a Homey flow by voice" below).
 
 ### High value, more work
 
-- [ ] **Reply audio as a URL for speakerless devices (Sonos hand-off)** — ReSpeaker tester
+- [x] **Reply audio as a URL for speakerless devices (Sonos hand-off)** — **SHIPPED 2026-08-10**
+      as the per-device `reply_audio_output` dropdown (*Reply audio*: "Play on this device" /
+      "Send to a Flow as a URL") plus the **Reply audio is ready** trigger card with `url` +
+      `text` + `duration` tokens. Built exactly as designed below, on all five drivers, with two
+      decisions worth carrying forward: **follow-ups need the wake word again** in URL mode
+      (`keepOpen` is forced false — we hand off and return immediately, so "end of playback" is
+      send time, and reopening then would let the device hear the reply being spoken elsewhere),
+      and `askAgentOutputToSpeaker()` needed re-routing since its `cancelInband()` selects the
+      announce path that waits for an ack no speakerless device can send. Encoded at 48 kHz with
+      a 2-minute deletion grace. Still **unverified on real hardware** — the tester has yet to
+      confirm Sonos actually plays the file; `pcmToWav()` remains the fallback if it balks.
+      Original design notes kept below for that follow-up.
+      ORIGINAL ITEM — ReSpeaker tester
       request 2026-08-07. His board has **no speaker**: he wants our TTS delivered as a URL so
       a flow can hand it to the Sonos app's *"Play URL `<url>` at volume `<volume>`"* action.
       Distinct from (and much easier than) the voice-input-only entry below: he still wants

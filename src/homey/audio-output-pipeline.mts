@@ -3,7 +3,11 @@ import { TypedEmitter } from 'tiny-typed-emitter';
 import { PcmSegmenter } from '../helpers/pcm-segmenter.mjs';
 import { pcmToFlacBuffer } from '../helpers/audio-encoders.mjs';
 import { scheduleAudioFileDeletion } from '../helpers/file-helper.mjs';
+import { resamplePcm16Mono } from '../helpers/wav.mjs';
 import { AudioData, FileInfo } from '../helpers/interfaces.mjs';
+
+/** Sample rate the providers deliver reply PCM at, and the satellites play. */
+const REPLY_SAMPLE_RATE = 24_000;
 
 /** How a turn's reply leaves the device. Decided per turn at mic-open. */
 export type ReplyMode = 'announce' | 'inband';
@@ -136,17 +140,35 @@ export class AudioOutputPipeline extends (EventEmitter as new () => TypedEmitter
     /**
      * Encode + serve the in-band reply and schedule the file's deletion, TTL
      * extended by the reply's playback length (M2/M9).
+     *
+     * `sampleRate` re-samples before encoding. The satellites play our native
+     * 24 kHz happily, but third-party players often do not: Sonos documents FLAC
+     * "up to 48 kHz" and is only actually tested at 44.1/48, so the Flow-URL path
+     * asks for 48 kHz (an exact 2x upsample — no resampling quality question).
+     *
+     * `extraGraceMs` widens the deletion window beyond playback length. Our own
+     * playback starts within milliseconds; a Flow handing the URL to a speaker may
+     * group players, save a queue or ramp volume first, and 30 s of grace is thin
+     * for that.
      */
-    async buildReplyFile(pcm: Buffer): Promise<{ url: string; playbackMs: number }> {
-        // PCM16 mono 24 kHz = 48 bytes/ms.
+    async buildReplyFile(
+        pcm: Buffer,
+        opts: { sampleRate?: number; extraGraceMs?: number } = {},
+    ): Promise<{ url: string; playbackMs: number }> {
+        const { sampleRate = REPLY_SAMPLE_RATE, extraGraceMs = 0 } = opts;
+        // PCM16 mono 24 kHz = 48 bytes/ms. Measured before any resample, so the
+        // duration is the same number either way.
         const playbackMs = Math.round(pcm.length / 48);
-        const flac = await pcmToFlacBuffer(pcm, {
-            sampleRate: 24_000,
+        const samples = sampleRate === REPLY_SAMPLE_RATE
+            ? pcm
+            : resamplePcm16Mono(pcm, REPLY_SAMPLE_RATE, sampleRate);
+        const flac = await pcmToFlacBuffer(samples, {
+            sampleRate,
             channels: 1,
             bitsPerSample: 16,
         });
         const fileInfo = await this.webServer.buildStream({ data: flac, extension: 'flac', prefix: 'tx' });
-        scheduleAudioFileDeletion(this.homey, fileInfo, playbackMs);
+        scheduleAudioFileDeletion(this.homey, fileInfo, playbackMs + extraGraceMs);
         return { url: fileInfo.url, playbackMs };
     }
 

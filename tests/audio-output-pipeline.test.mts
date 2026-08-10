@@ -143,6 +143,35 @@ describe('AudioOutputPipeline', () => {
             expect(ttlCalls[0][1]).toBe(30_100);
             timeoutSpy.mockRestore();
         });
+
+        it('buildReplyFile resamples to the requested rate (Flow-URL path)', async () => {
+            const p = makePipeline();
+            // 24 kHz -> 48 kHz is an exact 2x upsample, so the PCM handed to the
+            // encoder must be twice as long. Sonos will not reliably play 24 kHz.
+            await p.pipeline.buildReplyFile(Buffer.alloc(4800, 5), { sampleRate: 48_000 });
+            expect(p.built[0].length).toBe(9600);
+        });
+
+        it('buildReplyFile leaves PCM untouched at the native rate', async () => {
+            const p = makePipeline();
+            await p.pipeline.buildReplyFile(Buffer.alloc(4800, 5), { sampleRate: 24_000 });
+            expect(p.built[0].length).toBe(4800);
+        });
+
+        it('buildReplyFile reports duration from the ORIGINAL pcm, not the resampled copy', async () => {
+            const p = makePipeline();
+            const file = await p.pipeline.buildReplyFile(Buffer.alloc(4800, 5), { sampleRate: 48_000 });
+            expect(file.playbackMs).toBe(100);
+        });
+
+        it('buildReplyFile adds extraGraceMs to the deletion TTL (Flow round trip)', async () => {
+            const p = makePipeline();
+            const timeoutSpy = vi.spyOn(p.homey, 'setTimeout');
+            await p.pipeline.buildReplyFile(Buffer.alloc(4800, 5), { extraGraceMs: 120_000 });
+            const ttlCalls = timeoutSpy.mock.calls.filter(c => (c[1] as number) >= 30_000);
+            expect(ttlCalls[0][1]).toBe(150_100);
+            timeoutSpy.mockRestore();
+        });
     });
 
     describe('abort', () => {

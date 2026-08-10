@@ -1,0 +1,48 @@
+{
+  "title": {
+    "en": "Reply audio is ready"
+  },
+  "hint": {
+    "en": "Fires when the assistant's spoken reply has been rendered to an audio file, with a link a speaker can play. Only fires when the device's \"Reply audio\" setting is set to send the reply to a Flow — use it to play the assistant's own voice on a Sonos or any other speaker that can play a URL. The link is only valid for a couple of minutes, so play it right away rather than storing it."
+  },
+  "args": [
+    {
+      "type": "device",
+      "name": "device",
+      "title": {
+        "en": "Device"
+      },
+      "filter": "driver_id=home-assistant-voice-preview-edition|xiaozhi-ai|thirdreality-voice--music-assistant|respeaker-xvf3800|m5stack-atoms3r"
+    }
+  ],
+  "tokens": [
+    {
+      "name": "url",
+      "type": "string",
+      "title": {
+        "en": "Audio URL"
+      },
+      "example": {
+        "en": "http://192.168.1.10/app/no.arvebjoe.ai-voice-assistant/userdata/audio/tx_1a2b.flac"
+      }
+    },
+    {
+      "name": "text",
+      "type": "string",
+      "title": {
+        "en": "Text"
+      },
+      "example": {
+        "en": "It is 21 degrees and sunny."
+      }
+    },
+    {
+      "name": "duration",
+      "type": "number",
+      "title": {
+        "en": "Duration"
+      },
+      "example": 4
+    }
+  ]
+}

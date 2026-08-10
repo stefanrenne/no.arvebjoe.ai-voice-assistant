@@ -1,0 +1,27 @@
+[
+    {
+        "id": "reply_audio_output",
+        "type": "dropdown",
+        "label": {
+            "en": "Reply audio"
+        },
+        "value": "device",
+        "hint": {
+            "en": "Where the assistant's spoken reply is played. \"Play on this device\" uses the built-in speaker. \"Send to a Flow as a URL\" plays nothing here and instead fires the \"Reply audio is ready\" Flow trigger with a link to the audio, so another speaker can play it — useful when this device has no speaker, or when a better one is in the room. The reply is not spoken until it is fully generated, so expect a little more delay than playing it here."
+        },
+        "values": [
+            {
+                "id": "device",
+                "label": {
+                    "en": "Play on this device"
+                }
+            },
+            {
+                "id": "flow_url",
+                "label": {
+                    "en": "Send to a Flow as a URL"
+                }
+            }
+        ]
+    }
+]

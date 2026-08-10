@@ -42,16 +42,26 @@ export interface Harness {
     homey: any;
     buildStreamCalls: Buffer[];
     zoneChangeCallback: ((changed: any) => void) | null;
+    /** Device-trigger fires, in order, as {cardId, tokens}. */
+    triggers: Array<{ cardId: string; tokens: Record<string, any> }>;
     /** Let queued microtasks/timers settle. */
     settle: (ms?: number) => Promise<void>;
 }
 
-function makeFakeHomey(globals: Record<string, any>): any {
+function makeFakeHomey(
+    globals: Record<string, any>,
+    triggers: Array<{ cardId: string; tokens: Record<string, any> }>,
+): any {
     const homey: any = new MockHomey();
     for (const [k, v] of Object.entries(globals)) homey.setMockSetting(k, v);
     homey.notifications = { createNotification: async () => { } };
     homey.flow = {
-        getDeviceTriggerCard: () => ({ trigger: async () => { }, registerRunListener: () => { } }),
+        getDeviceTriggerCard: (cardId: string) => ({
+            trigger: async (_device: any, tokens: Record<string, any>) => {
+                triggers.push({ cardId, tokens });
+            },
+            registerRunListener: () => { },
+        }),
         getActionCard: () => ({ registerRunListener: () => { } }),
         getConditionCard: () => ({ registerRunListener: () => { } }),
     };
@@ -70,7 +80,8 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
         ...(opts.globals ?? {}),
     };
 
-    const homey = makeFakeHomey(globals);
+    const triggers: Array<{ cardId: string; tokens: Record<string, any> }> = [];
+    const homey = makeFakeHomey(globals, triggers);
 
     // The device reads global settings via the settingsManager singleton.
     settingsManager.reset();
@@ -122,6 +133,7 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
         provider: (device as any).provider,
         homey,
         buildStreamCalls,
+        triggers,
         get zoneChangeCallback() { return zoneChangeCallback; },
         settle: (ms = 0) => new Promise(r => setTimeout(r, ms)),
     } as Harness;
