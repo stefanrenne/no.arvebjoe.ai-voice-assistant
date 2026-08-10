@@ -49,5 +49,8 @@
   },
   "1.4.10": {
     "en": "The on/off switch on the device tile is now called \"Start conversation\", because that is what it does: switch it on and the device chimes and listens, so you can speak without saying the wake word. Switching it off now cancels a conversation that is running — useful if the device is stuck listening. In the custom pipeline you can now set the language model or the speech output to \"None\": with no language model the device just sends you what it heard, for your own Flows to answer; with no speech output the answer comes back as text so a Flow can speak it on another speaker."
+  },
+  "1.4.11": {
+    "en": "New: the assistant's spoken reply can be handed to a Flow as an audio link instead of playing on the device — pick \"Send to a Flow as a URL\" under Reply audio in the device settings and use the new \"Reply audio is ready\" trigger to play it on a Sonos or any other speaker. Useful for devices without a speaker of their own. The settings page also gains a Debug section: a list of every voice device seen on your network (so you can tell a pairing problem from a network problem) and an optional \"What did I just say?\" recorder that plays back what the microphone actually captured, so you can tell a microphone problem from a speech-recognition one. Fix: replies could intermittently fail to play, with the device retrying the same audio over and over, because the app told it an address it could not reach."
   }
 }
