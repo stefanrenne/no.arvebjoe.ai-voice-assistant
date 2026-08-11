@@ -18,6 +18,14 @@ vi.mock('../src/helpers/listening-chime.mjs', async (importOriginal) => ({
     ensureListeningChime: async () => 'listening_chime.flac',
     ensureMicClosedChime: async () => 'mic_closed_chime.flac',
 }));
+// Same reason: the real one fetches the clip from GitHub and writes /userdata.
+// Its own conversion is covered by tests/feedback-sounds.test.mts.
+vi.mock('../src/helpers/feedback-sounds.mjs', () => ({
+    ensureFeedbackSoundMp3: async (key: string) => ({
+        filename: `feedback_${key}.mp3`,
+        durationMs: 4000,
+    }),
+}));
 
 import { createHarness, Harness } from './mocks/device-harness.mjs';
 import { __resetProviderRegistry, createdProviders } from './mocks/mock-voice-provider.mjs';
@@ -755,6 +763,14 @@ describe('VoiceAssistantDevice (harness)', () => {
     describe('reply audio sent to Flows as a URL', () => {
         const flowUrl = () => createHarness({ settings: { reply_audio_output: 'flow_url' } });
 
+        /**
+         * The trigger firings that carry a REPLY. A turn on this path also fires
+         * the card once at wake time with the "speak now" cue, which is a
+         * feedback clip served under its own filename.
+         */
+        const replyCards = (h: Harness) => h.triggers.filter(
+            t => t.cardId === 'reply-audio-ready' && !String(t.tokens.url).includes('/feedback_'));
+
         /** One plain wake turn whose reply would normally take the announce path. */
         async function runWakeTurn(h: Harness, reply = 'Det er 21 grader.') {
             h.esp.emit('starting');
@@ -768,11 +784,82 @@ describe('VoiceAssistantDevice (harness)', () => {
             await h.settle(20);
         }
 
+        describe('pre-recorded feedback sounds', () => {
+            /** Wake a device whose provider has no connection — the error-sound path. */
+            async function wakeWithoutAgent(h: Harness) {
+                h.provider.close();
+                h.esp.emit('starting');
+                await h.settle(5);
+            }
+
+            it('hands the sound to Flows instead of playing it locally', async () => {
+                const h = await flowUrl();
+                await wakeWithoutAgent(h);
+
+                const fired = h.triggers.filter(t => t.cardId === 'reply-audio-ready');
+                expect(fired).toHaveLength(1);
+                // The MP3 we converted and serve ourselves, not the GitHub FLAC:
+                // this URL ends up on a third-party speaker.
+                expect(fired[0].tokens.url).toBe('http://x/feedback_agent_not_connected.mp3');
+                expect(fired[0].tokens.text).toBe('The voice service is not reachable');
+                expect(fired[0].tokens.duration).toBe(4);
+                // Nothing may play on a device that has no speaker to play it on.
+                expect(h.esp.countOf('playAudioFromUrl')).toBe(0);
+            });
+
+            it('picks the sound that matches the failure', async () => {
+                const h = await flowUrl();
+                h.provider.hasApiKey = () => false;
+                await wakeWithoutAgent(h);
+
+                const fired = h.triggers.filter(t => t.cardId === 'reply-audio-ready');
+                expect(fired[0].tokens.url).toBe('http://x/feedback_api_key_missing.mp3');
+                expect(fired[0].tokens.text).toBe('No API key is configured');
+            });
+
+            it('sends the wake cue when a turn starts', async () => {
+                // Without it the user gets no sign the wake word landed until the
+                // whole answer has been generated — there is no speaker to ding.
+                const h = await flowUrl();
+                h.esp.emit('starting');
+                await h.settle(5);
+
+                const fired = h.triggers.filter(t => t.cardId === 'reply-audio-ready');
+                expect(fired).toHaveLength(1);
+                expect(fired[0].tokens.url).toBe('http://x/feedback_wake_word_triggered.mp3');
+                expect(fired[0].tokens.text).toBe('Wake word detected');
+                // The cue must not hold up the mic.
+                expect((h.device as any).turn.isListening).toBe(true);
+            });
+
+            it('does not send a wake cue on a device that plays its own audio', async () => {
+                // The firmware already dings on its own speaker.
+                const h = await createHarness();
+                h.esp.emit('starting');
+                await h.settle(5);
+
+                expect(h.triggers.filter(t => t.cardId === 'reply-audio-ready')).toHaveLength(0);
+                expect(h.esp.countOf('playAudioFromUrl')).toBe(0);
+            });
+
+            it('plays the FLAC original on the speaker when replies are not routed to a Flow', async () => {
+                // ESPHome compiles in only the decoders its `format:` asks for and
+                // these firmwares are built for FLAC — an MP3 URL would not play.
+                const h = await createHarness();
+                await wakeWithoutAgent(h);
+
+                const plays = h.esp.calls.filter(c => c.method === 'playAudioFromUrl');
+                expect(plays).toHaveLength(1);
+                expect(plays[0].args[0]).toMatch(/\/agent_not_connected\.flac$/);
+                expect(h.triggers.filter(t => t.cardId === 'reply-audio-ready')).toHaveLength(0);
+            });
+        });
+
         it('fires reply-audio-ready with the URL, text and duration', async () => {
             const h = await flowUrl();
             await runWakeTurn(h);
 
-            const fired = h.triggers.filter(t => t.cardId === 'reply-audio-ready');
+            const fired = replyCards(h);
             expect(fired).toHaveLength(1);
             expect(fired[0].tokens.url).toMatch(/^http:\/\/x\//);
             // MP3, not our native FLAC: this URL goes to third-party speakers.
@@ -858,7 +945,7 @@ describe('VoiceAssistantDevice (harness)', () => {
             });
             await runWakeTurn(h);
 
-            expect(h.triggers.filter(t => t.cardId === 'reply-audio-ready')).toHaveLength(1);
+            expect(replyCards(h)).toHaveLength(1);
             expect(h.esp.countOf('playAudioFromUrl')).toBe(0);
         });
     });

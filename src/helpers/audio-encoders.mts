@@ -6,6 +6,7 @@ const require = createRequire(import.meta.url);
 const FlacFactory = require('libflacjs');
 const Flac = FlacFactory();
 const { Encoder } = require('libflacjs/lib/encoder');
+const { Decoder } = require('libflacjs/lib/decoder');
 
 // Track initialization state
 let isFlacReady = false;
@@ -30,6 +31,55 @@ function initializeFlac(): Promise<void> {
     });
 
     return initializationPromise;
+}
+
+/**
+ * Decode a FLAC file back to raw PCM16. The reverse of pcmToFlacBuffer, and the
+ * first half of turning one of our pre-recorded feedback clips into the MP3 a
+ * Flow can hand to a third-party speaker.
+ */
+export async function flacToPcmBuffer(flacData: Buffer | Uint8Array): Promise<{
+    pcm: Buffer;
+    sampleRate: number;
+    channels: number;
+}> {
+    if (!isFlacReady) {
+        await initializeFlac();
+    }
+
+    const decoder = new Decoder(Flac, { verify: false });
+    try {
+        // `new Uint8Array(buf)` COPIES into a fresh, exactly-sized ArrayBuffer —
+        // do not "optimize" this into a zero-copy view. libflacjs 5.4.0 sizes the
+        // stream from `binData.buffer.byteLength` (the whole enclosing
+        // ArrayBuffer) rather than the view's, so a Buffer that is a view into
+        // Node's allocation pool decodes as several times its real length
+        // (LOST_SYNC), replaying stale heap bytes as extra frames.
+        if (!decoder.decode(new Uint8Array(flacData))) {
+            throw new Error('FLAC decode failed (corrupt file?)');
+        }
+        const meta = decoder.metadata;
+        if (!meta) {
+            throw new Error('FLAC decode produced no stream metadata');
+        }
+        if (meta.bitsPerSample !== 16) {
+            throw new Error(`Only 16-bit FLAC is supported (file is ${meta.bitsPerSample}-bit)`);
+        }
+        // Interleaved raw PCM bytes across all channels. Copied out because the
+        // decoder's buffer is invalidated by destroy().
+        const interleaved: Uint8Array = decoder.getSamples(true);
+        return {
+            pcm: Buffer.from(interleaved.subarray(0, interleaved.byteLength)),
+            sampleRate: meta.sampleRate,
+            channels: meta.channels,
+        };
+    } finally {
+        try {
+            decoder.destroy();
+        } catch {
+            // ignore teardown errors
+        }
+    }
 }
 
 interface Mp3Options {

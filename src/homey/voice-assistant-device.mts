@@ -14,7 +14,8 @@ import { TurnStateMachine } from './turn-state-machine.mjs';
 import { AudioOutputPipeline } from './audio-output-pipeline.mjs';
 import { DeviceStore } from '../helpers/interfaces.mjs';
 import { createLogger } from '../helpers/logger.mjs';
-import { SOUND_URLS } from '../helpers/sound-urls.mjs';
+import { SOUND_URLS, SOUND_TEXTS, SoundUrlKey } from '../helpers/sound-urls.mjs';
+import { ensureFeedbackSoundMp3 } from '../helpers/feedback-sounds.mjs';
 import { ensureListeningChime, ensureMicClosedChime, appendChimeToPcm } from '../helpers/listening-chime.mjs';
 import { scheduleAudioFileDeletion } from '../helpers/file-helper.mjs';
 import { recordingRegistry, retentionMsFromSetting, Recording } from '../helpers/recording-registry.mjs';
@@ -372,12 +373,15 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
         this.convo.warn(hasKey
           ? 'Wake ignored — agent not connected, playing error sound'
           : 'Wake ignored — API key missing, playing error sound');
-        const url = hasKey ? SOUND_URLS.agent_not_connected : SOUND_URLS.api_key_missing;
         this.esp.run_start();
         this.esp.pipeline_error('agent-not-connected', hasKey ? 'Voice agent is not connected.' : 'API key is missing.');
         this.esp.run_end();
-        this.playUrl(url);
+        this.playFeedbackSound(hasKey ? 'agent_not_connected' : 'api_key_missing');
         return;
+      }
+      
+      if (this.replyToFlowUrl) {
+        this.playFeedbackSound('wake_word_triggered');
       }
 
       // The machine decides: fresh conversation (context TTL expired), follow-up
@@ -766,7 +770,7 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
         this.setStoreValue('justPaired', false).catch((err) =>
           this.logger.error('Failed to clear justPaired flag', err));
         this.convo.info('Paired device connected — playing welcome sound', 'INIT');
-        this.playUrl(SOUND_URLS.device_connected);
+        this.playFeedbackSound('device_connected');
       }
     });
 
@@ -1153,7 +1157,7 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
       // ESP link itself dropped, the sound can't play anyway.
       if (playError && this.isEspClientHealthy) {
         this.convo.warn('Playing error sound', 'END');
-        this.playUrl(SOUND_URLS.error);
+        this.playFeedbackSound('error');
       }
     }
 
@@ -1392,6 +1396,38 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
 
   }
 
+
+  /**
+   * Play one of the pre-recorded feedback clips (`sound-urls.mts`).
+   *
+   * Normally that means the satellite's own speaker, straight from the GitHub
+   * FLAC. When this device's reply audio goes to a Flow there is usually no
+   * speaker to play it on — the same reason the reply itself is handed over as
+   * a URL — so the clip fires the "Reply audio is ready" trigger instead, as an
+   * MP3 served from Homey (`ensureFeedbackSoundMp3`), because that URL ends up
+   * on a third-party speaker.
+   *
+   * Fire-and-forget: every call site is a failure path that must not wait on a
+   * fetch/encode, and a clip we cannot produce is logged, not thrown.
+   */
+  private playFeedbackSound(key: SoundUrlKey): void {
+    if (!this.replyToFlowUrl) {
+      this.playUrl(SOUND_URLS[key]);
+      return;
+    }
+
+    ensureFeedbackSoundMp3(key)
+      .then((sound) => {
+        const url = this.webServer.buildStaticUrl(sound.filename);
+        this.logger.info(`Feedback sound sent to Flows as a URL: ${url}`);
+        this.fireDeviceTrigger('reply-audio-ready', {
+          url,
+          text: SOUND_TEXTS[key],
+          duration: Math.round(sound.durationMs / 1000),
+        });
+      })
+      .catch((err) => this.logger.error(`Failed to prepare the ${key} feedback sound`, err));
+  }
 
   playUrl(url: string): void {
     this.logger.info(`Playing audio from URL: ${url}`);

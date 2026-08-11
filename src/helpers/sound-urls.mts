@@ -27,3 +27,19 @@ export const SOUND_URLS = {
 } as const;
 
 export type SoundUrlKey = keyof typeof SOUND_URLS;
+
+/**
+ * What each clip is about, for the `text` tag of the "Reply audio is ready"
+ * trigger — a device that routes its reply audio to a Flow gets these sounds as
+ * a URL instead of playing them (see `feedback-sounds.mts`).
+ *
+ * Deliberately a label of the *event*, not a transcript: a Flow can log it or
+ * speak it through its own TTS, and it stays true if a clip is re-recorded.
+ */
+export const SOUND_TEXTS: Record<SoundUrlKey, string> = {
+  wake_word_triggered: 'Wake word detected',
+  device_connected: 'Connected to Homey',
+  api_key_missing: 'No API key is configured',
+  agent_not_connected: 'The voice service is not reachable',
+  error: 'Something went wrong',
+};

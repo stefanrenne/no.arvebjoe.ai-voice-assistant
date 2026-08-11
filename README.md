@@ -524,6 +524,10 @@ Worth knowing before you switch it on:
 * The audio is MP3, 48 kHz mono, served from Homey on your LAN — MP3 because that is the one
   format every networked speaker plays. The link is valid for about two minutes — play it straight
   away rather than storing it.
+* **The app's own feedback sounds come through the same trigger** — the "something went wrong"
+  clip, "no API key is configured", and the greeting the device plays the first time it connects
+  after pairing. On a device with no speaker they would otherwise be silent. Their **text** tag is
+  a short label of what happened rather than the reply text, and their link does not expire.
 * The reply is not sent until it is **fully generated**, so a long answer starts later than it
   would on the device's own speaker.
 * **Follow-up questions need the wake word again.** Normally the device reopens its microphone
@@ -556,8 +560,9 @@ it turns itself on whenever the assistant wakes and off again when the turn ends
   message is a **text** tag and a **type** tag says whether it was a `tool` call or the final
   `reply`. Combine with *Heard something* to follow a whole conversation on the timeline
 * **Reply audio is ready** — the spoken reply has been rendered to a file, with **url**, **text**
-  and **duration** tags. Only fires on devices whose *Reply audio* setting is set to send the reply
-  to a Flow (see [Playing the reply on another speaker](#playing-the-reply-on-another-speaker))
+  and **duration** tags. Also fires for the app's own feedback sounds (an error, a missing API key,
+  the post-pairing greeting). Only fires on devices whose *Reply audio* setting is set to send the
+  reply to a Flow (see [Playing the reply on another speaker](#playing-the-reply-on-another-speaker))
 * Plus standard device triggers (*Start conversation* turned on/off — i.e. a conversation
   started or ended — and volume changed)
 

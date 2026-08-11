@@ -8,6 +8,13 @@ URLs), mapped in [`src/helpers/sound-urls.mjs`](../src/helpers/sound-urls.mts).
 Keep them **provider-agnostic** — the app supports OpenAI, Gemini, Mistral and a
 local pipeline, so no clip should name a specific vendor.
 
+**FLAC is the format to record in.** The satellites fetch these URLs themselves,
+and ESPHome compiles in only the decoders its `format:` option asks for — these
+firmwares are built for FLAC. A device that routes its reply audio to a Flow has
+no speaker of its own, so there the app converts the clip to MP3 itself
+(`src/helpers/feedback-sounds.mts`, using the same encoder as reply audio) and
+serves it from Homey. Nothing here needs a second file per clip.
+
 | File | Played when |
 | --- | --- |
 | `wake_word_triggered.flac` | The wake word was detected (start-of-turn chime). |
