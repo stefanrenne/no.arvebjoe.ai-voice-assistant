@@ -101,7 +101,10 @@ class VirtualSatelliteHub {
       res.end('Not found');
       return;
     }
-    res.setHeader('Content-Type', filename.endsWith('.wav') ? 'audio/wav' : 'audio/flac');
+    // .mp3 shows up here via the Flow-URL reply path (buildReplyFile).
+    res.setHeader('Content-Type', filename.endsWith('.wav')
+      ? 'audio/wav'
+      : filename.endsWith('.mp3') ? 'audio/mpeg' : 'audio/flac');
     res.setHeader('Content-Length', String(statSync(file).size));
     createReadStream(file).pipe(res);
   }

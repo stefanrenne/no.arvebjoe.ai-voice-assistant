@@ -6,6 +6,7 @@ vi.mock('../src/voice_assistant/esp-voice-assistant-client.mjs', () => import('.
 vi.mock('../src/llm/voice-provider-factory.mjs', () => import('./mocks/mock-voice-provider.mjs'));
 vi.mock('../src/helpers/audio-encoders.mjs', () => ({
     pcmToFlacBuffer: async (b: any) => (Buffer.isBuffer(b) ? b : Buffer.from(b)),
+    pcmToMp3Buffer: async (b: any) => (Buffer.isBuffer(b) ? b : Buffer.from(b)),
 }));
 // Keep the pure PCM helpers real; only stub the /userdata-writing ones so tests
 // never touch the filesystem and the reopen path still carries the chime URL.
@@ -388,7 +389,7 @@ describe('VoiceAssistantDevice (harness)', () => {
             const plays = h.esp.calls.filter(c => c.method === 'playAudioFromUrl');
             // First segment plays; second is queued behind it (announce queue).
             expect(plays).toHaveLength(1);
-            expect(plays[0].args[0]).toBe('http://x/1');
+            expect(plays[0].args[0]).toBe('http://x/1.flac');
             expect((h.device as any).audioOutput.queue).toHaveLength(1);
         });
 
@@ -405,7 +406,7 @@ describe('VoiceAssistantDevice (harness)', () => {
             await h.settle(10);
 
             const plays = h.esp.calls.filter(c => c.method === 'playAudioFromUrl');
-            expect(plays.map(p => p.args[0])).toEqual(['http://x/1', 'http://x/2']);
+            expect(plays.map(p => p.args[0])).toEqual(['http://x/1.flac', 'http://x/2.flac']);
         });
 
         it('M9 — extends the announce file TTL by the segment playback length', async () => {
@@ -774,6 +775,8 @@ describe('VoiceAssistantDevice (harness)', () => {
             const fired = h.triggers.filter(t => t.cardId === 'reply-audio-ready');
             expect(fired).toHaveLength(1);
             expect(fired[0].tokens.url).toMatch(/^http:\/\/x\//);
+            // MP3, not our native FLAC: this URL goes to third-party speakers.
+            expect(fired[0].tokens.url).toMatch(/\.mp3$/);
             expect(fired[0].tokens.text).toBe('Det er 21 grader.');
             // 4800 bytes of 24 kHz mono PCM16 = 100 ms, rounded to whole seconds.
             expect(fired[0].tokens.duration).toBe(0);

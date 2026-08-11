@@ -31,6 +31,12 @@ import { getAppServices } from '../helpers/app-services.mjs';
 // exact 2x upsample, so there is no resampling quality question.
 const FLOW_URL_SAMPLE_RATE = 48_000;
 
+// ...and as MP3, not the FLAC our own satellites get. The URL goes to whatever
+// the Flow hands it to, and MP3 is the format every networked speaker plays;
+// third-party FLAC support is patchy and picky about rate/bit depth. Speech at
+// 128 kbit/s (the encoder default) is well past transparent.
+const FLOW_URL_FORMAT = 'mp3' as const;
+
 // Extra grace on top of playback length before the file is deleted. Our own
 // playback starts in milliseconds; a Flow may group speakers, save and restore a
 // queue or ramp volume before it ever fetches the URL.
@@ -635,11 +641,11 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
         const pcm = keepOpen && d.pcm.length > 0 ? appendChimeToPcm(d.pcm) : d.pcm;
 
         // Encode + serve + schedule deletion (TTL extended by playback length) —
-        // the pipeline owns the file mechanics. Flow-URL replies are encoded at
-        // 48 kHz and given a wider deletion window; see buildReplyFile.
+        // the pipeline owns the file mechanics. Flow-URL replies are MP3 at
+        // 48 kHz with a wider deletion window; see buildReplyFile.
         const file = pcm.length > 0
           ? await this.audioOutput.buildReplyFile(pcm, this.replyToFlowUrl
-            ? { sampleRate: FLOW_URL_SAMPLE_RATE, extraGraceMs: FLOW_URL_GRACE_MS }
+            ? { sampleRate: FLOW_URL_SAMPLE_RATE, extraGraceMs: FLOW_URL_GRACE_MS, format: FLOW_URL_FORMAT }
             : {})
           : null;
 

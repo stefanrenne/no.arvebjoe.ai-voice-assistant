@@ -23,7 +23,7 @@
         "en": "Audio URL"
       },
       "example": {
-        "en": "http://192.168.1.10/app/no.arvebjoe.ai-voice-assistant/userdata/audio/tx_1a2b.flac"
+        "en": "http://192.168.1.10/app/no.arvebjoe.ai-voice-assistant/userdata/audio/tx_1a2b.mp3"
       }
     },
     {

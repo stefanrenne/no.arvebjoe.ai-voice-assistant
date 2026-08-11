@@ -521,8 +521,9 @@ speaker's own text-to-speech.
 
 Worth knowing before you switch it on:
 
-* The audio is FLAC, 48 kHz mono, served from Homey on your LAN. The link is valid for about two
-  minutes — play it straight away rather than storing it.
+* The audio is MP3, 48 kHz mono, served from Homey on your LAN — MP3 because that is the one
+  format every networked speaker plays. The link is valid for about two minutes — play it straight
+  away rather than storing it.
 * The reply is not sent until it is **fully generated**, so a long answer starts later than it
   would on the device's own speaker.
 * **Follow-up questions need the wake word again.** Normally the device reopens its microphone
