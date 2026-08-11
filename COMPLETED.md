@@ -1328,6 +1328,20 @@ instead of returning them; if every candidate looks like a bridge it still retur
 Homey could genuinely sit on 172.16/12 and a wrong-but-plausible address beats `127.0.0.1`, which is
 wrong for certain. Tests: `tests/webserver-lan-ip.test.mts`.
 
+**Follow-up 2026-08-11 — `socket.localAddress` is not enough either.** A `reply-audio-ready` URL came
+out as `http://172.17.0.2/…` again. Both sources this fix relied on can see *only* the bridge:
+where the app container is NATed, our end of the device socket **is** `172.17.0.2` (the satellite
+still reaches Homey on its LAN address, after masquerading), and the interface list inside the
+container has nothing else in it to sniff. Neither heuristic can derive an address the container
+cannot see. Fix: **ask Homey** — `homey.cloud.getLocalAddress()` returns `"<ip>:<port>"` and needs no
+permission (`homey-lib`'s permission list has no cloud entry). Fetched in `WebServer.init()` behind a
+5 s timeout so a hanging manager can't stall app boot, cached 10 min (60 s backoff on failure) and
+refreshed lazily from `getLanIP()`. Precedence is now: `HE_HOST_IP` → device-reported address **when
+it is not bridge-shaped** (still routable by construction on an ordinary LAN, and it beats Homey's
+answer if Homey is dual-homed) → Homey's own local address → interface sniffing → any bridge-shaped
+address as the last resort. A bridge-shaped report is recorded and logged as NATed but no longer
+wins. Port is kept in the URL only when it isn't 80.
+
 **Worth recognising in future reports:** an unreachable announce URL puts the satellite in a ~2 s
 retry loop — the firmware's hardcoded `start_playback_timeout_` ends the announce as "finished", our
 `announce_finished` handler dequeues the next segment, repeat. On the ReSpeaker that surfaced as
