@@ -765,11 +765,11 @@ describe('VoiceAssistantDevice (harness)', () => {
 
         /**
          * The trigger firings that carry a REPLY. A turn on this path also fires
-         * the card once at wake time with the "speak now" cue, which is a
-         * feedback clip served under its own filename.
+         * the card once at wake time with the "speak now" cue; the is_sound_effect
+         * tag is exactly how a Flow tells those apart, so filter on it here too.
          */
         const replyCards = (h: Harness) => h.triggers.filter(
-            t => t.cardId === 'reply-audio-ready' && !String(t.tokens.url).includes('/feedback_'));
+            t => t.cardId === 'reply-audio-ready' && !t.tokens.is_sound_effect);
 
         /** One plain wake turn whose reply would normally take the announce path. */
         async function runWakeTurn(h: Harness, reply = 'Det er 21 grader.') {
@@ -803,6 +803,8 @@ describe('VoiceAssistantDevice (harness)', () => {
                 expect(fired[0].tokens.url).toBe('http://x/feedback_agent_not_connected.mp3');
                 expect(fired[0].tokens.text).toBe('The voice service is not reachable');
                 expect(fired[0].tokens.duration).toBe(4);
+                // How a Flow tells a canned clip from a real answer.
+                expect(fired[0].tokens.is_sound_effect).toBe(true);
                 // Nothing may play on a device that has no speaker to play it on.
                 expect(h.esp.countOf('playAudioFromUrl')).toBe(0);
             });
@@ -828,6 +830,7 @@ describe('VoiceAssistantDevice (harness)', () => {
                 expect(fired).toHaveLength(1);
                 expect(fired[0].tokens.url).toBe('http://x/feedback_wake_word_triggered.mp3');
                 expect(fired[0].tokens.text).toBe('Wake word detected');
+                expect(fired[0].tokens.is_sound_effect).toBe(true);
                 // The cue must not hold up the mic.
                 expect((h.device as any).turn.isListening).toBe(true);
             });
@@ -867,6 +870,8 @@ describe('VoiceAssistantDevice (harness)', () => {
             expect(fired[0].tokens.text).toBe('Det er 21 grader.');
             // 4800 bytes of 24 kHz mono PCM16 = 100 ms, rounded to whole seconds.
             expect(fired[0].tokens.duration).toBe(0);
+            // The real answer, not one of the canned clips.
+            expect(fired[0].tokens.is_sound_effect).toBe(false);
         });
 
         it('never hands the device a URL to play', async () => {

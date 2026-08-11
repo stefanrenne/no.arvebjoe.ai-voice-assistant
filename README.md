@@ -524,10 +524,13 @@ Worth knowing before you switch it on:
 * The audio is MP3, 48 kHz mono, served from Homey on your LAN — MP3 because that is the one
   format every networked speaker plays. The link is valid for about two minutes — play it straight
   away rather than storing it.
-* **The app's own feedback sounds come through the same trigger** — the "something went wrong"
-  clip, "no API key is configured", and the greeting the device plays the first time it connects
-  after pairing. On a device with no speaker they would otherwise be silent. Their **text** tag is
-  a short label of what happened rather than the reply text, and their link does not expire.
+* **The app's own sound effects come through the same trigger** — the "speak now" cue when a turn
+  starts, the "something went wrong" clip, "no API key is configured", and the greeting the device
+  plays the first time it connects after pairing. On a device with no speaker they would otherwise
+  be silent. The **is a sound effect** tag is `yes` for these and `no` for a spoken answer, so a
+  Flow can treat them differently — play the cue at a lower volume, or ignore them entirely with a
+  condition card. Their **text** tag is a short label of what happened rather than the reply text,
+  and their link does not expire.
 * The reply is not sent until it is **fully generated**, so a long answer starts later than it
   would on the device's own speaker.
 * **Follow-up questions need the wake word again.** Normally the device reopens its microphone
@@ -559,9 +562,10 @@ it turns itself on whenever the assistant wakes and off again when the turn ends
 * **Thinking** — the assistant produced a reply or used a tool ("Using tool get_devices"); the
   message is a **text** tag and a **type** tag says whether it was a `tool` call or the final
   `reply`. Combine with *Heard something* to follow a whole conversation on the timeline
-* **Reply audio is ready** — the spoken reply has been rendered to a file, with **url**, **text**
-  and **duration** tags. Also fires for the app's own feedback sounds (an error, a missing API key,
-  the post-pairing greeting). Only fires on devices whose *Reply audio* setting is set to send the
+* **Reply audio is ready** — the spoken reply has been rendered to a file, with **url**, **text**,
+  **duration** and **is a sound effect** tags. Also fires for the app's own sound effects (the wake
+  cue, an error, a missing API key, the post-pairing greeting), which is what that last tag is for.
+  Only fires on devices whose *Reply audio* setting is set to send the
   reply to a Flow (see [Playing the reply on another speaker](#playing-the-reply-on-another-speaker))
 * Plus standard device triggers (*Start conversation* turned on/off — i.e. a conversation
   started or ended — and volume changed)

@@ -664,6 +664,9 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
               url: file.url,
               text: replyText,
               duration: Math.round(file.playbackMs / 1000),
+              // The spoken answer, not one of the pre-recorded clips — a Flow
+              // that only wants real replies filters on this.
+              is_sound_effect: false,
             });
           } else {
             this.convo.info('Turn ended with no reply audio', 'END');
@@ -1424,6 +1427,7 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
           url,
           text: SOUND_TEXTS[key],
           duration: Math.round(sound.durationMs / 1000),
+          is_sound_effect: true,
         });
       })
       .catch((err) => this.logger.error(`Failed to prepare the ${key} feedback sound`, err));
