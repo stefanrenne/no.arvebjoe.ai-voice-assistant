@@ -1,8 +1,17 @@
 import { describe, it, expect, vi } from 'vitest';
 
-// Passthrough "FLAC" so buffers stay byte-identical through the pipeline.
+// Passthrough encoders so buffers stay byte-identical through the pipeline.
+// Tagged so a test can tell which one the pipeline picked.
+const encoderCalls: string[] = [];
 vi.mock('../src/helpers/audio-encoders.mjs', () => ({
-    pcmToFlacBuffer: async (b: any) => (Buffer.isBuffer(b) ? b : Buffer.from(b)),
+    pcmToFlacBuffer: async (b: any) => {
+        encoderCalls.push('flac');
+        return Buffer.isBuffer(b) ? b : Buffer.from(b);
+    },
+    pcmToMp3Buffer: async (b: any) => {
+        encoderCalls.push('mp3');
+        return Buffer.isBuffer(b) ? b : Buffer.from(b);
+    },
 }));
 
 import { AudioOutputPipeline } from '../src/homey/audio-output-pipeline.mjs';
@@ -11,15 +20,19 @@ import { MockHomey } from './mocks/mock-homey.mjs';
 const tick = (ms = 0) => new Promise(r => setTimeout(r, ms));
 
 function makePipeline(opts: { delayByFirstByte?: Record<number, number> } = {}) {
+    encoderCalls.length = 0;
     const homey = new MockHomey();
     const built: Buffer[] = [];
+    const extensions: string[] = [];
     const webServer = {
         async buildStream(audioData: any) {
             const data: Buffer = audioData.data;
             built.push(data);
+            extensions.push(audioData.extension);
             const delay = opts.delayByFirstByte?.[data[0]] ?? 0;
             if (delay > 0) await tick(delay);
-            return { filename: `f.flac`, filepath: `/tmp/f.flac`, url: `http://x/${data[0]}` };
+            const ext = audioData.extension;
+            return { filename: `f.${ext}`, filepath: `/tmp/f.${ext}`, url: `http://x/${data[0]}` };
         },
     };
     const logger = { error: vi.fn() };
@@ -30,7 +43,7 @@ function makePipeline(opts: { delayByFirstByte?: Record<number, number> } = {}) 
     const replies: any[] = [];
     pipeline.on('reply-done', (d) => replies.push(d));
 
-    return { pipeline, homey, built, segments, replies, logger };
+    return { pipeline, homey, built, extensions, encoderCalls, segments, replies, logger };
 }
 
 const chunk = (marker: number, len = 4) => {
@@ -162,6 +175,22 @@ describe('AudioOutputPipeline', () => {
             const p = makePipeline();
             const file = await p.pipeline.buildReplyFile(Buffer.alloc(4800, 5), { sampleRate: 48_000 });
             expect(file.playbackMs).toBe(100);
+        });
+
+        it('buildReplyFile encodes FLAC by default (our own satellites)', async () => {
+            const p = makePipeline();
+            await p.pipeline.buildReplyFile(Buffer.alloc(4800, 5));
+            expect(p.encoderCalls).toEqual(['flac']);
+            expect(p.extensions).toEqual(['flac']);
+        });
+
+        it('buildReplyFile encodes MP3 when asked (Flow-URL path)', async () => {
+            const p = makePipeline();
+            // The URL goes to third-party players; MP3 is the format they all
+            // handle, and the extension has to match or they refuse to fetch it.
+            await p.pipeline.buildReplyFile(Buffer.alloc(4800, 5), { format: 'mp3' });
+            expect(p.encoderCalls).toEqual(['mp3']);
+            expect(p.extensions).toEqual(['mp3']);
         });
 
         it('buildReplyFile adds extraGraceMs to the deletion TTL (Flow round trip)', async () => {

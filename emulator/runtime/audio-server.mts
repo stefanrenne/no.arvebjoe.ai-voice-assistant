@@ -12,6 +12,18 @@ import { createLogger } from '../../src/helpers/logger.mjs';
 import { audioDir } from '../../src/helpers/file-helper.mjs';
 
 const log = createLogger('EMU-Audio', false);
+
+/**
+ * Reply files are FLAC for our own satellites, but the Flow-URL path writes MP3
+ * (see buildReplyFile) and debug/chime files can be WAV — a blanket audio/flac
+ * header made a browser refuse to play them.
+ */
+function contentTypeFor(filename: string): string {
+  if (filename.endsWith('.mp3')) return 'audio/mpeg';
+  if (filename.endsWith('.wav')) return 'audio/wav';
+  return 'audio/flac';
+}
+
 // Resolved lazily: config.mts may redirect the folder (HE_AUDIO_DIR) after this
 // module is loaded.
 const audioRoot = () => resolve(audioDir());
@@ -38,7 +50,7 @@ export function startAudioServer(required: boolean = true): Promise<void> {
         }
 
         const size = statSync(file).size;
-        res.setHeader('Content-Type', 'audio/flac');
+        res.setHeader('Content-Type', contentTypeFor(m[1]));
         res.setHeader('Content-Length', String(size));
         createReadStream(file).pipe(res);
         log.info(`${m[1]} (${size} bytes)`, 'SERVE');

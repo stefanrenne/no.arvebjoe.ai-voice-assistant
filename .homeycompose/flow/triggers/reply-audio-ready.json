@@ -3,7 +3,7 @@
     "en": "Reply audio is ready"
   },
   "hint": {
-    "en": "Fires when the assistant's spoken reply has been rendered to an audio file, with a link a speaker can play. Only fires when the device's \"Reply audio\" setting is set to send the reply to a Flow — use it to play the assistant's own voice on a Sonos or any other speaker that can play a URL. The link is only valid for a couple of minutes, so play it right away rather than storing it."
+    "en": "Fires when the assistant's spoken reply has been rendered to an audio file, with a link a speaker can play, and for the app's own sound effects (the wake cue, an error, a missing API key, the greeting after pairing) — the \"Is a sound effect\" tag tells the two apart. Only fires when the device's \"Reply audio\" setting is set to send the reply to a Flow — use it to play the assistant's own voice on a Sonos or any other speaker that can play a URL. A reply link is only valid for a couple of minutes, so play it right away rather than storing it."
   },
   "args": [
     {
@@ -23,7 +23,7 @@
         "en": "Audio URL"
       },
       "example": {
-        "en": "http://192.168.1.10/app/no.arvebjoe.ai-voice-assistant/userdata/audio/tx_1a2b.flac"
+        "en": "http://192.168.1.10/app/no.arvebjoe.ai-voice-assistant/userdata/audio/tx_1a2b.mp3"
       }
     },
     {
@@ -43,6 +43,14 @@
         "en": "Duration"
       },
       "example": 4
+    },
+    {
+      "name": "is_sound_effect",
+      "type": "boolean",
+      "title": {
+        "en": "Is a sound effect"
+      },
+      "example": false
     }
   ]
 }

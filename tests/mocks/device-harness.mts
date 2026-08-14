@@ -100,7 +100,10 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
             const delay = opts.buildStreamDelayByFirstByte?.[data[0]] ?? 0;
             if (delay > 0) await new Promise(r => setTimeout(r, delay));
             const id = buildStreamCalls.length;
-            return { filename: `f${id}.flac`, filepath: `/userdata/audio/f${id}.flac`, url: `http://x/${data[0]}` };
+            // The extension the caller asked for rides through into filename and
+            // URL — the Flow-URL path must hand out an .mp3, not our .flac.
+            const ext = audioData.extension;
+            return { filename: `f${id}.${ext}`, filepath: `/userdata/audio/f${id}.${ext}`, url: `http://x/${data[0]}.${ext}` };
         },
     };
 

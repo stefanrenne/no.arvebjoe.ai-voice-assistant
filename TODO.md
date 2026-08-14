@@ -278,8 +278,12 @@ un-dropped 2026-07-31** (see "Start a Homey flow by voice" below).
       send time, and reopening then would let the device hear the reply being spoken elsewhere),
       and `askAgentOutputToSpeaker()` needed re-routing since its `cancelInband()` selects the
       announce path that waits for an ack no speakerless device can send. Encoded at 48 kHz with
-      a 2-minute deletion grace. Still **unverified on real hardware** — the tester has yet to
-      confirm Sonos actually plays the file; `pcmToWav()` remains the fallback if it balks.
+      a 2-minute deletion grace. **Switched from FLAC to MP3 2026-08-11** (128 kbit/s mono,
+      `pcmToMp3Buffer()` on `@breezystack/lamejs` — pure JS, same no-native-deps constraint that
+      picked libflacjs): the FLAC blocker below was never worth waiting to hit, since MP3 is the
+      one format every networked speaker plays. `format` is a per-call option on
+      `buildReplyFile()`, so our own satellites keep getting FLAC. Still **unverified on real
+      hardware** — the tester has yet to confirm Sonos actually plays the file.
       Original design notes kept below for that follow-up.
       ORIGINAL ITEM — ReSpeaker tester
       request 2026-08-07. His board has **no speaker**: he wants our TTS delivered as a URL so
