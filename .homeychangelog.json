@@ -52,5 +52,8 @@
   },
   "1.4.11": {
     "en": "New: the assistant's spoken reply can be handed to a Flow as an audio link instead of playing on the device — pick \"Send to a Flow as a URL\" under Reply audio in the device settings and use the new \"Reply audio is ready\" trigger to play it on a Sonos or any other speaker. Useful for devices without a speaker of their own. The settings page also gains a Debug section: a list of every voice device seen on your network (so you can tell a pairing problem from a network problem) and an optional \"What did I just say?\" recorder that plays back what the microphone actually captured, so you can tell a microphone problem from a speech-recognition one. Fix: replies could intermittently fail to play, with the device retrying the same audio over and over, because the app told it an address it could not reach."
+  },
+  "1.4.12": {
+    "en": "Replies sent to a Flow as an audio link are now MP3 instead of FLAC, so they play on far more speakers — a Sonos in particular. The app's own sounds now come through the same trigger: a short cue when the device starts listening, plus the error, missing-key and post-pairing sounds, which devices without their own speaker could not play before. A new \"Is a sound effect\" tag lets a Flow tell those apart from a spoken reply. Fix: the audio link could point at an address your speaker was unable to reach, so nothing played. Fix: on newer ESPHome firmware the volume and mute controls, and playing music on the device, could stop working."
   }
 }
