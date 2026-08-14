@@ -705,3 +705,26 @@ fixes — is archived in **[COMPLETED.md](./COMPLETED.md)**.
 * **RealDeco** for the XiaoZhi ESPHome configs
 * **M5Stack** for their official ESPHome voice-assistant configs
 * Everyone experimenting with tiny ESP32 voice devices 💛
+
+---
+
+## License & third-party software
+
+This app is released under the **GNU General Public License v3.0** — see [LICENSE](./LICENSE).
+
+It bundles the following third-party libraries, each under its own license:
+
+| Library | License | Used for |
+| --- | --- | --- |
+| [`@breezystack/lamejs`](https://github.com/breezystack/lamejs) | LGPL-3.0 | MP3 encoding of reply audio and sound effects |
+| [`libflacjs`](https://github.com/mmig/libflac.js) | MIT | FLAC encoding/decoding for the satellites |
+| [`protobufjs`](https://github.com/protobufjs/protobuf.js) | BSD-3-Clause | ESPHome native API messages |
+| [`@google/genai`](https://github.com/googleapis/js-genai) | Apache-2.0 | Gemini Live provider |
+| [`ws`](https://github.com/websockets/ws), [`uuid`](https://github.com/uuidjs/uuid), [`varint`](https://github.com/chrisdickinson/varint) | MIT | WebSockets, ids, varint framing |
+| [`homey-api`](https://www.npmjs.com/package/homey-api), [`homey-lib`](https://www.npmjs.com/package/homey-lib), [`homey-log`](https://www.npmjs.com/package/homey-log) | Athom | Homey platform SDK |
+
+`@breezystack/lamejs` is a JavaScript port of the **LAME MP3 encoder**
+(<https://lame.sourceforge.io/>) and is covered by the LGPL. It is used unmodified, as a separate
+package under `node_modules/`, and its license text ships with it. LGPL-3.0 is compatible with
+this app's GPL-3.0 license; if you modify the library itself, those changes must be released
+under the LGPL.
