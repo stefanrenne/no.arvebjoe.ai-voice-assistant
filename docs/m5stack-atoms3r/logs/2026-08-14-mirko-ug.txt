@@ -1,0 +1,2090 @@
+
+[14:49:26.172][I][app:151]: ESPHome version 2026.7.4 compiled on 2026-08-07 22:04:16 +0200
+[14:49:26.172][I][app:158]: ESP32 Chip: ESP32-S3 rev0.2, 2 core(s)
+[14:49:26.172][C][logger:223]: Logger:
+[14:49:26.172][C][logger:223]:   Max Level: DEBUG
+[14:49:26.172][C][logger:223]:   Initial Level: DEBUG
+[14:49:26.172][C][logger:230]:   Log Baud Rate: 115200
+[14:49:26.172][C][logger:230]:   Hardware UART: USB_SERIAL_JTAG
+[14:49:26.177][C][logger:239]:   Task Log Buffer Size: 768 bytes
+[14:49:26.202][C][i2c.idf:092]: I2C Bus:
+[14:49:26.206][C][i2c.idf:093]:   SDA Pin: GPIO45
+[14:49:26.206][C][i2c.idf:093]:   SCL Pin: GPIO0
+[14:49:26.206][C][i2c.idf:093]:   Frequency: 50000 Hz
+[14:49:26.206][C][i2c.idf:103]:   Recovery: bus successfully recovered
+[14:49:26.206][C][i2c.idf:113]: Results from bus scan:
+[14:49:26.211][C][i2c.idf:119]: Found device at address 0x30
+[14:49:26.211][C][i2c.idf:119]: Found device at address 0x68
+[14:49:26.231][C][i2c.idf:092]: I2C Bus:
+[14:49:26.235][C][i2c.idf:093]:   SDA Pin: GPIO38
+[14:49:26.235][C][i2c.idf:093]:   SCL Pin: GPIO39
+[14:49:26.235][C][i2c.idf:093]:   Frequency: 50000 Hz
+[14:49:26.235][C][i2c.idf:103]:   Recovery: bus successfully recovered
+[14:49:26.235][C][i2c.idf:113]: Results from bus scan:
+[14:49:26.240][C][i2c.idf:119]: Found device at address 0x18
+[14:49:26.240][C][i2c.idf:119]: Found device at address 0x43
+[14:49:26.258][C][spi:066]: SPI bus:
+[14:49:26.258][C][spi:131]:   CLK Pin: GPIO15
+[14:49:26.263][C][spi:131]:   SDI Pin: 
+[14:49:26.269][C][spi:131]:   SDO Pin: GPIO21
+[14:49:26.269][C][spi:074]:   Using HW SPI: SPI2_HOST
+[14:49:26.269][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:26.277][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:26.277][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:26.277][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:26.292][C][pi4ioe5v6408:051]: PI4IOE5V6408:
+[14:49:26.295][C][pi4ioe5v6408:053]:   Address: 0x43
+[14:49:26.319][C][gpio.binary_sensor:016]: GPIO Binary Sensor 'user_button'
+[14:49:26.319][C][gpio.binary_sensor:131]:   Pin: GPIO41
+[14:49:26.319][C][gpio.binary_sensor:061]:   Mode: interrupt
+[14:49:26.328][C][gpio.binary_sensor:063]:   Interrupt Type: ANY_EDGE
+[14:49:26.354][C][switch.gpio:088]: GPIO Switch 'Speaker Enable'
+[14:49:26.354][C][switch.gpio:088]:   Restore Mode: restore defaults to ON
+[14:49:26.355][C][switch.gpio:]:   Icon: 'mdi:volume-high'
+[14:49:26.355][C][switch.gpio:131]:   Pin: 0 via PI4IOE5V6408
+[14:49:26.376][C][template.select:010]: Template Select 'Wake word engine location'
+[14:49:26.395][C][template.select:]:   Icon: 'mdi:account-voice'
+[14:49:26.395][C][template.select:014]:   Optimistic: YES
+[14:49:26.395][C][template.select:014]:   Initial Option: On device
+[14:49:26.395][C][template.select:014]:   Restore Value: YES
+[14:49:26.395][C][template.select:010]: Template Select 'Wake word sensitivity'
+[14:49:26.440][C][template.select:014]:   Optimistic: YES
+[14:49:26.440][C][template.select:014]:   Initial Option: Slightly sensitive
+[14:49:26.440][C][template.select:014]:   Restore Value: YES
+[14:49:26.441][C][light:101]: Light 'LCD Backlight'
+[14:49:26.441][C][light:104]:   Default Transition Length: 1.0s
+[14:49:26.441][C][light:104]:   Gamma Correct: 2.80
+[14:49:26.466][C][template.switch:088]: Template Switch 'Mute Microphone'
+[14:49:26.466][C][template.switch:088]:   Restore Mode: restore defaults to OFF
+[14:49:26.491][C][template.switch:]:   Icon: 'mdi:microphone-off'
+[14:49:26.491][C][template.switch:055]:   Optimistic: YES
+[14:49:26.491][C][template.switch:088]: Template Switch 'timer_ringing'
+[14:49:26.491][C][template.switch:088]:   Restore Mode: always OFF
+[14:49:26.491][C][template.switch:055]:   Optimistic: YES
+[14:49:26.514][C][psram:015]: PSRAM:
+[14:49:26.515][C][psram:018]:   Available: YES
+[14:49:26.515][C][psram:020]:   Size: 8192 KB
+[14:49:26.515][C][factory_reset.button:014]: Factory Reset Button 'factory_reset_btn'
+[14:49:26.535][C][factory_reset.button:]:   Icon: 'mdi:restart-alert'
+[14:49:26.586][C][es8311:053]: ES8311 Audio Codec:
+[14:49:26.586][C][es8311:053]:   Use MCLK: NO
+[14:49:26.586][C][es8311:053]:   Use Microphone: NO
+[14:49:26.586][C][es8311:053]:   DAC Bits per Sample: 16
+[14:49:26.586][C][es8311:053]:   Sample Rate: 48000
+[14:49:26.586][C][i2s_audio.microphone:053]: Microphone:
+[14:49:26.586][C][i2s_audio.microphone:053]:   Pin: 7
+[14:49:26.586][C][i2s_audio.microphone:053]:   PDM: NO
+[14:49:26.586][C][i2s_audio.microphone:053]:   DC offset correction: NO
+[14:49:26.586][C][lp5562:103]: LP5562 Config
+[14:49:26.594][C][lp5562:104]:   Address: 0x30
+[14:49:26.594][C][lp5562:105]:   use internal clock: TRUE
+[14:49:26.594][C][lp5562:105]:   power save mode: FALSE
+[14:49:26.594][C][lp5562:105]:   high pwm frequency: FALSE
+[14:49:26.594][C][lp5562:105]:   logarithmic dimming: FALSE
+[14:49:26.594][C][lp5562:105]:   red channel current: 0.0 mA
+[14:49:26.594][C][lp5562:105]:   green channel current: 0.0 mA
+[14:49:26.594][C][lp5562:105]:   blue channel current: 0.0 mA
+[14:49:26.594][C][lp5562:105]:   white channel current: 17.5 mA
+[14:49:26.640][C][display.mipi_spi:010]: MIPI_SPI Display
+[14:49:26.640][C][display.mipi_spi:010]:   Model: ST7789V
+[14:49:26.640][C][display.mipi_spi:010]:   Width: 128
+[14:49:26.640][C][display.mipi_spi:010]:   Height: 128
+[14:49:26.640][C][display.mipi_spi:010]:   Swap X/Y: NO
+[14:49:26.640][C][display.mipi_spi:010]:   Mirror X: NO
+[14:49:26.640][C][display.mipi_spi:010]:   Mirror Y: NO
+[14:49:26.640][C][display.mipi_spi:010]:   Hardware rotation: YES
+[14:49:26.640][C][display.mipi_spi:010]:   Invert colors: YES
+[14:49:26.640][C][display.mipi_spi:010]:   Color order: BGR
+[14:49:26.640][C][display.mipi_spi:010]:   Display pixels: 16 bits
+[14:49:26.640][C][display.mipi_spi:010]:   Endianness: Big
+[14:49:26.640][C][display.mipi_spi:010]:   SPI Mode: 0
+[14:49:26.640][C][display.mipi_spi:010]:   SPI Data rate: 40MHz
+[14:49:26.640][C][display.mipi_spi:010]:   SPI Bus width: 1
+[14:49:26.648][C][display.mipi_spi:131]:   CS Pin: GPIO14
+[14:49:26.650][C][display.mipi_spi:131]:   Reset Pin: GPIO48
+[14:49:26.650][C][display.mipi_spi:131]:   DC Pin: GPIO42
+[14:49:26.650][C][display.mipi_spi:034]:   Offset width: 110
+[14:49:26.650][C][display.mipi_spi:036]:   Offset height: 191
+[14:49:26.692][C][display.mipi_spi:524]:   Rotation: 180°
+[14:49:26.692][C][display.mipi_spi:524]:   Buffer pixels: 16 bits
+[14:49:26.692][C][display.mipi_spi:524]:   Buffer fraction: 1/1
+[14:49:26.692][C][display.mipi_spi:524]:   Buffer bytes: 32768
+[14:49:26.692][C][display.mipi_spi:524]:   Draw rounding: 1
+[14:49:26.829][C][i2s_audio.speaker:043]: Speaker:
+[14:49:26.829][C][i2s_audio.speaker:043]:   Pin: 5
+[14:49:26.829][C][i2s_audio.speaker:043]:   Buffer duration: 500
+[14:49:26.829][C][i2s_audio.speaker:049]:   Timeout: 500 ms
+[14:49:26.829][C][i2s_audio.speaker.std:067]:   Communication format: std
+[14:49:26.838][C][i2s_audio.speaker.std:072]:   Slot bit width: 16
+[14:49:26.887][C][captive_portal:141]: Captive Portal:
+[14:49:26.893][C][wifi:1556]: WiFi:
+[14:49:26.893][C][wifi:1556]:   Local MAC: 98:88:E0:0F:2C:EC
+[14:49:26.893][C][wifi:1556]:   Connected: YES
+[14:49:26.895][C][wifi:1259]:   IP Address: 192.168.xx.xxx
+[14:49:26.899][C][wifi:1270]:   SSID: 'mau_net'
+[14:49:26.899][C][wifi:1270]:   BSSID: 7A:CF:84:10:39:AB
+[14:49:26.899][C][wifi:1270]:   Hostname: 'mirko-ug'
+[14:49:26.899][C][wifi:1270]:   Signal strength: -69 dB ▂▄▆█
+[14:49:26.899][C][wifi:1270]:   Channel: 8
+[14:49:26.899][C][wifi:1270]:   Subnet: 255.255.255.0
+[14:49:26.899][C][wifi:1270]:   Gateway: 192.168.xx.xxx1
+[14:49:26.899][C][wifi:1270]:   DNS1: 192.168.xx.xxx1
+[14:49:26.899][C][wifi:1270]:   DNS2: 0.0.0.0
+[14:49:26.947][C][esphome.ota:098]: Over-The-Air updates:
+[14:49:26.947][C][esphome.ota:098]:   Address: mirko-ug.local:3232
+[14:49:26.947][C][esphome.ota:098]:   Version: 2
+[14:49:26.947][C][safe_mode:058]: Safe Mode:
+[14:49:26.947][C][safe_mode:058]:   Successful after: 60s
+[14:49:26.947][C][safe_mode:058]:   Invoke after: 10 attempts
+[14:49:26.947][C][safe_mode:058]:   Duration: 300s
+[14:49:26.947][C][safe_mode:079]:   Bootloader rollback: support unknown
+[14:49:27.025][C][web_server.ota:256]: Web Server OTA
+[14:49:27.025][C][api:269]: Server:
+[14:49:27.025][C][api:269]:   Address: mirko-ug.local:6053
+[14:49:27.025][C][api:269]:   Listen backlog: 4
+[14:49:27.025][C][api:269]:   Max connections: 5
+[14:49:27.025][C][api:276]:   Noise encryption: YES
+[14:49:27.025][C][mdns:259]: mDNS:
+[14:49:27.025][C][mdns:259]:   Hostname: mirko-ug
+[14:49:27.037][C][micro_wake_word:071]: microWakeWord:
+[14:49:27.037][C][micro_wake_word:072]:   models:
+[14:49:27.037][C][micro_wake_word:013]:     - Wake Word: Okay Nabu
+[14:49:27.037][C][micro_wake_word:013]:       Probability cutoff: 0.85
+[14:49:27.037][C][micro_wake_word:013]:       Sliding window size: 5
+[14:49:27.037][C][micro_wake_word:013]:     - Wake Word: Hey Jarvis
+[14:49:27.037][C][micro_wake_word:013]:       Probability cutoff: 0.97
+[14:49:27.037][C][micro_wake_word:013]:       Sliding window size: 5
+[14:49:27.117][C][micro_wake_word:013]:     - Wake Word: Hey Mycroft
+[14:49:27.117][C][micro_wake_word:013]:       Probability cutoff: 0.99
+[14:49:27.117][C][micro_wake_word:013]:       Sliding window size: 5
+[14:49:27.117][C][micro_wake_word:013]:     - Wake Word: Stop
+[14:49:27.117][C][micro_wake_word:013]:       Probability cutoff: 0.50
+[14:49:27.117][C][micro_wake_word:013]:       Sliding window size: 5
+[14:49:27.118][C][micro_wake_word:021]:     - VAD Model
+[14:49:27.118][C][micro_wake_word:021]:       Probability cutoff: 0.50
+[14:49:27.118][C][micro_wake_word:021]:       Sliding window size: 5
+[14:49:27.274][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:27.287][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:27.292][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:27.299][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:28.296][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:28.301][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:28.309][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:28.310][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:29.312][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:29.358][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:29.358][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:29.358][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:30.330][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:30.456][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:30.456][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:30.456][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:31.343][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:31.360][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:31.516][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:31.516][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:32.357][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:32.375][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:32.375][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:32.375][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:33.382][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:33.388][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:33.389][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:33.389][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:34.378][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:34.382][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:34.382][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:34.386][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:35.386][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:35.396][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:35.400][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:35.408][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:36.404][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:36.415][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:36.420][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:36.420][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:37.420][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:37.427][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:37.434][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:37.434][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:38.433][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:38.447][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:38.454][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:38.454][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:39.454][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:39.459][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:39.464][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:39.464][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:40.466][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:40.496][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:40.497][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:40.497][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:41.484][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:41.498][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:41.540][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:41.540][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:42.571][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:42.576][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:42.576][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:42.576][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:43.503][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:43.520][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:43.521][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:43.521][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:44.509][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:44.523][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:44.539][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:44.539][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:45.529][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:45.540][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:45.544][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:45.548][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:46.548][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:46.555][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:46.559][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:46.560][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:47.574][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:47.589][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:49:47.589][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:49:47.589][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:49:48.170][W][api.connection:2532]: ai-voice-assistant (192.168.xx.xxx): Reading failed CONNECTION_CLOSED errno=128
+[14:49:48.237][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to STOP_MICROPHONE
+[14:49:48.243][D][voice_assistant:614]: Desired state set to IDLE
+[14:49:48.256][D][voice_assistant:607]: State changed from STOP_MICROPHONE to STOPPING_MICROPHONE
+[14:49:48.275][D][voice_assistant:607]: State changed from STOPPING_MICROPHONE to IDLE
+[14:49:48.603][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:49:48.618][D][i2s_audio.speaker:063]: Starting
+[14:49:48.618][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[14:49:48.951][D][i2s_audio.speaker:088]: Stopped
+[14:49:48.987][D][main:1429]: State updated!
+[14:49:48.990][D][micro_wake_word:369]: Starting wake word detection
+[14:49:49.022][D][speaker_media_player:456]: State changed to IDLE
+[14:49:49.026][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[14:49:49.045][W][micro_wake_word:365]: Wake word detection is already running
+[14:49:49.082][W][micro_wake_word:365]: Wake word detection is already running
+[14:49:49.130][W][micro_wake_word:365]: Wake word detection is already running
+[14:49:49.169][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[14:49:49.173][D][micro_wake_word:279]: Inference task is running
+[14:49:49.173][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[14:49:49.174][S][media_player]: 'Echo Base Player' >> IDLE
+[14:49:49.174][S][media_player]:   Volume: 50%
+[14:49:49.196][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[14:49:xx.xxx172][D][voice_assistant:607]: State changed from IDLE to RESPONSE_FINISHED
+[14:49:xx.xxx176][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[14:49:xx.xxx181][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to IDLE
+[14:49:xx.xxx192][D][voice_assistant:614]: Desired state set to IDLE
+[14:49:51.669][D][api:253]: Accept 192.168.xx.xxx
+[14:49:51.758][W][api.connection:1751]: 'ai-voice-assistant' using outdated API 1.6, update to 1.14+
+[14:49:51.762][D][api.connection:2526]: ai-voice-assistant (192.168.xx.xxx): connected
+[14:49:52.177][W][micro_wake_word:365]: Wake word detection is already running
+[14:50:01.117][D][micro_wake_word:334]: Detected 'Okay Nabu' with sliding average probability is 0.93 and max probability is 1.00
+[14:50:01.122][D][micro_wake_word:379]: Stopping wake word detection
+[14:50:01.137][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[14:50:01.157][D][main:1429]: State updated!
+[14:50:01.165][D][main:350]: Announcing!
+[14:50:01.165][D][micro_wake_word:379]: Stopping wake word detection
+[14:50:01.179][D][speaker_media_player:456]: State changed to ANNOUNCING
+[14:50:01.183][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[14:50:01.188][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[14:50:01.189][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[14:50:01.189][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:50:01.192][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:50:01.227][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[14:50:01.247][D][i2s_audio.speaker:063]: Starting
+[14:50:01.249][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[14:50:01.268][S][media_player]: 'Echo Base Player' >> PLAYING
+[14:50:01.268][S][media_player]:   Volume: 50%
+[14:50:01.753][D][i2s_audio.speaker:088]: Stopped
+[14:50:01.788][D][main:1429]: State updated!
+[14:50:01.796][D][micro_wake_word:369]: Starting wake word detection
+[14:50:01.830][D][speaker_media_player:456]: State changed to IDLE
+[14:50:01.834][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[14:50:01.846][D][voice_assistant:607]: State changed from IDLE to START_MICROPHONE
+[14:50:01.846][D][voice_assistant:614]: Desired state set to START_PIPELINE
+[14:50:01.846][D][voice_assistant:310]: Starting Microphone
+[14:50:01.851][D][ring_buffer:035]: Created ring buffer with size 16384
+[14:50:01.855][D][voice_assistant:607]: State changed from START_MICROPHONE to STARTING_MICROPHONE
+[14:50:01.855][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[14:50:01.855][D][micro_wake_word:279]: Inference task is running
+[14:50:01.863][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[14:50:01.863][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[14:50:01.891][D][voice_assistant:607]: State changed from STARTING_MICROPHONE to START_PIPELINE
+[14:50:01.897][D][voice_assistant:334]: Requesting start
+[14:50:01.903][D][voice_assistant:607]: State changed from START_PIPELINE to STARTING_PIPELINE
+[14:50:01.907][S][media_player]: 'Echo Base Player' >> IDLE
+[14:50:01.907][S][media_player]:   Volume: 50%
+[14:50:01.934][D][voice_assistant:761]: Event Type: 1
+[14:50:01.947][D][voice_assistant:764]: Assist Pipeline running
+[14:50:02.107][D][voice_assistant:761]: Event Type: 10
+[14:50:02.109][D][voice_assistant:778]: Wake word detected
+[14:50:02.115][D][voice_assistant:761]: Event Type: 3
+[14:50:02.115][D][voice_assistant:783]: STT started
+[14:50:02.115][D][voice_assistant:629]: Client started, streaming microphone
+[14:50:02.115][D][voice_assistant:607]: State changed from STARTING_PIPELINE to STREAMING_MICROPHONE
+[14:50:02.120][D][voice_assistant:614]: Desired state set to STREAMING_MICROPHONE
+[14:50:06.403][D][voice_assistant:761]: Event Type: 11
+[14:50:06.407][D][voice_assistant:964]: Starting STT by VAD
+[14:50:06.424][D][voice_assistant:1012]: Timer Event
+[14:50:06.424][D][voice_assistant:1012]:   Type: 0
+[14:50:06.424][D][voice_assistant:1012]:   Timer(id=timer-1-1786711806410, name=, total_seconds=120, seconds_left=120, is_active=YES)
+[14:50:07.420][D][voice_assistant:761]: Event Type: 12
+[14:50:07.424][D][voice_assistant:968]: STT by VAD end
+[14:50:07.425][D][voice_assistant:607]: State changed from STREAMING_MICROPHONE to STOP_MICROPHONE
+[14:50:07.427][D][voice_assistant:614]: Desired state set to AWAITING_RESPONSE
+[14:50:07.435][D][voice_assistant:761]: Event Type: 4
+[14:50:07.436][D][voice_assistant:800]: Speech recognised as: "Setze den Timer auf 2 Minuten."
+[14:50:07.476][D][voice_assistant:607]: State changed from STOP_MICROPHONE to STOPPING_MICROPHONE
+[14:50:07.494][D][voice_assistant:607]: State changed from STOPPING_MICROPHONE to AWAITING_RESPONSE
+[14:50:07.630][D][voice_assistant:761]: Event Type: 5
+[14:50:07.635][D][voice_assistant:805]: Intent started
+[14:50:07.638][D][voice_assistant:761]: Event Type: 100
+[14:50:07.638][D][voice_assistant:809]: Intent progress
+[14:50:07.859][D][voice_assistant:761]: Event Type: 6
+[14:50:07.863][D][voice_assistant:761]: Event Type: 7
+[14:50:07.873][W][voice_assistant:851]: No text in TTS_START event
+[14:50:07.903][D][voice_assistant:607]: State changed from AWAITING_RESPONSE to STREAMING_RESPONSE
+[14:50:07.907][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[14:50:07.941][D][main:1429]: State updated!
+[14:50:07.946][D][main:350]: Announcing!
+[14:50:07.946][D][micro_wake_word:379]: Stopping wake word detection
+[14:50:07.952][D][speaker_media_player:456]: State changed to ANNOUNCING
+[14:50:07.957][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[14:50:07.972][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[14:50:07.974][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[14:50:07.992][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[14:50:08.006][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:50:08.054][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:50:08.054][S][media_player]: 'Echo Base Player' >> PLAYING
+[14:50:08.054][S][media_player]:   Volume: 50%
+[14:50:08.117][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 24000 Hz sample rate, and 16 bits per sample
+[14:50:08.154][D][i2s_audio.speaker:063]: Starting
+[14:50:08.154][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[14:50:08.995][D][i2s_audio.speaker:088]: Stopped
+[14:50:09.034][D][main:1429]: State updated!
+[14:50:09.036][D][speaker_media_player:456]: State changed to IDLE
+[14:50:09.036][D][voice_assistant:475]: Announcement finished playing
+[14:50:09.036][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to RESPONSE_FINISHED
+[14:50:09.039][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[14:50:09.048][D][micro_wake_word:369]: Starting wake word detection
+[14:50:09.083][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to IDLE
+[14:50:09.086][D][voice_assistant:614]: Desired state set to IDLE
+[14:50:09.090][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[14:50:09.125][D][voice_assistant:761]: Event Type: 8
+[14:50:09.126][W][voice_assistant:877]: No url in TTS_END event
+[14:50:09.126][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[14:50:09.139][D][micro_wake_word:279]: Inference task is running
+[14:50:09.139][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[14:50:09.139][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[14:50:09.140][S][media_player]: 'Echo Base Player' >> IDLE
+[14:50:09.140][S][media_player]:   Volume: 50%
+[14:50:09.439][D][voice_assistant:761]: Event Type: 2
+[14:50:09.439][D][voice_assistant:903]: Assist Pipeline ended
+[14:50:09.856][W][micro_wake_word:365]: Wake word detection is already running
+[14:50:36.516][D][voice_assistant:1012]: Timer Event
+[14:50:36.516][D][voice_assistant:1012]:   Type: 1
+[14:50:36.516][D][voice_assistant:1012]:   Timer(id=timer-1-1786711806410, name=, total_seconds=120, seconds_left=90, is_active=YES)
+[14:51:06.580][D][voice_assistant:1012]: Timer Event
+[14:51:06.580][D][voice_assistant:1012]:   Type: 1
+[14:51:06.580][D][voice_assistant:1012]:   Timer(id=timer-1-1786711806410, name=, total_seconds=120, seconds_left=60, is_active=YES)
+[14:51:36.505][D][voice_assistant:1012]: Timer Event
+[14:51:36.505][D][voice_assistant:1012]:   Type: 1
+[14:51:36.505][D][voice_assistant:1012]:   Timer(id=timer-1-1786711806410, name=, total_seconds=120, seconds_left=30, is_active=YES)
+[14:52:06.511][D][voice_assistant:1012]: Timer Event
+[14:52:06.511][D][voice_assistant:1012]:   Type: 3
+[14:52:06.511][D][voice_assistant:1012]:   Timer(id=timer-1-1786711806410, name=, total_seconds=120, seconds_left=0, is_active=NO)
+[14:52:06.516][D][micro_wake_word:379]: Stopping wake word detection
+[14:52:06.533][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[14:52:06.563][D][main:1429]: State updated!
+[14:52:06.569][D][main:350]: Announcing!
+[14:52:06.569][D][micro_wake_word:379]: Stopping wake word detection
+[14:52:06.582][D][speaker_media_player:456]: State changed to ANNOUNCING
+[14:52:06.582][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[14:52:06.589][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[14:52:06.589][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[14:52:06.594][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:52:06.594][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:52:06.649][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[14:52:06.655][S][media_player]: 'Echo Base Player' >> PLAYING
+[14:52:06.655][S][media_player]:   Volume: 50%
+[14:52:06.663][D][i2s_audio.speaker:063]: Starting
+[14:52:06.672][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[14:52:09.478][D][i2s_audio.speaker:088]: Stopped
+[14:52:09.513][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:52:09.521][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:52:09.573][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[14:52:10.519][D][i2s_audio.speaker:063]: Starting
+[14:52:10.523][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[14:52:13.325][D][i2s_audio.speaker:088]: Stopped
+[14:52:13.369][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:52:13.413][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:52:13.438][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[14:52:14.358][D][i2s_audio.speaker:063]: Starting
+[14:52:14.364][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[14:52:17.166][D][i2s_audio.speaker:088]: Stopped
+[14:52:17.210][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:52:17.217][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:52:17.268][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[14:52:18.214][D][i2s_audio.speaker:063]: Starting
+[14:52:18.215][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:18.219][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:18.223][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:18.227][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[14:52:19.224][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:21.067][D][i2s_audio.speaker:088]: Stopped
+[14:52:21.111][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:52:21.120][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:52:21.170][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[14:52:22.118][D][i2s_audio.speaker:063]: Starting
+[14:52:22.162][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[14:52:24.929][D][i2s_audio.speaker:088]: Stopped
+[14:52:24.967][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:52:24.975][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:52:25.026][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[14:52:25.975][D][i2s_audio.speaker:063]: Starting
+[14:52:25.976][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[14:52:28.907][D][i2s_audio.speaker:088]: Stopped
+[14:52:28.908][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:52:28.908][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:52:28.908][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[14:52:29.832][D][i2s_audio.speaker:063]: Starting
+[14:52:29.872][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[14:52:32.636][D][i2s_audio.speaker:088]: Stopped
+[14:52:32.677][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:52:32.684][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:52:32.737][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[14:52:33.690][D][i2s_audio.speaker:063]: Starting
+[14:52:33.690][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[14:52:36.489][D][i2s_audio.speaker:088]: Stopped
+[14:52:36.531][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:52:36.539][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:52:36.589][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[14:52:37.543][D][i2s_audio.speaker:063]: Starting
+[14:52:37.552][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[14:52:39.208][D][voice_assistant:607]: State changed from IDLE to STREAMING_RESPONSE
+[14:52:39.211][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[14:52:40.340][D][i2s_audio.speaker:088]: Stopped
+[14:52:40.383][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:52:40.392][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:52:40.442][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[14:52:41.209][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to RESPONSE_FINISHED
+[14:52:41.225][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[14:52:41.225][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to START_MICROPHONE
+[14:52:41.225][D][voice_assistant:614]: Desired state set to START_PIPELINE
+[14:52:41.235][D][voice_assistant:310]: Starting Microphone
+[14:52:41.238][D][ring_buffer:035]: Created ring buffer with size 16384
+[14:52:41.242][D][voice_assistant:607]: State changed from START_MICROPHONE to STARTING_MICROPHONE
+[14:52:41.284][D][voice_assistant:607]: State changed from STARTING_MICROPHONE to START_PIPELINE
+[14:52:41.296][D][voice_assistant:334]: Requesting start
+[14:52:41.311][D][voice_assistant:607]: State changed from START_PIPELINE to STARTING_PIPELINE
+[14:52:41.322][D][voice_assistant:761]: Event Type: 1
+[14:52:41.325][D][voice_assistant:764]: Assist Pipeline running
+[14:52:41.384][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:41.388][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:41.388][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:41.388][D][voice_assistant:761]: Event Type: 0
+[14:52:41.394][E][voice_assistant:936]: Error: agent-not-connected - Voice agent is not connected.
+[14:52:41.394][D][voice_assistant:741]: Signaling stop
+[14:52:41.398][D][voice_assistant:607]: State changed from STARTING_PIPELINE to STOP_MICROPHONE
+[14:52:41.400][D][voice_assistant:614]: Desired state set to IDLE
+[14:52:41.411][D][voice_assistant:761]: Event Type: 2
+[14:52:41.411][D][voice_assistant:903]: Assist Pipeline ended
+[14:52:41.412][D][voice_assistant:761]: Event Type: 1
+[14:52:41.412][D][voice_assistant:764]: Assist Pipeline running
+[14:52:41.444][D][voice_assistant:607]: State changed from STOP_MICROPHONE to STREAMING_RESPONSE
+[14:52:41.450][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[14:52:41.450][D][voice_assistant:761]: Event Type: 2
+[14:52:41.453][D][voice_assistant:903]: Assist Pipeline ended
+[14:52:42.387][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:42.391][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:42.391][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:42.391][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:43.394][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:43.404][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:43.404][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:43.404][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:43.452][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to RESPONSE_FINISHED
+[14:52:43.458][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[14:52:43.458][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to IDLE
+[14:52:43.458][D][voice_assistant:614]: Desired state set to IDLE
+[14:52:44.407][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:44.419][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:44.423][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:44.423][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:45.426][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:45.433][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:45.437][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:45.437][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:46.440][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:46.450][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:46.454][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:46.454][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:47.456][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:47.467][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:47.471][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:47.472][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:48.478][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:48.488][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:48.490][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:48.491][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:49.493][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:49.499][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:49.507][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:49.507][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:xx.xxx508][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:xx.xxx517][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:xx.xxx517][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:xx.xxx518][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:51.520][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:51.532][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:51.534][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:51.534][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:52.538][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:52.548][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:52.552][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:52.552][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:53.555][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:53.565][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:53.568][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:53.568][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:54.571][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:54.579][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:54.608][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:54.609][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:55.590][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:55.594][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:55.597][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:55.597][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:56.602][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:56.605][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:56.606][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:56.606][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:57.609][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:57.615][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:57.615][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:57.615][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:58.618][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:58.632][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:58.632][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:58.632][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:52:59.640][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:52:59.668][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:52:59.672][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:52:59.672][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:00.712][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:00.713][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:00.713][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:00.713][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:01.693][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:01.701][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:01.703][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:01.703][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:01.711][W][api.connection:2532]: ai-voice-assistant (192.168.xx.xxx): Reading failed CONNECTION_CLOSED errno=128
+[14:53:02.706][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:02.713][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:02.715][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:02.726][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:03.721][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:03.730][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:03.734][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:03.739][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:04.737][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:04.746][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:04.749][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:04.754][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:04.799][D][api:253]: Accept 192.168.xx.xxx
+[14:53:04.871][W][api.connection:1751]: 'ai-voice-assistant' using outdated API 1.6, update to 1.14+
+[14:53:04.874][D][api.connection:2526]: ai-voice-assistant (192.168.xx.xxx): connected
+[14:53:05.227][D][micro_wake_word:369]: Starting wake word detection
+[14:53:05.324][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[14:53:05.324][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[14:53:05.324][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[14:53:05.410][D][micro_wake_word:279]: Inference task is running
+[14:53:05.411][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[14:53:05.755][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:05.759][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:05.764][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:05.770][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:06.773][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:06.773][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:06.773][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:06.773][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:07.776][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:07.787][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:07.787][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:07.788][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:08.790][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:08.794][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:08.794][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:08.794][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:09.800][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:09.804][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:09.804][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:09.805][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:10.809][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:10.823][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:10.823][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:10.824][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:11.828][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:11.837][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:11.837][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:11.837][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:12.488][D][micro_wake_word:334]: Detected 'Okay Nabu' with sliding average probability is 0.96 and max probability is 0.99
+[14:53:12.529][D][micro_wake_word:379]: Stopping wake word detection
+[14:53:12.529][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[14:53:12.529][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[14:53:12.545][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[14:53:12.546][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[14:53:12.567][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:53:12.568][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:53:12.618][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[14:53:12.839][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:12.845][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:12.847][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:12.852][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:13.857][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:13.858][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:13.858][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:13.906][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:14.862][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:14.875][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:14.881][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:14.914][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:15.885][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:15.892][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:15.892][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:15.921][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:16.895][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:16.919][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:16.929][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:16.944][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:17.917][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:17.938][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:17.938][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:17.964][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:18.930][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:18.937][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:18.939][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:18.943][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:19.945][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:19.954][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:19.956][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:19.961][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:20.961][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:20.971][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:20.975][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:20.980][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:21.567][W][api.connection:2532]: ai-voice-assistant (192.168.xx.xxx): Reading failed CONNECTION_CLOSED errno=128
+[14:53:21.978][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:21.986][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:21.990][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:21.993][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:22.994][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:23.001][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:23.006][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:23.006][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:24.007][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:24.017][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:24.022][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:24.022][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:24.966][D][api:253]: Accept 192.168.xx.xxx
+[14:53:25.022][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:25.036][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:25.036][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:25.036][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:25.063][W][api.connection:1751]: 'ai-voice-assistant' using outdated API 1.6, update to 1.14+
+[14:53:25.067][D][api.connection:2526]: ai-voice-assistant (192.168.xx.xxx): connected
+[14:53:25.679][D][micro_wake_word:369]: Starting wake word detection
+[14:53:25.727][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[14:53:25.739][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[14:53:25.745][D][micro_wake_word:279]: Inference task is running
+[14:53:25.745][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[14:53:25.745][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[14:53:26.036][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:26.080][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:26.080][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:26.080][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:27.045][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:27.050][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:27.055][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:27.055][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:28.056][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:28.069][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:28.076][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:28.076][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:29.077][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:29.085][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:29.097][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:29.097][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:30.091][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:30.099][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:30.099][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:30.099][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:31.097][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:31.101][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:31.106][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:31.110][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:32.120][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:32.123][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:32.123][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:32.123][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:33.126][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:33.139][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:33.140][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:33.140][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:34.141][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:34.167][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:34.173][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:34.173][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:34.180][D][micro_wake_word:334]: Detected 'Okay Nabu' with sliding average probability is 0.89 and max probability is 0.99
+[14:53:34.185][D][micro_wake_word:379]: Stopping wake word detection
+[14:53:34.202][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[14:53:34.224][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[14:53:34.225][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[14:53:34.228][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[14:53:34.254][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:53:34.272][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:53:34.316][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[14:53:35.][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:35.217][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:35.217][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:35.217][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:36.176][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:36.196][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:36.196][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:36.196][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:37.194][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:37.211][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:37.211][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:37.211][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:38.210][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:38.223][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:38.223][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:38.223][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:39.226][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:39.232][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:39.232][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:39.232][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:40.233][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:40.245][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:40.249][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:40.249][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:41.252][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:41.260][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:41.261][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:41.261][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:42.263][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:42.267][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:42.267][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:42.267][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:53:43.271][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:53:43.278][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:53:43.281][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:53:43.281][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+INFO Processing unexpected disconnect from ESPHome API for mirko-ug @ 192.168.xx.xxx
+WARNING Disconnected from API
+INFO Successfully resolved mirko-ug @ 192.168.xx.xxx in 0.002s
+INFO Successfully connected to mirko-ug @ 192.168.xx.xxx in 0.034s
+INFO Successful handshake with mirko-ug @ 192.168.xx.xxx in 0.109s
+[14:54:48.663][I][safe_mode:142]: Boot seems successful; resetting boot loop counter
+[14:54:51.305][D][preferences:245]: Writing 1 items: 0 cached, 1 written, 0 failed
+[14:55:53.874][D][micro_wake_word:334]: Detected 'Okay Nabu' with sliding average probability is 0.89 and max probability is 1.00
+[14:55:53.880][D][micro_wake_word:379]: Stopping wake word detection
+[14:55:53.893][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[14:55:53.914][D][main:1429]: State updated!
+[14:55:53.927][D][main:350]: Announcing!
+[14:55:53.928][D][micro_wake_word:379]: Stopping wake word detection
+[14:55:53.937][D][speaker_media_player:456]: State changed to ANNOUNCING
+[14:55:53.937][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[14:55:53.957][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[14:55:53.958][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[14:55:53.958][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:55:53.958][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:55:53.981][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[14:55:54.018][S][media_player]: 'Echo Base Player' >> PLAYING
+[14:55:54.018][S][media_player]:   Volume: 50%
+[14:55:54.035][D][i2s_audio.speaker:063]: Starting
+[14:55:54.041][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[14:55:55.040][D][i2s_audio.speaker:088]: Stopped
+[14:55:55.070][D][main:1429]: State updated!
+[14:55:55.076][D][micro_wake_word:369]: Starting wake word detection
+[14:55:55.105][D][speaker_media_player:456]: State changed to IDLE
+[14:55:55.127][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[14:55:55.130][D][voice_assistant:607]: State changed from IDLE to START_MICROPHONE
+[14:55:55.136][D][voice_assistant:614]: Desired state set to START_PIPELINE
+[14:55:55.136][D][voice_assistant:310]: Starting Microphone
+[14:55:55.136][D][ring_buffer:035]: Created ring buffer with size 16384
+[14:55:55.136][D][voice_assistant:607]: State changed from START_MICROPHONE to STARTING_MICROPHONE
+[14:55:55.150][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[14:55:55.150][D][micro_wake_word:279]: Inference task is running
+[14:55:55.150][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[14:55:55.150][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[14:55:55.193][D][voice_assistant:607]: State changed from STARTING_MICROPHONE to START_PIPELINE
+[14:55:55.193][D][voice_assistant:334]: Requesting start
+[14:55:55.193][D][voice_assistant:607]: State changed from START_PIPELINE to STARTING_PIPELINE
+[14:55:55.201][S][media_player]: 'Echo Base Player' >> IDLE
+[14:55:55.201][S][media_player]:   Volume: 50%
+[14:55:55.218][D][voice_assistant:761]: Event Type: 1
+[14:55:55.264][D][voice_assistant:764]: Assist Pipeline running
+[14:55:55.398][D][voice_assistant:761]: Event Type: 10
+[14:55:55.401][D][voice_assistant:778]: Wake word detected
+[14:55:55.408][D][voice_assistant:761]: Event Type: 3
+[14:55:55.408][D][voice_assistant:783]: STT started
+[14:55:55.414][D][voice_assistant:629]: Client started, streaming microphone
+[14:55:55.417][D][voice_assistant:607]: State changed from STARTING_PIPELINE to STREAMING_MICROPHONE
+[14:55:55.445][D][voice_assistant:614]: Desired state set to STREAMING_MICROPHONE
+[14:55:55.446][D][voice_assistant:761]: Event Type: 0
+[14:55:55.446][E][voice_assistant:936]: Error: turn-aborted - agent connection closed
+[14:55:55.446][D][voice_assistant:741]: Signaling stop
+[14:55:55.460][D][voice_assistant:607]: State changed from STREAMING_MICROPHONE to STOP_MICROPHONE
+[14:55:55.461][D][voice_assistant:614]: Desired state set to IDLE
+[14:55:55.461][D][voice_assistant:761]: Event Type: 2
+[14:55:55.461][D][voice_assistant:903]: Assist Pipeline ended
+[14:55:55.479][D][voice_assistant:761]: Event Type: 1
+[14:55:55.479][D][voice_assistant:764]: Assist Pipeline running
+[14:55:55.497][D][voice_assistant:607]: State changed from STOP_MICROPHONE to STREAMING_RESPONSE
+[14:55:55.507][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[14:55:55.515][D][voice_assistant:761]: Event Type: 2
+[14:55:55.516][D][voice_assistant:903]: Assist Pipeline ended
+[14:55:55.516][W][component:473]: api took a long time for an operation (108 ms), max is 50 ms
+[14:55:55.608][D][main:1429]: State updated!
+[14:55:55.617][D][main:350]: Announcing!
+[14:55:55.618][D][micro_wake_word:379]: Stopping wake word detection
+[14:55:55.618][D][speaker_media_player:456]: State changed to ANNOUNCING
+[14:55:55.622][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[14:55:55.650][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[14:55:55.650][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[14:55:55.650][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[14:55:55.712][S][media_player]: 'Echo Base Player' >> PLAYING
+[14:55:55.712][S][media_player]:   Volume: 50%
+[14:55:59.846][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:56:00.068][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:56:00.069][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 24000 Hz sample rate, and 16 bits per sample
+[14:56:01.197][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:01.213][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:01.214][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:02.201][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:02.211][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:02.222][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:02.222][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:03.][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:03.232][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:03.237][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:03.237][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:04.231][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:04.246][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:04.273][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:04.273][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:05.249][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:05.259][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:05.269][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:05.269][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:06.265][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:06.273][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:06.517][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:06.518][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:07.280][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:07.290][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:07.297][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:07.297][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:08.296][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:08.306][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:08.314][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:08.314][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:09.312][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:09.324][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:09.331][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:09.331][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:10.328][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:10.342][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:10.349][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:10.349][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:11.365][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:11.383][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:11.408][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:11.409][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:12.374][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:12.397][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:12.408][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:12.408][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:13.377][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:13.394][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:13.423][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:13.423][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:14.393][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:14.406][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:14.440][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:14.441][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:15.408][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:15.420][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:15.431][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:15.431][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:16.424][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:16.445][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:16.451][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:16.451][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:17.444][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:17.450][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:17.471][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:17.471][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:18.456][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:18.466][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:18.477][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:18.477][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:19.473][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:19.482][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:19.497][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:19.497][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:20.488][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:20.504][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:20.522][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:20.522][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:21.503][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:21.520][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:21.528][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:21.529][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:22.522][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:22.535][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:56:22.541][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:56:22.541][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:56:23.138][W][api.connection:2532]: ai-voice-assistant (192.168.xx.xxx): Reading failed CONNECTION_CLOSED errno=128
+[14:56:23.209][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to STOP_MICROPHONE
+[14:56:23.258][D][voice_assistant:614]: Desired state set to IDLE
+[14:56:23.258][D][voice_assistant:607]: State changed from STOP_MICROPHONE to STOPPING_MICROPHONE
+[14:56:23.258][D][voice_assistant:607]: State changed from STOPPING_MICROPHONE to IDLE
+[14:56:23.539][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:56:23.554][D][i2s_audio.speaker:063]: Starting
+[14:56:23.564][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[14:56:25.144][D][voice_assistant:607]: State changed from IDLE to RESPONSE_FINISHED
+[14:56:25.153][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[14:56:25.196][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to IDLE
+[14:56:25.197][D][voice_assistant:614]: Desired state set to IDLE
+[14:56:26.610][D][api:253]: Accept 192.168.xx.xxx
+[14:56:26.707][W][api.connection:1751]: 'ai-voice-assistant' using outdated API 1.6, update to 1.14+
+[14:56:26.770][D][api.connection:2526]: ai-voice-assistant (192.168.xx.xxx): connected
+[14:56:26.999][D][micro_wake_word:369]: Starting wake word detection
+[14:56:27.064][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[14:56:27.098][E][i2s_audio.microphone:400]: Driver failed to start; retrying in 1 second
+[14:56:27.098][E][component:349]: i2s_audio.microphone set Error flag: unspecified
+[14:56:27.098][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[14:56:27.122][D][micro_wake_word:279]: Inference task is running
+[14:56:27.122][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[14:56:27.122][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[14:56:27.626][D][i2s_audio.speaker:088]: Stopped
+[14:56:27.712][D][main:1429]: State updated!
+[14:56:27.712][W][micro_wake_word:365]: Wake word detection is already running
+[14:56:27.809][D][speaker_media_player:456]: State changed to IDLE
+[14:56:27.809][W][micro_wake_word:365]: Wake word detection is already running
+[14:56:27.827][W][micro_wake_word:365]: Wake word detection is already running
+[14:56:27.828][W][micro_wake_word:365]: Wake word detection is already running
+[14:56:27.828][W][component:473]: voice_assistant took a long time for an operation (93 ms), max is 50 ms
+[14:56:27.828][S][media_player]: 'Echo Base Player' >> IDLE
+[14:56:27.828][S][media_player]:   Volume: 50%
+[14:56:28.105][E][component:374]: i2s_audio.microphone cleared Error flag
+[14:56:39.115][D][micro_wake_word:334]: Detected 'Okay Nabu' with sliding average probability is 0.91 and max probability is 0.99
+[14:56:39.120][D][micro_wake_word:379]: Stopping wake word detection
+[14:56:39.137][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[14:56:39.155][D][main:1429]: State updated!
+[14:56:39.161][D][main:350]: Announcing!
+[14:56:39.162][D][micro_wake_word:379]: Stopping wake word detection
+[14:56:39.178][D][speaker_media_player:456]: State changed to ANNOUNCING
+[14:56:39.192][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[14:56:39.192][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[14:56:39.192][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[14:56:39.195][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:56:39.207][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:56:39.225][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[14:56:39.242][D][i2s_audio.speaker:063]: Starting
+[14:56:39.245][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[14:56:39.263][S][media_player]: 'Echo Base Player' >> PLAYING
+[14:56:39.263][S][media_player]:   Volume: 50%
+[14:56:39.749][D][i2s_audio.speaker:088]: Stopped
+[14:56:39.782][D][main:1429]: State updated!
+[14:56:39.790][D][micro_wake_word:369]: Starting wake word detection
+[14:56:39.819][D][speaker_media_player:456]: State changed to IDLE
+[14:56:39.830][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[14:56:39.842][D][voice_assistant:607]: State changed from IDLE to START_MICROPHONE
+[14:56:39.845][D][voice_assistant:614]: Desired state set to START_PIPELINE
+[14:56:39.845][D][voice_assistant:310]: Starting Microphone
+[14:56:39.851][D][ring_buffer:035]: Created ring buffer with size 16384
+[14:56:39.851][D][voice_assistant:607]: State changed from START_MICROPHONE to STARTING_MICROPHONE
+[14:56:39.851][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[14:56:39.851][D][micro_wake_word:279]: Inference task is running
+[14:56:39.866][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[14:56:39.866][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[14:56:39.881][D][voice_assistant:607]: State changed from STARTING_MICROPHONE to START_PIPELINE
+[14:56:39.889][D][voice_assistant:334]: Requesting start
+[14:56:39.901][D][voice_assistant:607]: State changed from START_PIPELINE to STARTING_PIPELINE
+[14:56:39.901][S][media_player]: 'Echo Base Player' >> IDLE
+[14:56:39.901][S][media_player]:   Volume: 50%
+[14:56:39.930][D][voice_assistant:761]: Event Type: 1
+[14:56:39.936][D][voice_assistant:764]: Assist Pipeline running
+[14:56:40.206][D][voice_assistant:761]: Event Type: 10
+[14:56:40.215][D][voice_assistant:778]: Wake word detected
+[14:56:40.221][D][voice_assistant:761]: Event Type: 3
+[14:56:40.221][D][voice_assistant:783]: STT started
+[14:56:40.221][D][voice_assistant:629]: Client started, streaming microphone
+[14:56:40.221][D][voice_assistant:607]: State changed from STARTING_PIPELINE to STREAMING_MICROPHONE
+[14:56:40.232][D][voice_assistant:614]: Desired state set to STREAMING_MICROPHONE
+[14:56:45.375][D][voice_assistant:761]: Event Type: 11
+[14:56:45.858][D][voice_assistant:964]: Starting STT by VAD
+[14:56:46.118][D][voice_assistant:761]: Event Type: 12
+[14:56:46.123][D][voice_assistant:968]: STT by VAD end
+[14:56:46.123][D][voice_assistant:607]: State changed from STREAMING_MICROPHONE to STOP_MICROPHONE
+[14:56:46.123][D][voice_assistant:614]: Desired state set to AWAITING_RESPONSE
+[14:56:46.123][D][voice_assistant:607]: State changed from STOP_MICROPHONE to STOPPING_MICROPHONE
+[14:56:46.130][D][voice_assistant:607]: State changed from STOPPING_MICROPHONE to AWAITING_RESPONSE
+[14:56:46.136][D][voice_assistant:761]: Event Type: 4
+[14:56:46.136][D][voice_assistant:800]: Speech recognised as: "setze die Lautstärke auf 60%"
+[14:56:46.136][D][voice_assistant:761]: Event Type: 5
+[14:56:46.143][D][voice_assistant:805]: Intent started
+[14:56:46.144][D][voice_assistant:761]: Event Type: 100
+[14:56:46.144][D][voice_assistant:809]: Intent progress
+[14:56:46.166][D][voice_assistant:761]: Event Type: 100
+[14:56:46.172][D][voice_assistant:809]: Intent progress
+[14:56:46.411][D][voice_assistant:761]: Event Type: 100
+[14:56:46.423][D][voice_assistant:809]: Intent progress
+[14:56:46.434][D][voice_assistant:761]: Event Type: 100
+[14:56:46.448][D][voice_assistant:809]: Intent progress
+[14:56:46.448][D][voice_assistant:761]: Event Type: 100
+[14:56:46.448][D][voice_assistant:809]: Intent progress
+[14:56:46.661][D][voice_assistant:761]: Event Type: 100
+[14:56:46.682][D][voice_assistant:809]: Intent progress
+[14:56:46.682][D][voice_assistant:761]: Event Type: 100
+[14:56:46.682][D][voice_assistant:809]: Intent progress
+[14:56:49.137][D][voice_assistant:761]: Event Type: 6
+[14:56:49.176][D][voice_assistant:761]: Event Type: 7
+[14:56:49.195][W][voice_assistant:851]: No text in TTS_START event
+[14:56:49.221][D][voice_assistant:607]: State changed from AWAITING_RESPONSE to STREAMING_RESPONSE
+[14:56:49.230][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[14:56:49.260][D][main:1429]: State updated!
+[14:56:49.267][D][main:350]: Announcing!
+[14:56:49.268][D][micro_wake_word:379]: Stopping wake word detection
+[14:56:49.273][D][speaker_media_player:456]: State changed to ANNOUNCING
+[14:56:49.291][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[14:56:49.322][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[14:56:49.322][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[14:56:49.322][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[14:56:49.364][S][media_player]: 'Echo Base Player' >> PLAYING
+[14:56:49.364][S][media_player]:   Volume: 50%
+[14:56:49.434][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:56:49.434][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:56:49.548][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 24000 Hz sample rate, and 16 bits per sample
+[14:56:49.579][D][i2s_audio.speaker:063]: Starting
+[14:56:49.632][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[14:56:52.473][D][i2s_audio.speaker:088]: Stopped
+[14:56:52.509][D][main:1429]: State updated!
+[14:56:52.511][D][speaker_media_player:456]: State changed to IDLE
+[14:56:52.517][D][voice_assistant:475]: Announcement finished playing
+[14:56:52.517][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to RESPONSE_FINISHED
+[14:56:52.523][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[14:56:52.523][D][micro_wake_word:369]: Starting wake word detection
+[14:56:52.558][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to IDLE
+[14:56:52.567][D][voice_assistant:614]: Desired state set to IDLE
+[14:56:52.568][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[14:56:52.576][D][voice_assistant:761]: Event Type: 8
+[14:56:52.585][W][voice_assistant:877]: No url in TTS_END event
+[14:56:52.585][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[14:56:52.586][D][micro_wake_word:279]: Inference task is running
+[14:56:52.586][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[14:56:52.590][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[14:56:52.620][S][media_player]: 'Echo Base Player' >> IDLE
+[14:56:52.620][S][media_player]:   Volume: 50%
+[14:56:52.632][D][voice_assistant:761]: Event Type: 2
+[14:56:52.638][D][voice_assistant:903]: Assist Pipeline ended
+[14:56:52.688][D][voice_assistant:607]: State changed from IDLE to STREAMING_RESPONSE
+[14:56:52.690][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[14:56:52.723][D][main:1429]: State updated!
+[14:56:52.730][D][main:350]: Announcing!
+[14:56:52.730][D][micro_wake_word:379]: Stopping wake word detection
+[14:56:52.732][D][speaker_media_player:456]: State changed to ANNOUNCING
+[14:56:52.739][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[14:56:52.772][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:56:52.781][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[14:56:52.781][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[14:56:52.801][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[14:56:52.801][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:56:52.829][S][media_player]: 'Echo Base Player' >> PLAYING
+[14:56:52.829][S][media_player]:   Volume: 50%
+[14:56:52.850][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 24000 Hz sample rate, and 16 bits per sample
+[14:56:52.875][D][i2s_audio.speaker:063]: Starting
+[14:56:52.885][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[14:56:53.243][D][i2s_audio.speaker:088]: Stopped
+[14:56:53.262][D][main:1429]: State updated!
+[14:56:53.306][D][speaker_media_player:456]: State changed to IDLE
+[14:56:53.306][D][voice_assistant:475]: Announcement finished playing
+[14:56:53.306][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to RESPONSE_FINISHED
+[14:56:53.362][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[14:56:53.362][D][micro_wake_word:369]: Starting wake word detection
+[14:56:53.362][D][micro_wake_word:369]: Starting wake word detection
+[14:56:53.362][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to START_MICROPHONE
+[14:56:53.374][D][voice_assistant:614]: Desired state set to START_PIPELINE
+[14:56:53.374][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[14:56:53.374][S][media_player]: 'Echo Base Player' >> IDLE
+[14:56:53.374][S][media_player]:   Volume: 50%
+[14:56:53.389][D][voice_assistant:310]: Starting Microphone
+[14:56:53.389][D][ring_buffer:035]: Created ring buffer with size 16384
+[14:56:53.389][D][voice_assistant:607]: State changed from START_MICROPHONE to STARTING_MICROPHONE
+[14:56:53.389][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[14:56:53.461][D][micro_wake_word:279]: Inference task is running
+[14:56:53.461][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[14:56:53.461][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[14:56:53.461][D][voice_assistant:607]: State changed from STARTING_MICROPHONE to START_PIPELINE
+[14:56:53.489][D][voice_assistant:334]: Requesting start
+[14:56:53.489][D][voice_assistant:607]: State changed from START_PIPELINE to STARTING_PIPELINE
+[14:56:53.513][D][voice_assistant:761]: Event Type: 1
+[14:56:53.515][D][voice_assistant:764]: Assist Pipeline running
+[14:56:53.660][D][voice_assistant:761]: Event Type: 10
+[14:56:53.666][D][voice_assistant:778]: Wake word detected
+[14:56:53.666][D][voice_assistant:761]: Event Type: 3
+[14:56:53.672][D][voice_assistant:783]: STT started
+[14:56:53.685][D][voice_assistant:629]: Client started, streaming microphone
+[14:56:53.685][D][voice_assistant:607]: State changed from STARTING_PIPELINE to STREAMING_MICROPHONE
+[14:56:53.685][D][voice_assistant:614]: Desired state set to STREAMING_MICROPHONE
+[14:57:08.534][D][voice_assistant:761]: Event Type: 4
+[14:57:08.574][W][voice_assistant:794]: No text in STT_END event
+[14:57:08.579][D][voice_assistant:761]: Event Type: 2
+[14:57:08.579][D][voice_assistant:903]: Assist Pipeline ended
+[14:57:08.579][D][voice_assistant:607]: State changed from STREAMING_MICROPHONE to STOP_MICROPHONE
+[14:57:08.589][D][voice_assistant:614]: Desired state set to IDLE
+[14:57:08.589][D][voice_assistant:761]: Event Type: 1
+[14:57:08.589][D][voice_assistant:764]: Assist Pipeline running
+[14:57:08.610][D][voice_assistant:607]: State changed from STOP_MICROPHONE to STREAMING_RESPONSE
+[14:57:08.618][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[14:57:08.618][D][voice_assistant:761]: Event Type: 2
+[14:57:08.618][D][voice_assistant:903]: Assist Pipeline ended
+[14:57:08.651][D][main:1429]: State updated!
+[14:57:08.662][D][main:350]: Announcing!
+[14:57:08.662][D][micro_wake_word:379]: Stopping wake word detection
+[14:57:08.665][D][speaker_media_player:456]: State changed to ANNOUNCING
+[14:57:08.665][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[14:57:08.698][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[14:57:08.706][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[14:57:08.706][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[14:57:08.709][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[14:57:08.730][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[14:57:08.762][S][media_player]: 'Echo Base Player' >> PLAYING
+[14:57:08.762][S][media_player]:   Volume: 50%
+[14:57:08.793][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 24000 Hz sample rate, and 16 bits per sample
+[14:57:08.805][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:57:08.808][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:57:08.808][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:57:09.808][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:57:09.825][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:57:09.828][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:57:09.828][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:57:10.835][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:57:10.844][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:57:10.844][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:57:10.844][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:57:11.841][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:57:11.852][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:57:11.852][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:57:11.852][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:57:12.848][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:57:12.856][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:57:12.864][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:57:12.864][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:57:13.866][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:57:13.872][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[14:57:13.872][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[14:57:13.872][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[14:57:14.482][W][api.connection:2532]: ai-voice-assistant (192.168.xx.xxx): Reading failed CONNECTION_CLOSED errno=128
+[14:57:14.546][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to STOP_MICROPHONE
+[14:57:14.551][D][voice_assistant:614]: Desired state set to IDLE
+[14:57:14.570][D][voice_assistant:607]: State changed from STOP_MICROPHONE to STOPPING_MICROPHONE
+[14:57:14.584][D][voice_assistant:607]: State changed from STOPPING_MICROPHONE to IDLE
+[14:57:14.874][E][component:374]: i2s_audio.speaker cleared Error flag
+[14:57:14.886][D][i2s_audio.speaker:063]: Starting
+[14:57:14.895][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[14:57:15.224][D][i2s_audio.speaker:088]: Stopped
+[14:57:15.259][D][main:1429]: State updated!
+[14:57:15.264][D][micro_wake_word:369]: Starting wake word detection
+[14:57:15.299][D][speaker_media_player:456]: State changed to IDLE
+[14:57:15.305][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[14:57:15.322][W][micro_wake_word:365]: Wake word detection is already running
+[14:57:15.352][W][micro_wake_word:365]: Wake word detection is already running
+[14:57:15.399][W][micro_wake_word:365]: Wake word detection is already running
+[14:57:15.442][W][component:473]: voice_assistant took a long time for an operation (124 ms), max is 100 ms
+[14:57:15.450][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[14:57:15.450][D][micro_wake_word:279]: Inference task is running
+[14:57:15.455][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[14:57:15.455][S][media_player]: 'Echo Base Player' >> IDLE
+[14:57:15.455][S][media_player]:   Volume: 50%
+[14:57:15.461][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[14:57:16.499][D][voice_assistant:607]: State changed from IDLE to RESPONSE_FINISHED
+[14:57:16.502][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[14:57:16.503][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to IDLE
+[14:57:16.509][D][voice_assistant:614]: Desired state set to IDLE
+[14:57:17.877][D][api:253]: Accept 192.168.xx.xxx
+[14:57:17.962][W][api.connection:1751]: 'ai-voice-assistant' using outdated API 1.6, update to 1.14+
+[14:57:17.964][D][api.connection:2526]: ai-voice-assistant (192.168.xx.xxx): connected
+[14:57:18.241][W][micro_wake_word:365]: Wake word detection is already running
+[14:58:59.936][D][wifi:2480]: Roam scan (-85 dBm, attempt 1/3)
+[14:59:02.881][I][wifi:2536]: Roaming to 7A:CF:84:10:39:AB (+27 dB)
+INFO Processing unexpected disconnect from ESPHome API for mirko-ug @ 192.168.xx.xxx
+WARNING Disconnected from API
+INFO Successfully resolved mirko-ug @ 192.168.xx.xxx in 0.002s
+INFO Successfully connected to mirko-ug @ 192.168.xx.xxx in 0.056s
+WARNING Can't connect to ESPHome API for mirko-ug @ 192.168.xx.xxx: mirko-ug @ 192.168.xx.xxx: EOF received (SocketClosedAPIError)
+INFO Trying to connect to mirko-ug @ 192.168.xx.xxx in the background
+INFO Successfully connected to mirko-ug @ 192.168.xx.xxx in 0.479s
+INFO Successfully connected to mirko-ug @ 192.168.xx.xxx in 1.069s
+INFO Successfully connected to mirko-ug @ 192.168.xx.xxx in 0.651s
+INFO Successful handshake with mirko-ug @ 192.168.xx.xxx in 4.140s
+[15:00:04.845][D][api:253]: Accept 192.168.xx.xxx
+[15:00:05.093][W][api.connection:1751]: 'ai-voice-assistant' using outdated API 1.6, update to 1.14+
+[15:00:05.139][D][api.connection:2526]: ai-voice-assistant (192.168.xx.xxx): connected
+[15:00:05.604][D][micro_wake_word:369]: Starting wake word detection
+[15:00:05.652][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:00:05.672][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:00:05.673][D][micro_wake_word:279]: Inference task is running
+[15:00:05.673][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:00:05.677][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:01:53.427][D][voice_assistant:209]: reset conversation ID
+[15:02:13.311][D][micro_wake_word:334]: Detected 'Okay Nabu' with sliding average probability is 0.89 and max probability is 0.99
+[15:02:13.317][D][micro_wake_word:379]: Stopping wake word detection
+[15:02:13.341][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[15:02:13.377][D][main:1429]: State updated!
+[15:02:13.389][D][main:350]: Announcing!
+[15:02:13.390][D][micro_wake_word:379]: Stopping wake word detection
+[15:02:13.397][D][speaker_media_player:456]: State changed to ANNOUNCING
+[15:02:13.406][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[15:02:13.406][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[15:02:13.406][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[15:02:13.406][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[15:02:13.414][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[15:02:13.459][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[15:02:13.480][S][media_player]: 'Echo Base Player' >> PLAYING
+[15:02:13.480][S][media_player]:   Volume: 50%
+[15:02:13.517][D][i2s_audio.speaker:063]: Starting
+[15:02:13.518][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[15:02:13.983][D][i2s_audio.speaker:088]: Stopped
+[15:02:14.017][D][main:1429]: State updated!
+[15:02:14.035][D][micro_wake_word:369]: Starting wake word detection
+[15:02:14.057][D][speaker_media_player:456]: State changed to IDLE
+[15:02:14.080][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:02:14.080][D][voice_assistant:607]: State changed from IDLE to START_MICROPHONE
+[15:02:14.081][D][voice_assistant:614]: Desired state set to START_PIPELINE
+[15:02:14.081][D][voice_assistant:310]: Starting Microphone
+[15:02:14.081][D][ring_buffer:035]: Created ring buffer with size 16384
+[15:02:14.081][D][voice_assistant:607]: State changed from START_MICROPHONE to STARTING_MICROPHONE
+[15:02:14.126][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:02:14.126][D][micro_wake_word:279]: Inference task is running
+[15:02:14.126][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:02:14.126][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:02:14.128][D][voice_assistant:607]: State changed from STARTING_MICROPHONE to START_PIPELINE
+[15:02:14.128][S][media_player]: 'Echo Base Player' >> IDLE
+[15:02:14.128][S][media_player]:   Volume: 50%
+[15:02:14.320][D][voice_assistant:334]: Requesting start
+[15:02:14.320][D][voice_assistant:607]: State changed from START_PIPELINE to STARTING_PIPELINE
+[15:02:14.368][D][voice_assistant:761]: Event Type: 1
+[15:02:14.368][D][voice_assistant:764]: Assist Pipeline running
+[15:02:14.543][D][voice_assistant:761]: Event Type: 10
+[15:02:14.561][D][voice_assistant:778]: Wake word detected
+[15:02:14.561][D][voice_assistant:761]: Event Type: 3
+[15:02:14.561][D][voice_assistant:783]: STT started
+[15:02:14.576][D][voice_assistant:629]: Client started, streaming microphone
+[15:02:14.577][D][voice_assistant:607]: State changed from STARTING_PIPELINE to STREAMING_MICROPHONE
+[15:02:14.577][D][voice_assistant:614]: Desired state set to STREAMING_MICROPHONE
+[15:02:17.000][D][voice_assistant:761]: Event Type: 11
+[15:02:17.017][D][voice_assistant:964]: Starting STT by VAD
+[15:02:17.767][D][voice_assistant:761]: Event Type: 12
+[15:02:17.773][D][voice_assistant:968]: STT by VAD end
+[15:02:17.773][D][voice_assistant:607]: State changed from STREAMING_MICROPHONE to STOP_MICROPHONE
+[15:02:17.782][D][voice_assistant:614]: Desired state set to AWAITING_RESPONSE
+[15:02:17.783][D][voice_assistant:761]: Event Type: 4
+[15:02:17.783][D][voice_assistant:800]: Speech recognised as: "Schau dir auf Sturm."
+[15:02:17.783][D][voice_assistant:761]: Event Type: 5
+[15:02:17.819][D][voice_assistant:805]: Intent started
+[15:02:17.838][D][voice_assistant:607]: State changed from STOP_MICROPHONE to STOPPING_MICROPHONE
+[15:02:17.839][D][voice_assistant:761]: Event Type: 100
+[15:02:17.839][D][voice_assistant:809]: Intent progress
+[15:02:17.855][D][voice_assistant:607]: State changed from STOPPING_MICROPHONE to AWAITING_RESPONSE
+[15:02:18.065][D][voice_assistant:761]: Event Type: 100
+[15:02:18.088][D][voice_assistant:809]: Intent progress
+[15:02:18.280][D][voice_assistant:761]: Event Type: 100
+[15:02:18.287][D][voice_assistant:809]: Intent progress
+[15:02:18.287][D][voice_assistant:761]: Event Type: 100
+[15:02:18.287][D][voice_assistant:809]: Intent progress
+[15:02:18.287][D][voice_assistant:761]: Event Type: 100
+[15:02:18.292][D][voice_assistant:809]: Intent progress
+[15:02:18.530][D][voice_assistant:761]: Event Type: 100
+[15:02:18.539][D][voice_assistant:809]: Intent progress
+[15:02:18.552][D][voice_assistant:761]: Event Type: 100
+[15:02:18.574][D][voice_assistant:809]: Intent progress
+[15:02:18.794][D][voice_assistant:761]: Event Type: 100
+[15:02:18.876][D][voice_assistant:809]: Intent progress
+[15:02:19.049][D][voice_assistant:761]: Event Type: 100
+[15:02:19.067][D][voice_assistant:809]: Intent progress
+[15:02:19.291][D][voice_assistant:761]: Event Type: 100
+[15:02:19.300][D][voice_assistant:809]: Intent progress
+[15:02:19.300][D][voice_assistant:761]: Event Type: 6
+[15:02:19.345][D][voice_assistant:761]: Event Type: 7
+[15:02:19.345][W][voice_assistant:851]: No text in TTS_START event
+[15:02:19.345][D][voice_assistant:607]: State changed from AWAITING_RESPONSE to STREAMING_RESPONSE
+[15:02:19.345][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[15:02:19.409][D][main:1429]: State updated!
+[15:02:19.413][D][main:350]: Announcing!
+[15:02:19.416][D][micro_wake_word:379]: Stopping wake word detection
+[15:02:19.416][D][speaker_media_player:456]: State changed to ANNOUNCING
+[15:02:19.428][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[15:02:19.444][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[15:02:19.445][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[15:02:19.445][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[15:02:19.595][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[15:02:19.615][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[15:02:19.616][S][media_player]: 'Echo Base Player' >> PLAYING
+[15:02:19.616][S][media_player]:   Volume: 50%
+[15:02:19.756][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 24000 Hz sample rate, and 16 bits per sample
+[15:02:19.812][D][voice_assistant:761]: Event Type: 100
+[15:02:19.812][D][voice_assistant:809]: Intent progress
+[15:02:19.813][D][i2s_audio.speaker:063]: Starting
+[15:02:19.823][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[15:02:22.896][D][i2s_audio.speaker:088]: Stopped
+[15:02:22.934][D][main:1429]: State updated!
+[15:02:22.934][D][speaker_media_player:456]: State changed to IDLE
+[15:02:22.941][D][voice_assistant:475]: Announcement finished playing
+[15:02:22.942][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to RESPONSE_FINISHED
+[15:02:22.942][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[15:02:22.942][D][micro_wake_word:369]: Starting wake word detection
+[15:02:22.975][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to IDLE
+[15:02:23.019][D][voice_assistant:614]: Desired state set to IDLE
+[15:02:23.019][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:02:23.040][D][voice_assistant:607]: State changed from IDLE to STREAMING_RESPONSE
+[15:02:23.063][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[15:02:23.063][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:02:23.063][D][micro_wake_word:279]: Inference task is running
+[15:02:23.063][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:02:23.063][S][media_player]: 'Echo Base Player' >> IDLE
+[15:02:23.063][S][media_player]:   Volume: 50%
+[15:02:23.088][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:02:23.088][D][main:1429]: State updated!
+[15:02:23.088][D][main:350]: Announcing!
+[15:02:23.088][D][micro_wake_word:379]: Stopping wake word detection
+[15:02:23.115][D][speaker_media_player:456]: State changed to ANNOUNCING
+[15:02:23.115][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[15:02:23.115][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[15:02:23.115][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[15:02:23.167][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[15:02:23.167][S][media_player]: 'Echo Base Player' >> PLAYING
+[15:02:23.167][S][media_player]:   Volume: 50%
+[15:02:23.221][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[15:02:23.222][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[15:02:23.945][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 24000 Hz sample rate, and 16 bits per sample
+[15:02:24.052][D][i2s_audio.speaker:063]: Starting
+[15:02:24.062][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[15:02:25.932][D][i2s_audio.speaker:088]: Stopped
+[15:02:25.969][D][main:1429]: State updated!
+[15:02:25.970][D][speaker_media_player:456]: State changed to IDLE
+[15:02:25.970][D][voice_assistant:475]: Announcement finished playing
+[15:02:25.982][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to RESPONSE_FINISHED
+[15:02:25.982][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[15:02:25.982][D][micro_wake_word:369]: Starting wake word detection
+[15:02:26.009][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to IDLE
+[15:02:26.014][D][voice_assistant:614]: Desired state set to IDLE
+[15:02:26.014][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:02:26.043][D][voice_assistant:761]: Event Type: 8
+[15:02:26.043][W][voice_assistant:877]: No url in TTS_END event
+[15:02:26.048][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:02:26.048][D][micro_wake_word:279]: Inference task is running
+[15:02:26.048][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:02:26.048][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:02:26.075][S][media_player]: 'Echo Base Player' >> IDLE
+[15:02:26.075][S][media_player]:   Volume: 50%
+[15:02:26.090][D][voice_assistant:761]: Event Type: 2
+[15:02:26.091][D][voice_assistant:903]: Assist Pipeline ended
+[15:02:26.135][D][voice_assistant:607]: State changed from IDLE to STREAMING_RESPONSE
+[15:02:26.135][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[15:02:26.175][D][main:1429]: State updated!
+[15:02:26.193][D][main:350]: Announcing!
+[15:02:26.193][D][micro_wake_word:379]: Stopping wake word detection
+[15:02:26.194][D][speaker_media_player:456]: State changed to ANNOUNCING
+[15:02:26.229][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[15:02:26.230][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[15:02:26.230][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[15:02:26.230][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[15:02:26.276][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[15:02:26.276][S][media_player]: 'Echo Base Player' >> PLAYING
+[15:02:26.276][S][media_player]:   Volume: 50%
+[15:02:26.333][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[15:02:26.405][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 24000 Hz sample rate, and 16 bits per sample
+[15:02:26.405][D][i2s_audio.speaker:063]: Starting
+[15:02:26.405][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[15:02:26.745][D][i2s_audio.speaker:088]: Stopped
+[15:02:26.783][D][main:1429]: State updated!
+[15:02:26.783][D][speaker_media_player:456]: State changed to IDLE
+[15:02:26.783][D][voice_assistant:475]: Announcement finished playing
+[15:02:26.820][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to RESPONSE_FINISHED
+[15:02:26.821][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[15:02:26.821][D][micro_wake_word:369]: Starting wake word detection
+[15:02:26.821][D][micro_wake_word:369]: Starting wake word detection
+[15:02:26.886][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to START_MICROPHONE
+[15:02:26.886][D][voice_assistant:614]: Desired state set to START_PIPELINE
+[15:02:26.886][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:02:26.886][S][media_player]: 'Echo Base Player' >> IDLE
+[15:02:26.886][S][media_player]:   Volume: 50%
+[15:02:26.896][D][voice_assistant:310]: Starting Microphone
+[15:02:26.896][D][ring_buffer:035]: Created ring buffer with size 16384
+[15:02:26.910][D][voice_assistant:607]: State changed from START_MICROPHONE to STARTING_MICROPHONE
+[15:02:26.910][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:02:26.918][D][micro_wake_word:279]: Inference task is running
+[15:02:26.918][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:02:26.918][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:02:26.918][D][voice_assistant:607]: State changed from STARTING_MICROPHONE to START_PIPELINE
+[15:02:26.979][D][voice_assistant:334]: Requesting start
+[15:02:26.980][D][voice_assistant:607]: State changed from START_PIPELINE to STARTING_PIPELINE
+[15:02:26.980][D][voice_assistant:761]: Event Type: 1
+[15:02:26.980][D][voice_assistant:764]: Assist Pipeline running
+[15:02:27.397][D][voice_assistant:761]: Event Type: 10
+[15:02:27.412][D][voice_assistant:778]: Wake word detected
+[15:02:27.412][D][voice_assistant:761]: Event Type: 3
+[15:02:27.412][D][voice_assistant:783]: STT started
+[15:02:27.446][D][voice_assistant:629]: Client started, streaming microphone
+[15:02:27.446][D][voice_assistant:607]: State changed from STARTING_PIPELINE to STREAMING_MICROPHONE
+[15:02:27.446][D][voice_assistant:614]: Desired state set to STREAMING_MICROPHONE
+[15:02:27.477][W][component:473]: voice_assistant took a long time for an operation (60 ms), max is 50 ms
+[15:02:37.790][D][micro_wake_word:334]: Detected 'Okay Nabu' with sliding average probability is 0.87 and max probability is 1.00
+[15:02:37.827][D][micro_wake_word:379]: Stopping wake word detection
+[15:02:37.827][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[15:02:37.827][D][main:1429]: State updated!
+[15:02:37.834][D][main:350]: Announcing!
+[15:02:37.834][D][micro_wake_word:379]: Stopping wake word detection
+[15:02:37.834][D][speaker_media_player:456]: State changed to ANNOUNCING
+[15:02:37.834][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[15:02:37.859][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[15:02:37.860][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[15:02:37.860][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[15:02:37.860][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[15:02:37.909][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[15:02:37.927][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:02:37.927][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:02:37.927][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:02:37.931][S][media_player]: 'Echo Base Player' >> PLAYING
+[15:02:37.931][S][media_player]:   Volume: 50%
+[15:02:38.942][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:02:38.943][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:02:38.943][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:02:38.943][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:02:39.691][D][voice_assistant:761]: Event Type: 11
+[15:02:39.696][D][voice_assistant:964]: Starting STT by VAD
+[15:02:39.943][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:02:39.955][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:02:39.968][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:02:39.968][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:02:40.632][D][voice_assistant:761]: Event Type: 12
+[15:02:40.634][D][voice_assistant:968]: STT by VAD end
+[15:02:40.687][D][voice_assistant:607]: State changed from STREAMING_MICROPHONE to STOP_MICROPHONE
+[15:02:40.688][D][voice_assistant:614]: Desired state set to AWAITING_RESPONSE
+[15:02:40.688][D][voice_assistant:607]: State changed from STOP_MICROPHONE to STOPPING_MICROPHONE
+[15:02:40.690][D][voice_assistant:607]: State changed from STOPPING_MICROPHONE to AWAITING_RESPONSE
+[15:02:40.833][D][voice_assistant:761]: Event Type: 4
+[15:02:40.839][D][voice_assistant:800]: Speech recognised as: "오케이, 나부."
+[15:02:40.840][D][voice_assistant:761]: Event Type: 5
+[15:02:40.840][D][voice_assistant:805]: Intent started
+[15:02:40.853][D][voice_assistant:761]: Event Type: 100
+[15:02:40.854][D][voice_assistant:809]: Intent progress
+[15:02:40.962][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:02:40.976][D][i2s_audio.speaker:063]: Starting
+[15:02:40.987][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[15:02:41.063][D][voice_assistant:761]: Event Type: 100
+[15:02:41.068][D][voice_assistant:809]: Intent progress
+[15:02:41.068][D][voice_assistant:761]: Event Type: 100
+[15:02:41.117][D][voice_assistant:809]: Intent progress
+[15:02:41.303][D][voice_assistant:761]: Event Type: 100
+[15:02:41.310][D][voice_assistant:809]: Intent progress
+[15:02:41.310][D][voice_assistant:761]: Event Type: 100
+[15:02:41.318][D][voice_assistant:809]: Intent progress
+[15:02:41.480][D][i2s_audio.speaker:088]: Stopped
+[15:02:41.517][D][main:1429]: State updated!
+[15:02:41.517][D][speaker_media_player:456]: State changed to IDLE
+[15:02:41.577][D][voice_assistant:761]: Event Type: 100
+[15:02:41.590][D][voice_assistant:809]: Intent progress
+[15:02:41.590][D][voice_assistant:761]: Event Type: 100
+[15:02:41.590][D][voice_assistant:809]: Intent progress
+[15:02:41.617][S][media_player]: 'Echo Base Player' >> IDLE
+[15:02:41.617][S][media_player]:   Volume: 50%
+[15:02:41.637][D][voice_assistant:761]: Event Type: 100
+[15:02:41.681][D][voice_assistant:809]: Intent progress
+[15:02:41.811][D][voice_assistant:761]: Event Type: 100
+[15:02:41.813][D][voice_assistant:809]: Intent progress
+[15:02:42.049][D][voice_assistant:761]: Event Type: 100
+[15:02:42.056][D][voice_assistant:809]: Intent progress
+[15:02:42.056][D][voice_assistant:761]: Event Type: 100
+[15:02:42.056][D][voice_assistant:809]: Intent progress
+[15:02:42.091][D][voice_assistant:761]: Event Type: 100
+[15:02:42.091][D][voice_assistant:809]: Intent progress
+[15:02:42.333][D][voice_assistant:761]: Event Type: 100
+[15:02:42.337][D][voice_assistant:809]: Intent progress
+[15:02:42.343][D][voice_assistant:761]: Event Type: 100
+[15:02:42.343][D][voice_assistant:809]: Intent progress
+[15:02:42.546][D][voice_assistant:761]: Event Type: 100
+[15:02:42.550][D][voice_assistant:809]: Intent progress
+[15:02:42.554][D][voice_assistant:761]: Event Type: 100
+[15:02:42.554][D][voice_assistant:809]: Intent progress
+[15:02:42.804][D][voice_assistant:761]: Event Type: 100
+[15:02:42.806][D][voice_assistant:809]: Intent progress
+[15:02:48.415][D][voice_assistant:761]: Event Type: 6
+[15:02:48.496][D][voice_assistant:761]: Event Type: 7
+[15:02:48.502][D][voice_assistant:858]: Response: "Alles klar, in der Standardzone ist nichts los. Gibt es einen anderen Raum, in dem ich nachsehen soll? Oder meinst du vielleicht "überall"?"
+[15:02:48.503][D][voice_assistant:761]: Event Type: 8
+[15:02:48.513][D][voice_assistant:880]: Response URL: "http://192.168.xx.xxx/app/no.arvebjoe.ai-voice-assistant/userdata/audio/tx_70653d3b-3fb0-4836-8ddd-95856e0ad7a1.flac"
+[15:02:48.513][D][voice_assistant:607]: State changed from AWAITING_RESPONSE to STREAMING_RESPONSE
+[15:02:48.513][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[15:02:48.513][D][voice_assistant:761]: Event Type: 2
+[15:02:48.560][D][voice_assistant:903]: Assist Pipeline ended
+[15:02:48.560][D][main:1429]: State updated!
+[15:02:48.560][D][main:350]: Announcing!
+[15:02:48.560][D][speaker_media_player:456]: State changed to ANNOUNCING
+[15:02:48.626][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[15:02:48.664][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[15:02:48.664][S][media_player]: 'Echo Base Player' >> PLAYING
+[15:02:48.664][S][media_player]:   Volume: 50%
+[15:02:48.785][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 24000 Hz sample rate, and 16 bits per sample
+[15:02:49.028][D][i2s_audio.speaker:063]: Starting
+[15:02:49.028][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[15:02:56.559][D][i2s_audio.speaker:088]: Stopped
+[15:02:56.594][D][main:1429]: State updated!
+[15:02:56.608][D][speaker_media_player:456]: State changed to IDLE
+[15:02:56.617][D][voice_assistant:475]: Announcement finished playing
+[15:02:56.617][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to RESPONSE_FINISHED
+[15:02:56.636][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[15:02:56.636][D][micro_wake_word:369]: Starting wake word detection
+[15:02:56.658][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to START_MICROPHONE
+[15:02:56.659][D][voice_assistant:614]: Desired state set to START_PIPELINE
+[15:02:56.675][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:02:56.681][D][voice_assistant:310]: Starting Microphone
+[15:02:56.681][D][voice_assistant:607]: State changed from START_MICROPHONE to STARTING_MICROPHONE
+[15:02:56.681][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:02:56.689][D][micro_wake_word:279]: Inference task is running
+[15:02:56.689][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:02:56.689][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:02:56.703][D][voice_assistant:607]: State changed from STARTING_MICROPHONE to START_PIPELINE
+[15:02:56.707][S][media_player]: 'Echo Base Player' >> IDLE
+[15:02:56.707][S][media_player]:   Volume: 50%
+[15:02:56.736][D][voice_assistant:334]: Requesting start
+[15:02:56.743][D][voice_assistant:607]: State changed from START_PIPELINE to STARTING_PIPELINE
+[15:02:56.759][D][voice_assistant:761]: Event Type: 1
+[15:02:56.761][D][voice_assistant:764]: Assist Pipeline running
+[15:02:56.786][D][voice_assistant:761]: Event Type: 10
+[15:02:56.792][D][voice_assistant:778]: Wake word detected
+[15:02:56.792][D][voice_assistant:761]: Event Type: 3
+[15:02:56.794][D][voice_assistant:783]: STT started
+[15:02:56.814][D][voice_assistant:629]: Client started, streaming microphone
+[15:02:56.815][D][voice_assistant:607]: State changed from STARTING_PIPELINE to STREAMING_MICROPHONE
+[15:02:56.815][D][voice_assistant:614]: Desired state set to STREAMING_MICROPHONE
+[15:03:11.785][D][voice_assistant:761]: Event Type: 4
+[15:03:11.802][W][voice_assistant:794]: No text in STT_END event
+[15:03:11.839][D][voice_assistant:761]: Event Type: 2
+[15:03:11.843][D][voice_assistant:903]: Assist Pipeline ended
+[15:03:11.843][D][voice_assistant:607]: State changed from STREAMING_MICROPHONE to STOP_MICROPHONE
+[15:03:11.863][D][voice_assistant:614]: Desired state set to IDLE
+[15:03:11.863][D][voice_assistant:761]: Event Type: 1
+[15:03:11.863][D][voice_assistant:764]: Assist Pipeline running
+[15:03:11.882][D][voice_assistant:607]: State changed from STOP_MICROPHONE to STREAMING_RESPONSE
+[15:03:11.924][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[15:03:11.925][D][voice_assistant:761]: Event Type: 2
+[15:03:11.925][D][voice_assistant:903]: Assist Pipeline ended
+[15:03:11.925][D][main:1429]: State updated!
+[15:03:11.945][D][main:350]: Announcing!
+[15:03:11.946][D][micro_wake_word:379]: Stopping wake word detection
+[15:03:11.946][D][speaker_media_player:456]: State changed to ANNOUNCING
+[15:03:11.946][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[15:03:11.989][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[15:03:11.989][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[15:03:11.989][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[15:03:12.023][S][media_player]: 'Echo Base Player' >> PLAYING
+[15:03:12.023][S][media_player]:   Volume: 50%
+[15:03:12.035][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[15:03:12.072][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[15:03:12.107][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 24000 Hz sample rate, and 16 bits per sample
+[15:03:12.126][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:03:12.136][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:03:12.136][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:03:13.132][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:03:13.143][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:03:13.150][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:03:13.150][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:03:14.142][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:03:14.162][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:03:14.185][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:03:14.185][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:03:15.159][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:03:15.170][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:03:15.185][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:03:15.185][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:03:16.175][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:03:16.187][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:03:16.235][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:03:16.235][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:03:17.192][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:03:17.203][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:03:17.210][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:03:17.210][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:03:18.209][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:03:18.219][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:03:18.225][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:03:18.226][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:03:19.226][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:03:19.234][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:03:19.246][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:03:19.246][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:03:20.241][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:03:20.253][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:03:20.259][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:03:20.259][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:03:21.256][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:03:21.265][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:03:21.270][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:03:21.270][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:03:22.271][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:03:22.284][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:03:22.292][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:03:22.292][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:03:23.288][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:03:23.302][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:03:23.486][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:03:23.487][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:03:23.880][W][api.connection:2532]: ai-voice-assistant (192.168.xx.xxx): Reading failed CONNECTION_CLOSED errno=128
+[15:03:23.947][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to STOP_MICROPHONE
+[15:03:23.955][D][voice_assistant:614]: Desired state set to IDLE
+[15:03:23.964][D][voice_assistant:607]: State changed from STOP_MICROPHONE to STOPPING_MICROPHONE
+[15:03:23.986][D][voice_assistant:607]: State changed from STOPPING_MICROPHONE to IDLE
+[15:03:24.307][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:03:24.317][D][i2s_audio.speaker:063]: Starting
+[15:03:24.317][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[15:03:24.724][D][i2s_audio.speaker:088]: Stopped
+[15:03:24.725][D][main:1429]: State updated!
+[15:03:24.725][D][micro_wake_word:369]: Starting wake word detection
+[15:03:24.725][D][speaker_media_player:456]: State changed to IDLE
+[15:03:24.771][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:03:24.771][W][micro_wake_word:365]: Wake word detection is already running
+[15:03:24.794][W][micro_wake_word:365]: Wake word detection is already running
+[15:03:24.847][W][micro_wake_word:365]: Wake word detection is already running
+[15:03:24.905][W][component:473]: voice_assistant took a long time for an operation (156 ms), max is 130 ms
+[15:03:24.909][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:03:24.910][D][micro_wake_word:279]: Inference task is running
+[15:03:24.910][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:03:24.910][S][media_player]: 'Echo Base Player' >> IDLE
+[15:03:24.910][S][media_player]:   Volume: 50%
+[15:03:24.925][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:03:25.886][D][voice_assistant:607]: State changed from IDLE to RESPONSE_FINISHED
+[15:03:25.897][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[15:03:25.898][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to IDLE
+[15:03:25.921][D][voice_assistant:614]: Desired state set to IDLE
+[15:03:27.403][D][api:253]: Accept 192.168.xx.xxx
+[15:03:27.503][W][api.connection:1751]: 'ai-voice-assistant' using outdated API 1.6, update to 1.14+
+[15:03:27.505][D][api.connection:2526]: ai-voice-assistant (192.168.xx.xxx): connected
+[15:03:27.887][W][micro_wake_word:365]: Wake word detection is already running
+[15:04:39.792][D][wifi:2480]: Roam scan (-59 dBm, attempt 1/3)
+[15:05:05.872][D][micro_wake_word:334]: Detected 'Okay Nabu' with sliding average probability is 0.88 and max probability is 0.99
+[15:05:05.885][D][micro_wake_word:379]: Stopping wake word detection
+[15:05:05.897][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[15:05:05.911][D][main:1429]: State updated!
+[15:05:05.933][D][main:350]: Announcing!
+[15:05:05.933][D][micro_wake_word:379]: Stopping wake word detection
+[15:05:05.933][D][speaker_media_player:456]: State changed to ANNOUNCING
+[15:05:05.934][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[15:05:05.941][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[15:05:05.941][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[15:05:05.941][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[15:05:05.941][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[15:05:05.991][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[15:05:06.011][S][media_player]: 'Echo Base Player' >> PLAYING
+[15:05:06.011][S][media_player]:   Volume: 50%
+[15:05:06.018][D][i2s_audio.speaker:063]: Starting
+[15:05:06.042][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[15:05:06.539][D][i2s_audio.speaker:088]: Stopped
+[15:05:06.572][D][main:1429]: State updated!
+[15:05:06.598][D][micro_wake_word:369]: Starting wake word detection
+[15:05:06.611][D][speaker_media_player:456]: State changed to IDLE
+[15:05:06.611][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:05:06.627][D][voice_assistant:607]: State changed from IDLE to START_MICROPHONE
+[15:05:06.633][D][voice_assistant:614]: Desired state set to START_PIPELINE
+[15:05:06.633][D][voice_assistant:310]: Starting Microphone
+[15:05:06.633][D][ring_buffer:035]: Created ring buffer with size 16384
+[15:05:06.633][D][voice_assistant:607]: State changed from START_MICROPHONE to STARTING_MICROPHONE
+[15:05:06.646][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:05:06.646][D][micro_wake_word:279]: Inference task is running
+[15:05:06.647][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:05:06.647][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:05:06.672][D][voice_assistant:607]: State changed from STARTING_MICROPHONE to START_PIPELINE
+[15:05:06.678][D][voice_assistant:334]: Requesting start
+[15:05:06.695][D][voice_assistant:607]: State changed from START_PIPELINE to STARTING_PIPELINE
+[15:05:06.696][S][media_player]: 'Echo Base Player' >> IDLE
+[15:05:06.696][S][media_player]:   Volume: 50%
+[15:05:06.742][D][voice_assistant:761]: Event Type: 1
+[15:05:06.769][D][voice_assistant:764]: Assist Pipeline running
+[15:05:06.812][D][voice_assistant:761]: Event Type: 10
+[15:05:06.814][D][voice_assistant:778]: Wake word detected
+[15:05:06.826][D][voice_assistant:761]: Event Type: 3
+[15:05:06.826][D][voice_assistant:783]: STT started
+[15:05:06.826][D][voice_assistant:629]: Client started, streaming microphone
+[15:05:06.826][D][voice_assistant:607]: State changed from STARTING_PIPELINE to STREAMING_MICROPHONE
+[15:05:06.839][D][voice_assistant:614]: Desired state set to STREAMING_MICROPHONE
+[15:05:10.111][D][voice_assistant:761]: Event Type: 11
+[15:05:10.115][D][voice_assistant:964]: Starting STT by VAD
+[15:05:11.013][D][voice_assistant:761]: Event Type: 12
+[15:05:11.025][D][voice_assistant:968]: STT by VAD end
+[15:05:11.025][D][voice_assistant:607]: State changed from STREAMING_MICROPHONE to STOP_MICROPHONE
+[15:05:11.025][D][voice_assistant:614]: Desired state set to AWAITING_RESPONSE
+[15:05:11.058][D][voice_assistant:607]: State changed from STOP_MICROPHONE to STOPPING_MICROPHONE
+[15:05:11.073][D][voice_assistant:607]: State changed from STOPPING_MICROPHONE to AWAITING_RESPONSE
+[15:05:11.079][D][voice_assistant:761]: Event Type: 4
+[15:05:11.083][D][voice_assistant:800]: Speech recognised as: "Wie spät ist es?"
+[15:05:11.083][D][voice_assistant:761]: Event Type: 5
+[15:05:11.125][D][voice_assistant:805]: Intent started
+[15:05:11.125][D][voice_assistant:761]: Event Type: 100
+[15:05:11.126][D][voice_assistant:809]: Intent progress
+[15:05:11.319][D][voice_assistant:761]: Event Type: 100
+[15:05:11.574][D][voice_assistant:809]: Intent progress
+[15:05:11.574][D][voice_assistant:761]: Event Type: 100
+[15:05:11.574][D][voice_assistant:809]: Intent progress
+[15:05:11.574][D][voice_assistant:761]: Event Type: 100
+[15:05:11.581][D][voice_assistant:809]: Intent progress
+[15:05:11.820][D][voice_assistant:761]: Event Type: 100
+[15:05:11.826][D][voice_assistant:809]: Intent progress
+[15:05:12.078][D][voice_assistant:761]: Event Type: 100
+[15:05:12.103][D][voice_assistant:809]: Intent progress
+[15:05:12.326][D][voice_assistant:761]: Event Type: 100
+[15:05:12.330][D][voice_assistant:809]: Intent progress
+[15:05:12.330][D][voice_assistant:761]: Event Type: 6
+[15:05:12.358][D][voice_assistant:761]: Event Type: 7
+[15:05:12.358][W][voice_assistant:851]: No text in TTS_START event
+[15:05:12.375][D][voice_assistant:607]: State changed from AWAITING_RESPONSE to STREAMING_RESPONSE
+[15:05:12.379][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[15:05:12.391][D][voice_assistant:761]: Event Type: 100
+[15:05:12.391][D][voice_assistant:809]: Intent progress
+[15:05:12.450][D][main:1429]: State updated!
+[15:05:12.453][D][main:350]: Announcing!
+[15:05:12.471][D][micro_wake_word:379]: Stopping wake word detection
+[15:05:12.472][D][speaker_media_player:456]: State changed to ANNOUNCING
+[15:05:12.472][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[15:05:12.479][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[15:05:12.503][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[15:05:12.504][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[15:05:12.589][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[15:05:12.600][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[15:05:12.600][S][media_player]: 'Echo Base Player' >> PLAYING
+[15:05:12.600][S][media_player]:   Volume: 50%
+[15:05:12.773][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 24000 Hz sample rate, and 16 bits per sample
+[15:05:12.773][D][voice_assistant:761]: Event Type: 100
+[15:05:12.773][D][voice_assistant:809]: Intent progress
+[15:05:12.773][D][voice_assistant:761]: Event Type: 100
+[15:05:12.921][D][voice_assistant:809]: Intent progress
+[15:05:12.921][D][voice_assistant:761]: Event Type: 100
+[15:05:12.921][D][voice_assistant:809]: Intent progress
+[15:05:12.921][D][i2s_audio.speaker:063]: Starting
+[15:05:13.016][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[15:05:13.036][D][voice_assistant:761]: Event Type: 100
+[15:05:13.036][D][voice_assistant:809]: Intent progress
+[15:05:13.036][D][voice_assistant:761]: Event Type: 100
+[15:05:13.053][D][voice_assistant:809]: Intent progress
+[15:05:13.076][D][voice_assistant:761]: Event Type: 100
+[15:05:13.079][D][voice_assistant:809]: Intent progress
+[15:05:13.080][D][voice_assistant:761]: Event Type: 100
+[15:05:13.085][D][voice_assistant:809]: Intent progress
+[15:05:13.319][D][voice_assistant:761]: Event Type: 100
+[15:05:13.323][D][voice_assistant:809]: Intent progress
+[15:05:13.323][D][voice_assistant:761]: Event Type: 100
+[15:05:13.334][D][voice_assistant:809]: Intent progress
+[15:05:13.360][D][voice_assistant:761]: Event Type: 100
+[15:05:13.361][D][voice_assistant:809]: Intent progress
+[15:05:13.572][D][voice_assistant:761]: Event Type: 100
+[15:05:13.586][D][voice_assistant:809]: Intent progress
+[15:05:15.902][D][i2s_audio.speaker:088]: Stopped
+[15:05:15.938][D][main:1429]: State updated!
+[15:05:15.941][D][speaker_media_player:456]: State changed to IDLE
+[15:05:15.948][D][voice_assistant:475]: Announcement finished playing
+[15:05:15.949][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to RESPONSE_FINISHED
+[15:05:15.949][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[15:05:15.949][D][micro_wake_word:369]: Starting wake word detection
+[15:05:15.999][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to IDLE
+[15:05:16.026][D][voice_assistant:614]: Desired state set to IDLE
+[15:05:16.026][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:05:16.049][D][voice_assistant:607]: State changed from IDLE to STREAMING_RESPONSE
+[15:05:16.057][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[15:05:16.057][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:05:16.057][D][micro_wake_word:279]: Inference task is running
+[15:05:16.057][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:05:16.068][S][media_player]: 'Echo Base Player' >> IDLE
+[15:05:16.068][S][media_player]:   Volume: 50%
+[15:05:16.087][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:05:16.088][D][main:1429]: State updated!
+[15:05:16.088][D][main:350]: Announcing!
+[15:05:16.089][D][micro_wake_word:379]: Stopping wake word detection
+[15:05:16.118][D][speaker_media_player:456]: State changed to ANNOUNCING
+[15:05:16.118][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[15:05:16.134][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[15:05:16.134][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[15:05:16.156][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[15:05:16.236][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[15:05:16.236][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[15:05:16.236][S][media_player]: 'Echo Base Player' >> PLAYING
+[15:05:16.236][S][media_player]:   Volume: 50%
+[15:05:16.266][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 24000 Hz sample rate, and 16 bits per sample
+[15:05:16.308][D][i2s_audio.speaker:063]: Starting
+[15:05:16.341][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[15:05:17.998][D][i2s_audio.speaker:088]: Stopped
+[15:05:18.034][D][main:1429]: State updated!
+[15:05:18.039][D][speaker_media_player:456]: State changed to IDLE
+[15:05:18.039][D][voice_assistant:475]: Announcement finished playing
+[15:05:18.039][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to RESPONSE_FINISHED
+[15:05:18.043][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[15:05:18.056][D][micro_wake_word:369]: Starting wake word detection
+[15:05:18.098][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to IDLE
+[15:05:18.098][D][voice_assistant:614]: Desired state set to IDLE
+[15:05:18.118][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:05:18.118][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:05:18.118][D][micro_wake_word:279]: Inference task is running
+[15:05:18.118][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:05:18.137][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:05:18.137][S][media_player]: 'Echo Base Player' >> IDLE
+[15:05:18.137][S][media_player]:   Volume: 50%
+[15:05:18.226][D][voice_assistant:607]: State changed from IDLE to STREAMING_RESPONSE
+[15:05:18.281][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[15:05:18.282][D][main:1429]: State updated!
+[15:05:18.282][D][main:350]: Announcing!
+[15:05:18.290][D][micro_wake_word:379]: Stopping wake word detection
+[15:05:18.291][D][speaker_media_player:456]: State changed to ANNOUNCING
+[15:05:18.291][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[15:05:18.306][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[15:05:18.380][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[15:05:18.380][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[15:05:18.380][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[15:05:18.380][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[15:05:18.405][S][media_player]: 'Echo Base Player' >> PLAYING
+[15:05:18.405][S][media_player]:   Volume: 50%
+[15:05:18.486][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 24000 Hz sample rate, and 16 bits per sample
+[15:05:18.537][D][i2s_audio.speaker:063]: Starting
+[15:05:18.559][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[15:05:20.586][D][i2s_audio.speaker:088]: Stopped
+[15:05:20.624][D][main:1429]: State updated!
+[15:05:20.624][D][speaker_media_player:456]: State changed to IDLE
+[15:05:20.624][D][voice_assistant:475]: Announcement finished playing
+[15:05:20.624][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to RESPONSE_FINISHED
+[15:05:20.649][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[15:05:20.649][D][micro_wake_word:369]: Starting wake word detection
+[15:05:20.666][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to IDLE
+[15:05:20.676][D][voice_assistant:614]: Desired state set to IDLE
+[15:05:20.694][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:05:20.758][D][voice_assistant:607]: State changed from IDLE to STREAMING_RESPONSE
+[15:05:20.758][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[15:05:20.758][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:05:20.758][D][micro_wake_word:279]: Inference task is running
+[15:05:20.758][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:05:20.759][S][media_player]: 'Echo Base Player' >> IDLE
+[15:05:20.759][S][media_player]:   Volume: 50%
+[15:05:20.774][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:05:20.774][D][main:1429]: State updated!
+[15:05:20.774][D][main:350]: Announcing!
+[15:05:20.779][D][micro_wake_word:379]: Stopping wake word detection
+[15:05:20.803][D][speaker_media_player:456]: State changed to ANNOUNCING
+[15:05:20.803][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[15:05:20.805][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[15:05:20.805][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[15:05:20.832][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[15:05:20.862][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[15:05:20.869][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[15:05:20.869][S][media_player]: 'Echo Base Player' >> PLAYING
+[15:05:20.869][S][media_player]:   Volume: 50%
+[15:05:21.009][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 24000 Hz sample rate, and 16 bits per sample
+[15:05:21.063][D][i2s_audio.speaker:063]: Starting
+[15:05:21.112][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[15:05:23.506][D][i2s_audio.speaker:088]: Stopped
+[15:05:23.544][D][main:1429]: State updated!
+[15:05:23.547][D][speaker_media_player:456]: State changed to IDLE
+[15:05:23.547][D][voice_assistant:475]: Announcement finished playing
+[15:05:23.547][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to RESPONSE_FINISHED
+[15:05:23.567][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[15:05:23.567][D][micro_wake_word:369]: Starting wake word detection
+[15:05:23.610][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to IDLE
+[15:05:23.611][D][voice_assistant:614]: Desired state set to IDLE
+[15:05:23.624][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:05:23.625][D][voice_assistant:761]: Event Type: 8
+[15:05:23.625][W][voice_assistant:877]: No url in TTS_END event
+[15:05:23.625][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:05:23.649][D][micro_wake_word:279]: Inference task is running
+[15:05:23.649][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:05:23.649][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:05:23.650][S][media_player]: 'Echo Base Player' >> IDLE
+[15:05:23.650][S][media_player]:   Volume: 50%
+[15:05:23.665][D][voice_assistant:761]: Event Type: 2
+[15:05:23.675][D][voice_assistant:903]: Assist Pipeline ended
+[15:05:24.180][W][micro_wake_word:365]: Wake word detection is already running
+[15:05:27.283][W][api.connection:2532]: ai-voice-assistant (192.168.xx.xxx): Reading failed CONNECTION_CLOSED errno=128
+[15:05:27.304][D][micro_wake_word:379]: Stopping wake word detection
+[15:05:27.350][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[15:05:27.368][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[15:05:27.371][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[15:05:27.403][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[15:05:30.534][D][api:253]: Accept 192.168.xx.xxx
+[15:05:30.592][W][api.connection:1751]: 'ai-voice-assistant' using outdated API 1.6, update to 1.14+
+[15:05:30.594][D][api.connection:2526]: ai-voice-assistant (192.168.xx.xxx): connected
+[15:05:30.943][D][micro_wake_word:369]: Starting wake word detection
+[15:05:30.989][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:05:31.016][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:05:31.020][D][micro_wake_word:279]: Inference task is running
+[15:05:31.051][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:05:31.051][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:05:35.303][D][micro_wake_word:334]: Detected 'Okay Nabu' with sliding average probability is 0.91 and max probability is 0.99
+[15:05:35.307][D][micro_wake_word:379]: Stopping wake word detection
+[15:05:35.346][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[15:05:35.347][D][main:1429]: State updated!
+[15:05:35.347][D][main:350]: Announcing!
+[15:05:35.347][D][micro_wake_word:379]: Stopping wake word detection
+[15:05:35.374][D][speaker_media_player:456]: State changed to ANNOUNCING
+[15:05:35.374][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[15:05:35.374][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[15:05:35.374][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[15:05:35.384][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[15:05:35.384][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[15:05:35.410][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 48000 Hz sample rate, and 16 bits per sample
+[15:05:35.432][D][i2s_audio.speaker:063]: Starting
+[15:05:35.450][D][ring_buffer:035][speaker_task]: Created ring buffer with size 48000
+[15:05:35.468][S][media_player]: 'Echo Base Player' >> PLAYING
+[15:05:35.468][S][media_player]:   Volume: 50%
+[15:05:35.938][D][i2s_audio.speaker:088]: Stopped
+[15:05:35.980][D][main:1429]: State updated!
+[15:05:35.986][D][micro_wake_word:369]: Starting wake word detection
+[15:05:36.009][D][speaker_media_player:456]: State changed to IDLE
+[15:05:36.021][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:05:36.033][D][voice_assistant:607]: State changed from IDLE to START_MICROPHONE
+[15:05:36.033][D][voice_assistant:614]: Desired state set to START_PIPELINE
+[15:05:36.033][D][voice_assistant:310]: Starting Microphone
+[15:05:36.037][D][ring_buffer:035]: Created ring buffer with size 16384
+[15:05:36.037][D][voice_assistant:607]: State changed from START_MICROPHONE to STARTING_MICROPHONE
+[15:05:36.037][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:05:36.037][D][micro_wake_word:279]: Inference task is running
+[15:05:36.056][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:05:36.056][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:05:36.061][D][voice_assistant:607]: State changed from STARTING_MICROPHONE to START_PIPELINE
+[15:05:36.085][D][voice_assistant:334]: Requesting start
+[15:05:36.090][D][voice_assistant:607]: State changed from START_PIPELINE to STARTING_PIPELINE
+[15:05:36.090][S][media_player]: 'Echo Base Player' >> IDLE
+[15:05:36.090][S][media_player]:   Volume: 50%
+[15:05:36.507][D][voice_assistant:761]: Event Type: 1
+[15:05:36.550][D][voice_assistant:764]: Assist Pipeline running
+[15:05:36.665][D][voice_assistant:761]: Event Type: 10
+[15:05:36.676][D][voice_assistant:778]: Wake word detected
+[15:05:36.676][D][voice_assistant:761]: Event Type: 3
+[15:05:36.676][D][voice_assistant:783]: STT started
+[15:05:36.676][D][voice_assistant:629]: Client started, streaming microphone
+[15:05:36.676][D][voice_assistant:607]: State changed from STARTING_PIPELINE to STREAMING_MICROPHONE
+[15:05:36.706][D][voice_assistant:614]: Desired state set to STREAMING_MICROPHONE
+[15:05:51.325][D][voice_assistant:761]: Event Type: 4
+[15:05:51.370][W][voice_assistant:794]: No text in STT_END event
+[15:05:51.374][D][voice_assistant:761]: Event Type: 2
+[15:05:51.379][D][voice_assistant:903]: Assist Pipeline ended
+[15:05:51.380][D][voice_assistant:607]: State changed from STREAMING_MICROPHONE to STOP_MICROPHONE
+[15:05:51.380][D][voice_assistant:614]: Desired state set to IDLE
+[15:05:51.380][D][voice_assistant:761]: Event Type: 1
+[15:05:51.388][D][voice_assistant:764]: Assist Pipeline running
+[15:05:51.416][D][voice_assistant:607]: State changed from STOP_MICROPHONE to STREAMING_RESPONSE
+[15:05:51.427][D][voice_assistant:614]: Desired state set to STREAMING_RESPONSE
+[15:05:51.427][D][voice_assistant:761]: Event Type: 2
+[15:05:51.450][D][voice_assistant:903]: Assist Pipeline ended
+[15:05:51.475][D][main:1429]: State updated!
+[15:05:51.481][D][main:350]: Announcing!
+[15:05:51.482][D][micro_wake_word:379]: Stopping wake word detection
+[15:05:51.490][D][speaker_media_player:456]: State changed to ANNOUNCING
+[15:05:51.509][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[15:05:51.509][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[15:05:51.509][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[15:05:51.525][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[15:05:51.559][D][ring_buffer:035][ann_read]: Created ring buffer with size 1000000
+[15:05:51.578][D][speaker_media_player.pipeline:118]: Reading FLAC file type
+[15:05:51.582][S][media_player]: 'Echo Base Player' >> PLAYING
+[15:05:51.582][S][media_player]:   Volume: 50%
+[15:05:51.633][D][speaker_media_player.pipeline:128]: Decoded audio has 1 channels, 24000 Hz sample rate, and 16 bits per sample
+[15:05:51.652][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:05:51.658][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:05:51.658][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:05:52.659][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:05:52.667][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:05:52.667][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:05:52.667][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:05:53.670][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:05:53.689][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:05:53.689][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:05:53.689][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:05:54.687][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:05:54.708][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:05:54.708][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:05:54.708][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:05:55.702][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:05:55.722][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:05:55.722][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:05:55.722][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:05:56.768][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:05:56.784][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:05:56.784][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:05:56.784][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:05:57.735][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:05:57.744][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:05:57.748][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:05:57.748][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:05:58.751][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:05:58.761][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:05:58.761][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:05:58.761][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:05:59.764][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:05:59.777][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:05:59.777][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:05:59.777][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:06:00.779][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:06:00.794][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:06:00.794][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:06:00.805][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:06:01.798][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:06:01.809][E][i2s_audio.speaker.std:401]: Parent bus is busy
+[15:06:01.809][E][i2s_audio.speaker:115]: Driver failed to start; retrying in 1 second
+[15:06:01.809][E][component:349]: i2s_audio.speaker set Error flag: unspecified
+[15:06:02.405][W][api.connection:2532]: ai-voice-assistant (192.168.xx.xxx): Reading failed CONNECTION_CLOSED errno=128
+[15:06:02.498][D][voice_assistant:607]: State changed from STREAMING_RESPONSE to STOP_MICROPHONE
+[15:06:02.509][D][voice_assistant:614]: Desired state set to IDLE
+[15:06:02.518][D][voice_assistant:607]: State changed from STOP_MICROPHONE to STOPPING_MICROPHONE
+[15:06:02.539][D][voice_assistant:607]: State changed from STOPPING_MICROPHONE to IDLE
+[15:06:02.811][E][component:374]: i2s_audio.speaker cleared Error flag
+[15:06:02.825][D][i2s_audio.speaker:063]: Starting
+[15:06:02.825][D][ring_buffer:035][speaker_task]: Created ring buffer with size 24000
+[15:06:03.159][D][i2s_audio.speaker:088]: Stopped
+[15:06:03.201][D][main:1429]: State updated!
+[15:06:03.201][D][micro_wake_word:369]: Starting wake word detection
+[15:06:03.229][D][speaker_media_player:456]: State changed to IDLE
+[15:06:03.242][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:06:03.256][W][micro_wake_word:365]: Wake word detection is already running
+[15:06:03.287][W][micro_wake_word:365]: Wake word detection is already running
+[15:06:03.339][W][micro_wake_word:365]: Wake word detection is already running
+[15:06:03.381][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:06:03.386][D][micro_wake_word:279]: Inference task is running
+[15:06:03.386][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:06:03.386][S][media_player]: 'Echo Base Player' >> IDLE
+[15:06:03.386][S][media_player]:   Volume: 50%
+[15:06:03.404][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:06:04.404][D][voice_assistant:607]: State changed from IDLE to RESPONSE_FINISHED
+[15:06:04.418][D][voice_assistant:614]: Desired state set to RESPONSE_FINISHED
+[15:06:04.419][D][voice_assistant:607]: State changed from RESPONSE_FINISHED to IDLE
+[15:06:04.426][D][voice_assistant:614]: Desired state set to IDLE
+[15:06:05.511][D][api:253]: Accept 192.168.xx.xxx
+[15:06:05.578][W][api.connection:1751]: 'ai-voice-assistant' using outdated API 1.6, update to 1.14+
+[15:06:05.584][D][api.connection:2526]: ai-voice-assistant (192.168.xx.xxx): connected
+[15:06:05.904][W][micro_wake_word:365]: Wake word detection is already running
+[15:06:57.929][W][api.connection:2532]: ai-voice-assistant (192.168.xx.xxx): Reading failed CONNECTION_CLOSED errno=128
+[15:06:57.933][D][micro_wake_word:379]: Stopping wake word detection
+[15:06:58.016][D][micro_wake_word:387]: State changed from DETECTING_WAKE_WORD to STOPPING
+[15:06:58.022][D][micro_wake_word:286]: Inference task is stopping, deallocating buffers
+[15:06:58.031][D][micro_wake_word:291]: Inference task is finished, freeing task resources
+[15:06:58.031][D][micro_wake_word:387]: State changed from STOPPING to STOPPED
+[15:07:01.791][D][api:253]: Accept 192.168.xx.xxx
+[15:07:01.875][W][api.connection:1751]: 'ai-voice-assistant' using outdated API 1.6, update to 1.14+
+[15:07:01.881][D][api.connection:2526]: ai-voice-assistant (192.168.xx.xxx): connected
+[15:07:02.145][D][micro_wake_word:369]: Starting wake word detection
+[15:07:02.195][D][micro_wake_word:387]: State changed from STOPPED to STARTING
+[15:07:02.212][D][micro_wake_word:274]: Inference task has started, attempting to allocate memory for buffers
+[15:07:02.231][D][micro_wake_word:279]: Inference task is running
+[15:07:02.231][D][micro_wake_word:387]: State changed from STARTING to DETECTING_WAKE_WORD
+[15:07:02.231][D][ring_buffer:035][mww]: Created ring buffer with size 3840
+[15:09:39.512][D][wifi:2480]: Roam scan (-61 dBm, attempt 2/3)
+[15:10:36.093][D][voice_assistant:209]: reset conversation ID
+[15:10:54.526][W][component:473]: display took a long time for an operation (55 ms), max is 50 ms
+[15:14:39.515][D][wifi:2480]: Roam scan (-58 dBm, attempt 3/3)

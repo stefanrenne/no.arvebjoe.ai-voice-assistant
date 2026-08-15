@@ -60,6 +60,12 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
   // ESP protocol around the decisions these two return.
   private turn = new TurnStateMachine();
   private audioOutput!: AudioOutputPipeline;
+  // Set by onDeleted() before it starts nulling fields. A closing transport can
+  // still emit one last event after teardown (a websocket 'close' lands a tick
+  // after close()), and those handlers reach into collaborators that are already
+  // gone. Detaching the listeners is the real fix; this makes the abort path
+  // inert even if some other late callback slips through.
+  private destroyed = false;
   // Which voice provider this.provider was built from (factory id). Compared in
   // handleSettingsChange so switching the 'voice_provider' setting rebuilds the
   // provider at runtime instead of silently keeping the old one until restart.
@@ -1134,6 +1140,11 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
 
 
   private abortCurrentTurn(reason: string, playError: boolean = false): void {
+    // Nothing left to abort once the device is torn down, and every collaborator
+    // this touches (audioOutput, esp) has been nulled by then.
+    if (this.destroyed) {
+      return;
+    }
     this.clearNoSpeechTimeout();
     // ONE reset each: the machine clears every turn/session flag, the pipeline
     // invalidates queued and in-flight segment work (generation bump) and drops
@@ -1988,6 +1999,7 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
    */
   async onDeleted(): Promise<void> {
     this.logger.info('Device has been deleted');
+    this.destroyed = true;
 
     // Clean up settings subscription
     if (this.settingsUnsubscribe) {
@@ -2022,6 +2034,11 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
     // pipeline unsubscribes its settings listener there), same as rebuildProvider.
     try {
       if (this.provider) {
+        // Detach FIRST, exactly as the ESP client above does: close() only asks
+        // the websocket to shut down, and its 'close' callback fires a tick later
+        // — by which point audioOutput/esp are null and the 'close' handler's
+        // abortCurrentTurn() would throw (portal crash report, 2026-08-15).
+        (this.provider as any).removeAllListeners?.();
         if (typeof (this.provider as any).destroy === 'function') {
           (this.provider as any).destroy();
         } else {

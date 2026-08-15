@@ -1420,3 +1420,43 @@ note are correct as written). `VoiceAssistantAudio` gained `data2 = 3`, a **seco
 channel** for dual-mic configs, not a continuation of `data` — ignoring it is right and it must not
 be concatenated. `VoiceAssistantConfigurationRequest` gained `external_wake_words` (client→server,
 optional). No renumbering or removals affecting anything we send or read.
+
+## 19. A deleted device kept receiving events from its provider (portal crash, 2026-08-15)
+
+**Crash report from the Homey developer portal**, on an M5Stack AtomS3R running the Gemini
+provider:
+
+```
+TypeError: Cannot read properties of null (reading 'abort')
+    at abortCurrentTurn (voice-assistant-device.mjs:978)
+    at GeminiLiveProvider.<anonymous> (voice-assistant-device.mjs:877)
+    at WebSocket.onclose (gemini-live-provider.mjs:207)
+```
+
+**Root cause: `onDeleted()` detached the ESP client's listeners but not the provider's.** It was
+already explicit about the ESP side — `this.esp.removeAllListeners()` *"before disconnecting to
+prevent any event-triggered actions"* — and `rebuildProvider()` did the same for the provider on a
+runtime provider switch. Only the delete path skipped it, and it then nulled `audioOutput`, `esp`
+and `provider`. `close()`/`destroy()` merely *asks* the websocket to shut down; the `onclose`
+callback fires a tick later and still reached the device's `provider.on('close')` handler, whose
+`abortCurrentTurn()` calls `this.audioOutput.abort()` on a null field. Triggered by deleting or
+re-pairing a device while its provider socket is open — which the AtomS3R tester had been doing
+repeatedly (issue #44).
+
+Nothing about it was Gemini- or driver-specific: no provider self-detaches in `destroy()`, and
+`error` / `Healthy` / `Unhealthy` / the audio handlers all pointed at the same dead instance.
+
+**Fix, in two parts.** `onDeleted()` now calls `(this.provider as any).removeAllListeners?.()`
+before `destroy()`/`close()`, mirroring the ESP client above it — that is the real fix, since it
+stops every late event at the source. Belt-and-braces, a `destroyed` flag set at the top of
+`onDeleted()` makes `abortCurrentTurn()` return immediately, so any path that still slips through
+is inert rather than throwing; the ESP calls inside it were already dead by then and only survived
+because they sit inside a `try`.
+
+**The mock lied, so the bug was untestable.** `tests/mocks/mock-voice-provider.mts` had
+`destroy()` call `this.removeAllListeners()` on itself, which no real provider does — that alone
+would have made a regression test pass against the broken code. The mock now matches
+`GeminiLiveProvider`/`LocalPipelineProvider`. Three tests in
+`tests/voice-assistant-device.test.mts` ("teardown — a deleted device must not be reachable from
+its transports") cover the late `close`, the full listener detach, and the `abortCurrentTurn`
+guard; all three fail against the pre-fix device.

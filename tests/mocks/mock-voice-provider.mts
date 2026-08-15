@@ -22,7 +22,11 @@ export class FakeVoiceProvider extends EventEmitter {
 
     async start(): Promise<void> { this.started = true; this.rec('start'); }
     close(): void { this.started = false; this.rec('close'); }
-    destroy(): void { this.destroyed = true; this.rec('destroy'); this.removeAllListeners(); }
+    // Deliberately does NOT removeAllListeners() on itself — no real provider does
+    // (see GeminiLiveProvider/LocalPipelineProvider.destroy), and a mock that
+    // self-detaches hides the bug where the DEVICE forgets to detach and a late
+    // websocket 'close' lands on a torn-down device.
+    destroy(): void { this.destroyed = true; this.rec('destroy'); }
     async restart(): Promise<void> { this.rec('restart'); }
     isConnected(): boolean { return this.started; }
     hasApiKey(): boolean { return true; }

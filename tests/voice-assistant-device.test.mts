@@ -708,6 +708,54 @@ describe('VoiceAssistantDevice (harness)', () => {
         });
     });
 
+    describe('teardown — a deleted device must not be reachable from its transports', () => {
+        // Portal crash report 2026-08-15:
+        //   TypeError: Cannot read properties of null (reading 'abort')
+        //     at abortCurrentTurn -> provider.on('close') -> WebSocket.onclose
+        // onDeleted() nulls audioOutput/esp but used to leave the provider's
+        // listeners attached, and close() only ASKS the socket to shut down — its
+        // 'close' callback fires a tick later, on a device that no longer has the
+        // collaborators the handler reaches into.
+        it('survives a late provider close after onDeleted', async () => {
+            const h = await createHarness();
+            startTurn(h);                       // a turn is in flight when the user deletes
+            const provider = h.provider;
+
+            await (h.device as any).onDeleted();
+
+            // The websocket finally closes, one tick after close()/destroy().
+            expect(() => provider.emit('close')).not.toThrow();
+        });
+
+        it('detaches every provider listener on delete, not just close', async () => {
+            const h = await createHarness();
+            const provider = h.provider;
+            // onInit wired these; if any survives teardown it can still reach a
+            // nulled audioOutput/esp.
+            expect(provider.listenerCount('close')).toBeGreaterThan(0);
+
+            await (h.device as any).onDeleted();
+
+            for (const event of ['close', 'error', 'Unhealthy', 'Healthy', 'audio.delta', 'response.done']) {
+                expect(provider.listenerCount(event)).toBe(0);
+            }
+            // ('error' is not re-emitted here: EventEmitter throws the payload
+            // itself once nothing is listening, which is Node's contract, not our
+            // bug — the listener count above is what proves it is detached.)
+            expect(() => provider.emit('Unhealthy')).not.toThrow();
+        });
+
+        it('abortCurrentTurn is inert once the device is torn down', async () => {
+            const h = await createHarness();
+            startTurn(h);
+            await (h.device as any).onDeleted();
+
+            // Belt-and-braces: any path that slips past the detach must no-op
+            // rather than throw on the nulled audioOutput.
+            expect(() => (h.device as any).abortCurrentTurn('late event', true)).not.toThrow();
+        });
+    });
+
     describe('settings save clears stale conversation context', () => {
         // The snapshot every save delivers when nothing provider-affecting changed
         // (matches the harness defaults, so needRestart stays false).
