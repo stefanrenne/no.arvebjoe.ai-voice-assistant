@@ -27,6 +27,15 @@
       rewritten alongside. Users now have a manual escape hatch (switching the tile's *Start
       conversation* off cancels the turn), so this is a robustness item, not an emergency.
 
+## Crash reports (Homey developer portal, seen 2026-08-15)
+
+- [x] ~~**`TypeError: Cannot read properties of null (reading 'abort')`**~~ — a deleted device kept
+      receiving events from its provider, because `onDeleted()` detached the ESP client's listeners
+      but not the provider's. Fixed; full write-up in [`COMPLETED.md`](./COMPLETED.md) §19.
+
+- [ ] **Second portal crash report — trace not captured yet.** Paste it in and triage; noted here so
+      it isn't lost.
+
 ## Diagnosability — "Unavailable / Connected: no" says nothing about *what* failed
 
 **Field report 2026-08-15 (forum), Voice PE firmware 26.6.0, app v1.4.11, Homey Pro Early 2023,
@@ -167,45 +176,117 @@ arrive"** shaped, and reading M5Stack's YAML against our code found no defect on
 mute switch really is `mute_microphone` (`scoreMuteCandidate()` scores it 1), the vendored
 `es8311` component does implement `set_volume`, ESPHome applies volume to the *announcement*
 speaker (our playback path) and `volume_min: 0.5`/`volume_max: 0.8` still spans roughly −32 dB
-to +6.5 dB at the DAC. **All of it is blocked on the ESPHome device log** — `logger: level: DEBUG`
-is already on in the stock config and the tester flashes his own firmware, so one log covering a
-mute, a volume change, a timer and a hang settles all four at once. Requested 2026-08-10.
+to +6.5 dB at the DAC. All of it was blocked on the ESPHome device log, requested 2026-08-10 —
+**that log arrived 2026-08-14 and is read below.**
 
-- [ ] **Mute switch does not work** (field report). Wiring looks correct end to end; needs the
-      device log to see whether `SwitchCommandRequest` arrives and whether `microphone.mute`
-      runs. Cosmetic firmware quirk to expect while reading it: `on_announcement` paints the
-      muted page during *any* announcement, so the mic-off icon is not proof of a mute.
-- [ ] **Volume does not work** (field report). Same: needs the log to see whether
-      `MediaPlayerCommandRequest` arrives. The clamp is not the explanation.
+**Third hardware report, 2026-08-14 — the device log arrived**
+([issue #44](https://github.com/arvebjoe/no.arvebjoe.ai-voice-assistant/issues/44), saved verbatim
+as [`docs/m5stack-atoms3r/logs/2026-08-14-mirko-ug.txt`](./docs/m5stack-atoms3r/logs/2026-08-14-mirko-ug.txt)).
+20 minutes, 2089 lines, `14:49:26` → `15:10:54`, firmware **ESPHome 2026.7.4** (compiled
+2026-08-07), Noise encryption **on**. Reporter's summary: mute dead, volume dead, timer fine but
+"the device crashed afterwards and I had to pull the plug", Sonos-over-URL failed, and it "keeps
+hanging". Four things the log settles:
+
+1. **Mute and volume were the `object_id` bug — already fixed, not yet shipped to him.** Every
+   reconnect logs `'ai-voice-assistant' using outdated API 1.6, update to 1.14+`, so the build he
+   ran predates `29338cf`; and 2026.7.0+ never sends `object_id` to *any* client
+   ([`COMPLETED.md`](./COMPLETED.md) §18). So **no** entity key resolved — not the mute switch,
+   not the volume number, not the media player. Evidence: pressing mute produces not one `switch`
+   line in the whole log, and `setze die Lautstärke auf 60%` is recognised at `14:56:46` while all
+   60-odd `[S][media_player]` dumps from `14:49` to `15:10` still read `Volume: 50%`. Nothing to
+   investigate — this needs a re-test on a build carrying `29338cf` (see the last item).
+2. **The timer worked end to end.** `14:50:06` timer created (120 s), countdown events at 90 / 60 /
+   30 s, `Type: 3` finished at `14:52:06`, chime played and repeat-played ~10× to `14:52:40`. The
+   earlier "no chime" report does not reproduce.
+3. **The I2S bus wedges: the mic and the speaker cannot both hold it, and that is what "keeps
+   hanging" means.** `[E][i2s_audio.speaker.std:401] Parent bus is busy` + `Driver failed to start;
+   retrying in 1 second` fires 139 times, and the clusters line up **exactly** with the dropped
+   turns: the retry loop starts on the same second our 24 kHz reply FLAC begins decoding
+   (`14:56:01`, `14:57:08`, `15:03:12`, `15:05:51`), runs for 10–25 s with **no audio playing**,
+   and stops on the same second the API connection drops — after which `i2s_audio.speaker:063
+   Starting` finally succeeds, because the disconnect made the VA stop the microphone and release
+   the bus. The AtomS3R mic (GPIO7) and Echo Base speaker (GPIO5) share one I2S peripheral, and
+   `micro_wake_word` re-arms the mic the moment the VA leaves `STREAMING_MICROPHONE` — the Voice PE
+   has separate buses and never shows this. It is a race, not a constant: plenty of turns
+   (`14:56:39`, `14:56:49`, `15:02:19`) announce and play normally.
+4. **Nine disconnects in 20 minutes, all closed from our end** — `Reading failed CONNECTION_CLOSED
+   errno=128`, and the device reacts by dropping `STREAMING_RESPONSE` → `IDLE`, i.e. **the reply is
+   cut off mid-sentence**. Only one of them (`15:05:27`, exactly 120 s after connect) is the ping
+   watchdog; the rest sit at 17 / 32 / 48 / 52 / 190 / 199 s, so `PING_TIMEOUT` (120 s,
+   `esp-voice-assistant-client.mts:205`) does not explain them. The unconditional
+   `handleDisconnect()` callers are the suspects — RX-buffer overflow (`:505`), frame-decode
+   failure (`:520`) and Noise decrypt failure — and this is the **only** tester running Noise
+   encryption.
+
+- [x] ~~**Mute switch does not work**~~ — explained by (1) above: no entity key, so no
+      `SwitchCommandRequest` was ever sent. Fixed by `29338cf`; **re-test**, don't investigate.
+- [x] ~~**Volume does not work**~~ — same cause, same fix, same re-test.
+- [ ] **Find out who closes the TCP connection mid-reply** (log finding 4). The device log cannot
+      name the path — **ask for the Homey-side log for the same window** (`homey app run --remote`,
+      or point `remote_log_*` at a collector), where every one of the three candidate paths logs a
+      warn/error naming itself. If it is the Noise decrypt/frame path, that is a real bug in
+      `noise-frame-codec.mts` under sustained traffic and it affects every encrypted device, not
+      just this one. This is the top item on the list: it is ours, it is reproducible, and it is
+      what the reporter experiences as "not stable enough for regular use".
+- [ ] **Decide what we do about the wedged I2S bus** (log finding 3). Firmware-side in origin, but
+      it strands *our* announce: nothing plays, no `announce_finished` ever comes, and the turn only
+      ends when the connection drops. Two angles — (a) an announce watchdog on our side that gives
+      up and ends the turn cleanly instead of leaving it hanging, and (b) report it to M5Stack /
+      check whether their `i2s_audio` can be configured duplex, since a satellite that cannot speak
+      while its wake-word engine listens is a hardware-config bug. (a) is ours and worth doing
+      regardless.
+- [ ] **Device rebooted at ~`14:53:35`** (`safe_mode:142 Boot seems successful; resetting boot loop
+      counter` at `14:54:48`, plus the CLI's `Processing unexpected disconnect`) — this is the
+      "crashed after the timer" report. Immediately before it: twelve announce cycles between
+      `14:52:06` and `14:53:34` (ten of them the timer-chime loop, inside 35 s), each allocating a
+      fresh **1 MB** `ann_read` ring buffer, on top of a
+      `Parent bus is busy` retry loop running continuously from `14:52:41` to `14:53:43`. Suspect
+      PSRAM exhaustion / fragmentation on the firmware side. No backtrace survived the reset, so
+      this stays a hypothesis; ask him to capture the crash dump if it recurs.
 - [ ] **`onoff` appears to do nothing** (field report). It should chime and open the mic
       (announce + `start_conversation`). ESPHome sets ANNOUNCE **and** START_CONVERSATION
       whenever the VA has a `media_player:`, and this config does — so if it genuinely does
       nothing, that is a real bug. The tile is now labelled *"Start conversation"* and off
       cancels the running turn, which removes the "is this a power switch?" confusion but not
-      the underlying report.
-- [ ] **No timer finish chime** (field report). `on_timer_finished` → `switch.turn_on:
-      timer_ringing` → repeat-plays `timer_finished_sound`, and `set_has_timers(True)` follows
-      from `on_timer_finished` alone, so `FEATURE_TIMERS` *is* advertised and our timer tool
-      registers. First thing to establish: did the assistant **say** it had set the timer? If
-      not this is the Norwegian phrasing miss under "Watch items", not a device problem.
-      **The missing countdown is expected and won't be fixed** — the firmware has no timer UI at
-      all (`voice_assist_timer_finished_phase_id: "20"` is defined but never appears as a `case`
-      in `draw_display`, so it falls through to the idle page).
-- [ ] **Session hangs — "stayed in listening mode and did not exit"** (field report). Prime
-      suspect is the missing max-utterance cap (own section above), which this hardware's
-      `auto_gain: 31dBFS` could plausibly trigger. Firmware-side candidate to rule out from the
-      log: `on_end` contains an **unbounded** `wait_until (not media_player.is_announcing AND
-      not speaker.is_playing)` before it restarts `micro_wake_word` — if that never resolves the
-      device goes deaf with no recovery.
+      the underlying report. **Not exercised in the 2026-08-14 log** — every turn in it starts from
+      the wake word — so this one is still untouched by evidence and needs its own test.
+- [x] ~~**No timer finish chime**~~ — does not reproduce; the 2026-08-14 log shows the full
+      120 s countdown and the chime repeat-playing (log finding 2). **The missing countdown *display*
+      is expected and won't be fixed** — the firmware has no timer UI at all
+      (`voice_assist_timer_finished_phase_id: "20"` is defined but never appears as a `case` in
+      `draw_display`, so it falls through to the idle page).
+- [ ] **The timer chime rings until the button is pressed, and nothing else stops it.** Firmware
+      repeat-plays `timer_finished_sound` while the `timer_ringing` switch is on; the log shows ~10
+      repeats and no path that clears it from our side. Decide whether the assistant should be able
+      to stop a ringing timer by voice (and whether we should clear `timer_ringing` when a turn
+      starts) — ten 1 MB announce buffers in 35 s is also the run-up to the reboot above.
+- [ ] **Session hangs — "stayed in listening mode and did not exit"** (field report). Two distinct
+      causes now, and the log points at the second: the missing max-utterance cap (own section
+      above), and the wedged-bus/dropped-connection pair (log findings 3 and 4), which is what
+      actually shows up in this log. Firmware-side candidate still worth ruling out: `on_end`
+      contains an **unbounded** `wait_until (not media_player.is_announcing AND not
+      speaker.is_playing)` before it restarts `micro_wake_word` — and with the I2S bus wedged that
+      condition is exactly what fails to resolve.
 - [ ] **Confirm the identity sniff on a device with its STOCK name**, and the **mDNS scan** with
       it. Both field reports came from renamed units, and a renamed device never appears in the
       network scan — manual IP is the documented route for those.
 - [ ] **Tune `initial_audio_skip` / `followup_audio_skip`** against the wake sound; both
-      default to 0 and were never measured on this hardware.
+      default to 0 and were never measured on this hardware. The log now shows why it matters: the
+      turn at `15:02:40` transcribed **`"오케이, 나부."`** — the device's own *Okay Nabu* wake sound
+      coming back through the mic — and three further turns burned 15 s of open mic each only to end
+      `No text in STT_END event` (`14:57:08`, `15:03:11`, `15:05:51`).
+- [ ] **Sonos-over-URL failed and needed a restart** (field report, 2026-08-14). The device log is
+      blind to this by definition — the `WARNING Disconnected from API` gap from `14:57:17` to
+      `15:00:04` is all it shows. Needs a Homey-side log plus which Flow card he used; the
+      *Reply audio ready* card path was rewritten on `fix/reply-audio-ready` (MP3, reachable IP)
+      after his build, so re-test before digging.
 - [ ] **Replace the stand-in artwork.** `drivers/m5stack-atoms3r/assets/` holds a drawn
       stylised front view, not a product photo. Swap in real images before the store release.
-- [ ] **Ship a test build carrying `3020e3d`** so the tester can drop the rename workaround.
-      The fix is on `dev` only; the build he tested predates it.
+- [ ] **Ship a test build carrying `3020e3d` *and* `29338cf`** — the first lets the tester drop the
+      rename workaround, the second is what makes mute and volume work at all on his 2026.7.4
+      firmware (log finding 1). His build advertises API 1.6, so it predates both. Until that build
+      is out, every "command doesn't arrive" report from him is expected and re-testing anything
+      else on that hardware is wasted effort.
 
 ## Deferred with a deadline
 
