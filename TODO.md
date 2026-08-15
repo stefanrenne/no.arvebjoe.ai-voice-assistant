@@ -27,6 +27,56 @@
       rewritten alongside. Users now have a manual escape hatch (switching the tile's *Start
       conversation* off cancels the turn), so this is a robustness item, not an emergency.
 
+## Diagnosability — "Unavailable / Connected: no" says nothing about *what* failed
+
+**Field report 2026-08-15 (forum), Voice PE firmware 26.6.0, app v1.4.11, Homey Pro Early 2023,
+no encryption, BLE+Improv pairing.** Tile stuck *Unavailable*, Debug tab *"Connected: no"*, while
+the same tab shows the device as a usable voice satellite, paired, probe accessible. Port 6053
+verified open from another host; the same device works against a local HA Core over the native
+ESPHome integration. Root cause **not established** — but the reply he was given was that **1.4.12
+does not fix it**, and triage should start from the two items below rather than from the network.
+
+Ruled out from the 1.4.11 → 1.4.12 diff (checked the whole `src/` diff, `5d34acd..HEAD`):
+
+- The `object_id` / API-1.14 fix (`29338cf`) only affects **volume, mute and the media-player
+  key**, never whether the client connects — `Healthy` is emitted right after `HelloResponse`,
+  before the entity list (`esp-voice-assistant-client.mts:975`). And it was **not even active for
+  him**: 26.6.0 still sends `object_id` to a client advertising 1.6, which is what 1.4.11 did.
+  The only other change in that commit is the Hello bump itself.
+- The `Beam lock released` loop (audio URL) and the `client has not subscribed to actions` spam
+  (`SubscribeHomeassistantServicesRequest`) are both **already in 1.4.11** — see
+  [`COMPLETED.md`](./COMPLETED.md) §17. Everything else in 1.4.12 is MP3 for the Flow URL card,
+  the sound-effect tag, the reachable-IP fix and the LED palette.
+
+**Leading hypothesis: the engine, not the device.** The Debug tab's `Connected` field is the
+paired device's *availability*, which is `isAgentHealthy && isEspClientHealthy`
+(`voice-assistant-device.mts:1786`, mirrored into the seen-devices list at `:1800`). A missing or
+invalid API key therefore produces this exact picture — probe accessible, star lit, tile
+Unavailable, "Connected: no" — while the ESP link is perfectly healthy: `missing_api_key` returns
+before the websocket is opened (`openai-realtime-agent.mts:270`, same in the Gemini and local
+providers), so `open` never fires and `isAgentHealthy` stays false forever. It also explains why
+the device is fine under Home Assistant, which needs no key of ours. **To confirm, ask for:**
+whether he got the Homey notification *"Please set api key in app settings"*
+(`voice-assistant-device.mts:846`); which engine is selected and whether that engine's key is
+filled in; and the startup log — expect `Connecting to <ip>:6053` + `ESP Voice Client healthy`
+to appear while `Agent connection opened` / `Agent connection healthy` do not.
+
+Two fixes worth making regardless of what his log says — both small, self-contained, and they
+turn this whole class of report into self-diagnosis (this tester spent an SSH session, a port
+check and a whole HA Core instance on what is probably a settings problem):
+
+- [ ] **Give `setUnavailable()` a reason.** Today it is called bare (`voice-assistant-device.mts:176`
+      and `:1791`), so two completely different faults — satellite unreachable vs. voice engine not
+      connected — render as the same one word on the tile. Pass the message that matches whichever
+      of `isEspClientHealthy` / `isAgentHealthy` is false (and name the engine when it is the
+      agent). Mind that `updateAvailable()` currently only calls `setUnavailable()` on a
+      true → false edge; a reason that can *change* while already unavailable needs that guard
+      rethought.
+- [ ] **Split the Debug row into "Device connected" and "Engine connected".** One boolean covering
+      two independent links is precisely what misdirected this report. `SeenDevice.available`
+      (`seen-devices.mts`) is written from a single AND in `updateAvailable()`; carry the two flags
+      separately through `markPaired` and render both rows in `settings/index.html:2126`.
+
 ## ReSpeaker XVF3800 driver — needs hardware verification
 
 Driver written 2026-07-28 from the community ESPHome config alone (**no hardware was
