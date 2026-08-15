@@ -57,6 +57,13 @@ export class ImprovDeviceError extends Error {
     }
 }
 
+/**
+ * One wording for "the device hung up", whether we noticed via the peripheral's
+ * disconnect event, its isConnected flag, or a failed read. The pair handler
+ * treats it as a transport failure and reconnects once.
+ */
+export const LINK_LOST_MESSAGE = 'Lost BLE connection to the device';
+
 /** Thrown when a provisioning phase does not complete in time. */
 export class ImprovTimeoutError extends Error {
     constructor(public readonly phase: 'authorization' | 'provisioning') {
@@ -89,6 +96,11 @@ export interface BlePeripheralLike {
     connect?(): Promise<any>;
     disconnect(): Promise<void>;
     discoverAllServicesAndCharacteristics(): Promise<BleServiceLike[]>;
+    // Homey's BlePeripheral extends SimpleClass (an EventEmitter) and emits
+    // 'disconnect', but that event is NOT in @types/homey — hence optional, and
+    // hence never the only way we notice a drop (see watchForDisconnect).
+    once?(event: string, listener: (...args: any[]) => void): unknown;
+    off?(event: string, listener: (...args: any[]) => void): unknown;
 }
 
 export interface BleAdvertisementLike {
@@ -284,6 +296,11 @@ export class ImprovBleSession extends EventEmitter {
     private subscribedChars: BleCharacteristicLike[] = [];
     private pollTimer: NodeJS.Timeout | null = null;
     private closed = false;
+    // The device hung up on us. Distinct from `closed` (we hung up) and from
+    // peripheral === null (never connected), because it is the only one of the
+    // three that can happen while nobody is looking.
+    private linkDown = false;
+    private onPeripheralDisconnect: (() => void) | null = null;
 
     private state: ImprovState | null = null;
     private errorState: ImprovErrorState = ImprovErrorState.NoError;
@@ -305,8 +322,17 @@ export class ImprovBleSession extends EventEmitter {
         return this.errorState;
     }
 
+    /**
+     * True only while the link is actually usable. Before, this answered "did we
+     * ever connect and have we closed it ourselves?", which reported a healthy
+     * session for a peripheral that had hung up — the wizard then spent 21 s
+     * telling the user to press a button on a dead link (portal log 6abc4a3e).
+     */
     get isConnected(): boolean {
-        return this.peripheral !== null && !this.closed;
+        return this.peripheral !== null
+            && !this.closed
+            && !this.linkDown
+            && this.peripheral.isConnected !== false;
     }
 
     async connect(): Promise<ImprovSessionInfo> {
@@ -314,6 +340,8 @@ export class ImprovBleSession extends EventEmitter {
         this.logger.info(`Connecting to ${this.advertisement.localName ?? this.advertisement.uuid}`);
 
         this.peripheral = await this.advertisement.connect();
+        this.linkDown = false;
+        this.watchForDisconnect(this.peripheral);
         const services = await this.peripheral.discoverAllServicesAndCharacteristics();
         const service = services.find((s) => normalizeUuid(s.uuid) === IMPROV_SERVICE_UUID);
         if (!service) {
@@ -345,6 +373,13 @@ export class ImprovBleSession extends EventEmitter {
         await this.subscribe(IMPROV_CHAR_CURRENT_STATE, (data) => this.onStateData(data));
         await this.subscribe(IMPROV_CHAR_ERROR_STATE, (data) => this.onErrorData(data));
         await this.subscribe(IMPROV_CHAR_RPC_RESULT, (data) => this.onRpcResultData(data));
+        // Three separate warnings read like three separate faults; one line says
+        // what actually happened. Not treated as a dead link on its own — in the
+        // field report every subscribe failed with "Not Connected" and the state
+        // read immediately after still succeeded.
+        if (this.subscribedChars.length === 0) {
+            this.logger.warn(`No notifications available — polling state every ${this.pollIntervalMs}ms instead`);
+        }
 
         await this.refresh();
         this.logger.info(`Connected — state=${this.describeState()}, capabilities=0x${this.capabilities.toString(16)}`);
@@ -368,6 +403,11 @@ export class ImprovBleSession extends EventEmitter {
         const provisioningTimeoutMs = options.provisioningTimeoutMs ?? 60_000;
 
         if (!this.peripheral || this.closed) throw new Error('Not connected');
+        // The wizard holds the session open while the user types their Wi-Fi
+        // credentials, so the link can die between connect() and here — 21 s in
+        // the field report. Fail fast, so the caller's reconnect-and-retry runs
+        // instead of prompting for a button press on a link that is already gone.
+        if (!this.isConnected) throw new Error(LINK_LOST_MESSAGE);
         const packet = buildWifiSettingsPacket(ssid, password);
 
         if (this.state === ImprovState.AwaitingAuthorization) {
@@ -434,6 +474,9 @@ export class ImprovBleSession extends EventEmitter {
     async disconnect(): Promise<void> {
         if (this.closed) return;
         this.closed = true;
+        // Detach before we hang up, so our own disconnect doesn't log itself as
+        // the device dropping us.
+        this.unwatchDisconnect();
         this.stopPolling();
         for (const char of this.subscribedChars) {
             try {
@@ -452,6 +495,32 @@ export class ImprovBleSession extends EventEmitter {
 
     private describeState(): string {
         return this.state === null ? 'unknown' : `${ImprovState[this.state] ?? this.state}`;
+    }
+
+    /**
+     * Notice a dropped link the moment it happens, rather than on the next read
+     * or write. Homey's BlePeripheral is an EventEmitter that emits 'disconnect',
+     * but that is undocumented in @types/homey — so this is an accelerator, not
+     * the mechanism: `isConnected` is re-checked on every waitFor poll, and a
+     * failed read still fails the wait, exactly as before.
+     */
+    private watchForDisconnect(peripheral: BlePeripheralLike): void {
+        if (typeof peripheral.once !== 'function') return;
+        const onDisconnect = () => {
+            if (this.linkDown || this.closed) return;
+            this.linkDown = true;
+            this.logger.warn('The device dropped the BLE link');
+            this.emit('link-down');
+        };
+        this.onPeripheralDisconnect = onDisconnect;
+        peripheral.once('disconnect', onDisconnect);
+    }
+
+    private unwatchDisconnect(): void {
+        if (this.onPeripheralDisconnect) {
+            this.peripheral?.off?.('disconnect', this.onPeripheralDisconnect);
+            this.onPeripheralDisconnect = null;
+        }
     }
 
     private async subscribe(uuid: string, callback: (data: Buffer) => void): Promise<void> {
@@ -531,6 +600,7 @@ export class ImprovBleSession extends EventEmitter {
                 finished = true;
                 this.stopPolling();
                 this.off('status', onStatus);
+                this.off('link-down', onLinkDown);
                 clearTimeout(timeoutHandle);
                 if (err) reject(err); else resolve();
             };
@@ -540,22 +610,37 @@ export class ImprovBleSession extends EventEmitter {
             };
             this.on('status', onStatus);
 
+            // A drop right after PROVISIONED is expected — the device hangs up on
+            // its client once it is on Wi-Fi — so what we were waiting for wins
+            // over the drop. Otherwise the wait is over and it failed.
+            const onLinkDown = () => {
+                if (predicate()) finish(); else finish(new Error(LINK_LOST_MESSAGE));
+            };
+            this.on('link-down', onLinkDown);
+
             const timeoutHandle = setTimeout(() => finish(makeTimeoutError()), timeoutMs);
 
             this.stopPolling();
             this.pollTimer = setInterval(async () => {
                 if (polling || finished) return;
+                // Cheaper than a read, and it catches the drop even when the
+                // peripheral's 'disconnect' event never arrives (it is not in
+                // Homey's typings, so we cannot count on it).
+                if (!this.isConnected) {
+                    onLinkDown();
+                    return;
+                }
                 polling = true;
                 try {
                     await this.refresh();
                     if (predicate()) finish();
                 } catch (err: any) {
-                    // A read failure usually means the BLE link dropped. A drop right
-                    // after PROVISIONED is expected (devices disconnect clients).
+                    // A read failure usually means the BLE link dropped. Same
+                    // precedence as onLinkDown: a completed wait beats the drop.
                     if (predicate()) {
                         finish();
                     } else {
-                        finish(new Error(`Lost BLE connection to the device: ${err?.message ?? err}`));
+                        finish(new Error(`${LINK_LOST_MESSAGE}: ${err?.message ?? err}`));
                     }
                 } finally {
                     polling = false;

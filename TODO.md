@@ -54,22 +54,8 @@ The one ESP-link error in the whole capture is a single `TCP connection error Er
 at 12:41:46, 18 minutes before the stdout window even starts — not enough to build anything on, but
 worth remembering if he sends a second log.
 
-- [ ] **A dropped BLE link stays invisible until a read or write fails** (`improv-ble-client.mts`).
-      Timeline from the log: peripheral `connected` 13:09:13 → all **three** notification subscribes
-      fail with `Not Connected` (13:09:14.996–15.042) → `refresh()` still reads state fine →
-      `Connected — state=AwaitingAuthorization` → peripheral **`disconnected` 13:09:15.772** → and 21
-      seconds later we log `Awaiting on-device authorization (button press)` and prompt the user to
-      press a button on a link that has been dead the whole time. The write then fails, the
-      reconnect-once path (`improv-pair-handlers.mts:278`) fires, and two 20 s connect attempts time
-      out — ~70 s wasted, ending in the Sentry-captured
-      `Lost BLE connection to the device: Not connected` (`improv-ble-client.mts:558`, the
-      authorization `waitFor` poll). Cause: `isConnected` (`:308`) only tests
-      `peripheral !== null && !this.closed`; nothing subscribes to the peripheral's disconnect
-      event, so a half-open link reads as healthy. Two fixes: watch the disconnect event and fail
-      the wait immediately, and treat **all three** subscribes failing as the link being dead rather
-      than as a cosmetic warning (swallowing them is right when polling is a genuine backstop, but
-      3-of-3 means notifications are simply gone). The user retried and provisioning succeeded at
-      13:11, so this is robustness and wasted user time, not a hard failure.
+- [x] ~~**A dropped BLE link stays invisible until a read or write fails**~~ — fixed; write-up in
+      [`COMPLETED.md`](./COMPLETED.md) §20.
 - [ ] **A user must be able to turn the quiet loggers on without a syslog collector.** They already
       mirror into remote logging at DEBUG (`remote-log.mts`), but that needs a collector the average
       reporter does not have — so a portal-submitted log is permanently missing the device, ESP and

@@ -1460,3 +1460,47 @@ would have made a regression test pass against the broken code. The mock now mat
 `tests/voice-assistant-device.test.mts` ("teardown — a deleted device must not be reachable from
 its transports") cover the late `close`, the full listener detach, and the `abortCurrentTurn`
 guard; all three fail against the pre-fix device.
+
+## 20. A dropped Improv BLE link stayed invisible until a read or write failed (2026-08-15)
+
+**From the second portal report** (log ID `6abc4a3e-...`, 2026-08-12; the user's message was
+*"Pas de connexion"*). Timeline: peripheral `connected` 13:09:13 → all **three** notification
+subscribes fail with `Not Connected` → `refresh()` reads the state fine anyway → `Connected —
+state=AwaitingAuthorization` returned 13:09:15.282 → peripheral **`disconnected` 13:09:15.772** →
+and 21 seconds later the wizard logged `Awaiting on-device authorization (button press)` and asked
+the user to press a button on a link that had been dead the whole time. The write then failed, the
+reconnect-once path fired, two 20 s connect attempts timed out — ~70 s wasted, ending in the
+Sentry-captured `Lost BLE connection to the device`.
+
+**Root cause:** `isConnected` answered *"did we ever connect, and have we closed it ourselves?"* —
+`peripheral !== null && !this.closed` — which is true for a peripheral that has hung up. Nothing
+watched for the drop, so it was only ever discovered by a read or write failing.
+
+**Fix.** `isConnected` now also tests `!linkDown && peripheral.isConnected !== false`, so it means
+what its name says. `linkDown` is set by `watchForDisconnect()`, which subscribes to the
+peripheral's `disconnect` event — Homey's `BlePeripheral` extends `SimpleClass` (an EventEmitter)
+and does emit it, but **it is not in `@types/homey`**, so the event is treated as an accelerator,
+never the mechanism: `waitFor()`'s poll re-checks `isConnected` every tick before it reads, and a
+failed read still fails the wait exactly as before. `provision()` checks the live link on entry —
+that is the 21-second window, since the wizard holds the session open while the user types their
+credentials — and a `link-down` event ends a wait already in flight. Both paths keep the existing
+precedence rule: **a completed wait beats the drop**, because a device hanging up right after
+`PROVISIONED` is normal and must not turn a success into a failure.
+
+Deliberately **not** done: treating "all three subscribes failed" as a dead link, which the TODO
+entry had proposed. The log disproves it — the state read immediately after those three failures
+succeeded, so the link was alive for reads at that moment. The three separate warnings are now one
+line (`No notifications available — polling state every Nms`), which reads as the mode it is
+instead of three faults.
+
+**Effect on the caller:** the pair handler's reconnect-and-retry (`improv-pair-handlers.mts:278`)
+now fires within a poll tick of the drop instead of after the authorization timeout, so the user
+gets a retry while still standing at the device.
+
+Tests: `tests/improv-ble-client.test.mts`, *"a link the device drops on its own"* — five cases.
+Three fail against the pre-fix client (the session reporting itself connected; `provision()`
+emitting the press-the-button prompt on a dead link; a wait in flight not ending until a poll
+reads). Two are guards that pass either way on purpose: the poll-only fallback
+(`emitsDisconnect: false`, since the event is undocumented) and the expected post-`PROVISIONED`
+drop still resolving. `tests/mocks/mock-improv-ble.mts` gained `dropLink()` and an EventEmitter
+peripheral to model the device hanging up.

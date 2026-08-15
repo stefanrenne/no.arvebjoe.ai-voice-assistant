@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import {
     BleAdvertisementLike,
     BleCharacteristicLike,
@@ -47,6 +48,8 @@ export interface FakeImprovDeviceOptions {
      * dies with an ATT error and the peripheral drops. A reconnect works.
      */
     dropLinkAfterFailedProvision?: boolean;
+    /** Whether the peripheral emits 'disconnect' (Homey does; the typings don't say so). */
+    emitsDisconnect?: boolean;
 }
 
 function encodeStrings(values: string[]): Buffer {
@@ -102,8 +105,17 @@ class FakeCharacteristic implements BleCharacteristicLike {
     }
 }
 
-class FakePeripheral implements BlePeripheralLike {
-    constructor(public uuid: string, private readonly device: FakeImprovDevice) { }
+// Homey's BlePeripheral extends SimpleClass (an EventEmitter) and emits
+// 'disconnect' — undocumented in @types/homey, so `emitsDisconnect: false`
+// covers the stacks where the client must fall back to polling isConnected.
+class FakePeripheral extends EventEmitter implements BlePeripheralLike {
+    constructor(public uuid: string, private readonly device: FakeImprovDevice) {
+        super();
+        if (device.options.emitsDisconnect === false) {
+            (this as any).once = undefined;
+            (this as any).off = undefined;
+        }
+    }
 
     get isConnected(): boolean {
         return this.device.connected;
@@ -129,6 +141,8 @@ export class FakeImprovDevice {
     errorState: ImprovErrorState = ImprovErrorState.NoError;
     rpcResultBuffer: Buffer = Buffer.alloc(0);
     services: BleServiceLike[];
+    /** The peripheral handed out by the last connect(), so dropLink can signal it. */
+    peripheral: FakePeripheral | null = null;
 
     readonly stateChar: FakeCharacteristic;
     readonly errorChar: FakeCharacteristic;
@@ -170,13 +184,25 @@ export class FakeImprovDevice {
             }],
             async connect(): Promise<BlePeripheralLike> {
                 device.connected = true;
-                return new FakePeripheral(uuid, device);
+                device.peripheral = new FakePeripheral(uuid, device);
+                return device.peripheral;
             },
         };
     }
 
     assertConnected(): void {
         if (!this.connected) throw new Error('not connected');
+    }
+
+    /**
+     * The device hangs up on its own — what the Voice PE did 0.5 s after the
+     * wizard finished connecting (portal log 6abc4a3e). Reads and writes fail
+     * from here on, and the peripheral emits 'disconnect' unless the fake was
+     * built with emitsDisconnect: false.
+     */
+    dropLink(): void {
+        this.connected = false;
+        this.peripheral?.emit('disconnect');
     }
 
     /** Simulate the user pressing the on-device authorize button. */

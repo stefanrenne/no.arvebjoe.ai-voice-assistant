@@ -219,6 +219,89 @@ describe('ImprovBleSession', () => {
         await expect(session.provision('x', 'y')).rejects.toThrow(/Not connected/);
     });
 
+    describe('a link the device drops on its own', () => {
+        // Portal log 6abc4a3e: the peripheral disconnected 0.5 s after connect()
+        // returned, the session still reported itself connected, and 21 s later
+        // the wizard was telling the user to press a button on a dead link.
+        it('reports itself disconnected once the peripheral hangs up', async () => {
+            const device = new FakeImprovDevice({});
+            const session = new ImprovBleSession(device.advertisement, fastPoll);
+            await session.connect();
+            expect(session.isConnected).toBe(true);
+
+            device.dropLink();
+
+            expect(session.isConnected).toBe(false);
+            await session.disconnect();
+        });
+
+        it('does not ask the user to press a button on a dead link', async () => {
+            const device = new FakeImprovDevice({ requireAuthorization: true });
+            const session = new ImprovBleSession(device.advertisement, fastPoll);
+            await session.connect();
+
+            const statuses: any[] = [];
+            session.on('status', (s) => statuses.push({ ...s }));
+
+            device.dropLink();
+
+            await expect(session.provision('MyWifi', 'pw')).rejects.toThrow(/Lost BLE connection/);
+            // The old code reached the AwaitingAuthorization branch and emitted
+            // the "press the button" prompt before any read could fail — that
+            // prompt is what the reporter obeyed for 21 s on a dead link.
+            expect(statuses).toEqual([]);
+            await session.disconnect();
+        });
+
+        it('ends a wait already in flight, without waiting for the next poll', async () => {
+            // Both clocks are set beyond the test timeout, so ONLY the
+            // disconnect event can end this wait — the old code had to wait for
+            // a read to fail, i.e. a full poll interval (500 ms in production),
+            // and here would hang until vitest killed the test. No wall-clock
+            // assertion, so nothing to go flaky under load.
+            const device = new FakeImprovDevice({ requireAuthorization: true });
+            const session = new ImprovBleSession(device.advertisement, { pollIntervalMs: 60_000 });
+            await session.connect();
+
+            setTimeout(() => device.dropLink(), 20);
+            await expect(
+                session.provision('MyWifi', 'pw', { authorizationTimeoutMs: 60_000 }),
+            ).rejects.toThrow(/Lost BLE connection/);
+            await session.disconnect();
+        });
+
+        it('notices without the disconnect event, via the poll', async () => {
+            // Homey's 'disconnect' event is undocumented in @types/homey, so the
+            // poll must carry this on its own.
+            const device = new FakeImprovDevice({ requireAuthorization: true, emitsDisconnect: false });
+            const session = new ImprovBleSession(device.advertisement, fastPoll);
+            await session.connect();
+
+            setTimeout(() => device.dropLink(), 30);
+            await expect(
+                session.provision('MyWifi', 'pw', { authorizationTimeoutMs: 5000 }),
+            ).rejects.toThrow(/Lost BLE connection/);
+            await session.disconnect();
+        });
+
+        it('still succeeds when the drop is the device hanging up after PROVISIONED', async () => {
+            // Devices disconnect their client once they are on Wi-Fi; that drop
+            // must not turn a successful provision into a failure.
+            const device = new FakeImprovDevice({ correctPassword: 'pw', urls: ['http://192.168.1.99'] });
+            const session = new ImprovBleSession(device.advertisement, fastPoll);
+            await session.connect();
+
+            const realSetState = device.setState.bind(device);
+            device.setState = (state) => {
+                realSetState(state);
+                if (state === ImprovState.Provisioned) device.dropLink();
+            };
+
+            await expect(session.provision('MyWifi', 'pw')).resolves.toEqual(['http://192.168.1.99']);
+            await session.disconnect();
+        });
+    });
+
     it('refuses to provision an already-provisioned device', async () => {
         const device = new FakeImprovDevice({ initialState: ImprovState.Provisioned });
         const session = new ImprovBleSession(device.advertisement, fastPoll);
