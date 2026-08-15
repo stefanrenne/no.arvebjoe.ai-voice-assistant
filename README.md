@@ -467,7 +467,7 @@ URL/key/model for each, with Test buttons, and the Ollama context-window size (n
 language-model and speech stages can also be set to **None** to switch them off — see
 [Switching a stage off](#switching-a-stage-off-none).
 
-**Debug** — three tools for working out what is going wrong, none of which cost the AI anything.
+**Debug** — four tools for working out what is going wrong, none of which cost the AI anything.
 
 * **Last seen devices** — every ESPHome device Homey's discovery has announced, recorded all the
   time (not just while you pair), with the exact fields pairing matches on: the name it would be
@@ -497,6 +497,14 @@ language-model and speech stages can also be set to **None** to switch them off 
   A **Send test message** button verifies the address before you save. Don't have a syslog
   server? [docs/remote-logging.md](docs/remote-logging.md) has a one-command Docker Compose
   setup (VictoriaLogs, free and open source, with a web UI) plus ready-made queries.
+* **Verbose logging** *(opt-in, off by default)* — the same detailed per-subsystem logs, written
+  straight to the app's own log instead of to a syslog server. Without it the app log shows only
+  conversation events, so a log you send in can't say whether the satellite and the AI engine
+  actually connected — the lines that would answer that are the ones being held back. Turn it on,
+  reproduce the problem, then copy the app log (Homey app → **More** → **Apps** → *AI Voice
+  Assistant* → the **⋮** menu). Leave it off the rest of the time: it's a lot of text, and it makes
+  the log harder to read rather than easier. Use this when you don't run a syslog server; use
+  **Remote logging** above when you do.
 
 Settings changes apply on the fly — no app restart needed.
 
@@ -646,6 +654,11 @@ entirely on the engine you pick — with the local pipeline, nothing does.
 * **No audio/response:** check the device volume and mute state, and confirm the selected
   engine's API key (or local service hosts) are set — use the settings page's **Test** buttons
   for the local pipeline.
+* **The tile says the device is unavailable, or Debug shows "Connected: no":** that needs *two*
+  links to be up — the satellite and the AI engine — and one word covers both. The commonest
+  cause is the selected engine's API key being missing or wrong, which leaves the satellite
+  perfectly healthy and the tile unavailable anyway. Turn on Settings → **Debug** →
+  **Verbose logging**, restart the app, and the log will name which side failed to connect.
 * **The assistant reacts to its own wake word sound:** increase the device's *Initial audio
   skip* setting slightly.
 * **The device wakes but doesn't hear what you say (or only up close):** raise the device's

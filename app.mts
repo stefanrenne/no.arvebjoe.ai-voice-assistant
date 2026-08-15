@@ -7,7 +7,7 @@ import { GeoHelper } from './src/helpers/geo-helper.mjs';
 import { WeatherHelper } from './src/helpers/weather-helper.mjs';
 import { AppServices } from './src/helpers/app-services.mjs';
 import { settingsManager } from './src/settings/settings-manager.mjs';
-import { createLogger } from './src/helpers/logger.mjs';
+import { createLogger, setVerboseLogging } from './src/helpers/logger.mjs';
 import { configureRemoteLogFromSettings } from './src/helpers/remote-log.mjs';
 import { recordingRegistry } from './src/helpers/recording-registry.mjs';
 import { DiscoveryWatcher } from './src/helpers/discovery-watcher.mjs';
@@ -54,7 +54,14 @@ export default class AiVoiceAssistantApp extends Homey.App implements AppService
     // ones) mirrors into this transport when it's enabled in settings. The
     // subscription fires once immediately with the current snapshot, then on
     // every settings save.
-    this.unsubscribeRemoteLog = settingsManager.onGlobals((globals) => configureRemoteLogFromSettings(globals));
+    // Same subscription drives the verbose-logging switch: with it on, the
+    // quieted subsystem loggers (device, ESP, agent) write to the app log, so a
+    // user can produce a log that actually shows whether the satellite and the
+    // AI engine connected. Off by default — it is noisy by design.
+    this.unsubscribeRemoteLog = settingsManager.onGlobals((globals) => {
+      configureRemoteLogFromSettings(globals);
+      setVerboseLogging(globals.verbose_logging === true);
+    });
 
     // Awaited: the cleanup inside deletes EVERY file in the audio folder, so it
     // must finish before devices come online and start writing reply audio — an

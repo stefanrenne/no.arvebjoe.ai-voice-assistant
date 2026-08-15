@@ -186,7 +186,9 @@ export class SettingsManager {
       'remote_log_enabled', 'remote_log_host', 'remote_log_port', 'remote_log_protocol', 'remote_log_level',
       // Debug: "what did I just say?" — keep each turn's microphone recording
       // for a while so it can be played back (settings page or by voice)
-      'debug_audio_enabled', 'debug_audio_retention_min'];
+      'debug_audio_enabled', 'debug_audio_retention_min',
+      // Debug: write the quieted subsystem loggers to the app log too
+      'verbose_logging'];
 
     for (const k of knownKeys) {
       this.globals[k] = this.homey.settings.get(k);

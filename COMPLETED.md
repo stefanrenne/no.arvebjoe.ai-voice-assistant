@@ -1504,3 +1504,39 @@ reads). Two are guards that pass either way on purpose: the poll-only fallback
 (`emitsDisconnect: false`, since the event is undocumented) and the expected post-`PROVISIONED`
 drop still resolving. `tests/mocks/mock-improv-ble.mts` gained `dropLink()` and an EventEmitter
 peripheral to model the device hanging up.
+
+## 21. Verbose logging — the quieted subsystems, on demand (2026-08-15)
+
+**Why.** Four loggers are constructed `disabled: true`: `Voice_Assistant_Device`, `ESP`, `PE` and
+`AGENT`. They are precisely the four that say whether the satellite link and the AI engine ever
+connected — and precisely the four a user's submitted log does not contain. The second portal
+report is the cost of that: a reporter wrote *"Pas de connexion"*, paired his Voice PE **six
+times**, and the log he sent proved the ESPHome handshake and playback worked while saying nothing
+at all about the agent (§ *Diagnosability* in `TODO.md`). They do mirror into remote syslog at
+DEBUG, but that needs a collector almost no reporter runs.
+
+**Shape.** A module-level flag on `Logger`, flipped by `setVerboseLogging()` — not per-instance
+state, because loggers are created at import time all over the app and are never registered
+anywhere, so one switch is the only thing that can reach them all. `info()` on a quieted logger
+now falls through to `write()` when the flag is on. Wired in `app.mts` from the existing
+`settingsManager.onGlobals` subscription that already configures remote logging, so it applies on
+the initial snapshot (app start) as well as on every save. Setting: `verbose_logging`, off by
+default, in Settings → Debug.
+
+Two deliberate choices:
+
+- **The remote-syslog severity does not change.** A quieted logger still emits at DEBUG whether or
+  not verbose is on: the severity describes what the logger *is*, and collector-side filters
+  depend on it. Verbose only decides whether the line also reaches the app log.
+- **Both transitions are announced** through a normal logger (`[LOGGER] Verbose logging ON/OFF …`),
+  and only on a real change. Without the OFF line, a reader cannot tell "someone turned it off"
+  from "that subsystem stopped saying anything" — which is the same ambiguity that made the
+  original report unreadable.
+
+`warn()`/`error()` are untouched, as they always were: `disabled` only ever silenced `info()`.
+
+Tests: `tests/logger-verbose.test.mts` — default-off, on, off again, the announcement on real
+changes only, no effect on never-quieted loggers, and warnings still written while off. The suite's
+`afterEach` resets the flag, since a leaked module-level `true` would change every later test's
+output. README's Debug section (now four tools) and a new troubleshooting entry for
+*"the tile says unavailable / Connected: no"* point at it; `README.txt` deliberately untouched.

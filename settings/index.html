@@ -1451,6 +1451,29 @@
             </div>
           </div>
         </div>
+
+        <!-- ---- Verbose logging: un-quiet the subsystem loggers ---- -->
+        <div class="card">
+          <div class="feature-head">
+            <div>
+              <div class="feature-title">Verbose logging</div>
+              <div class="feature-sub">Write the detailed subsystem logs to the app log</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="verbose_logging" aria-label="Enable verbose logging" />
+              <span class="knob"></span>
+            </label>
+          </div>
+          <div class="feature-body" data-feature-body="verbose_logging">
+            <div class="note">Normally the app log only shows conversation events, so a log you send in
+              cannot say whether the satellite and the AI engine actually connected — the lines that
+              would answer that are the ones being held back. Turn this on to add them: the device
+              connection, the ESP link, the AI provider and the tools. Turn it on, reproduce the
+              problem, then copy the app log (Homey app → More → Apps → AI Voice Assistant → the ⋮
+              menu). Leave it off the rest of the time — it is a lot of text, and it makes the log
+              harder to read, not easier. No token cost — this never touches the AI.</div>
+          </div>
+        </div>
       </section>
     </main>
 
@@ -2328,6 +2351,19 @@
         });
       });
 
+      // Verbose logging: un-quiets the subsystem loggers (no token cost either).
+      var verboseLoggingElement = document.getElementById("verbose_logging");
+      function refreshVerboseLoggingVisibility() {
+        document.querySelector('[data-feature-body="verbose_logging"]')
+          .classList.toggle("off", !verboseLoggingElement.checked);
+      }
+      verboseLoggingElement.addEventListener("change", refreshVerboseLoggingVisibility);
+      Homey.get("verbose_logging", function (err, enabled) {
+        if (err) return Homey.alert(err);
+        verboseLoggingElement.checked = enabled === true || enabled === "true";
+        refreshVerboseLoggingVisibility();
+      });
+
       // Show/hide toggles for the masked API-key inputs.
       document.querySelectorAll(".secret-toggle").forEach(function (btn) {
         btn.addEventListener("click", function () {
@@ -2462,6 +2498,8 @@
           ["remote_log_port", parseInt(document.getElementById("remote_log_port").value, 10) || 514],
           ["remote_log_protocol", document.getElementById("remote_log_protocol").value],
           ["remote_log_level", document.getElementById("remote_log_level").value],
+          // Debug: write the quieted subsystem loggers to the app log too
+          ["verbose_logging", verboseLoggingElement.checked],
           // Debug: keep each turn's microphone recording ("what did I just say?")
           ["debug_audio_enabled", debugAudioEnabledElement.checked],
           ["debug_audio_retention_min", parseInt(document.getElementById("debug_audio_retention_min").value, 10) || 15],

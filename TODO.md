@@ -56,14 +56,8 @@ worth remembering if he sends a second log.
 
 - [x] ~~**A dropped BLE link stays invisible until a read or write fails**~~ — fixed; write-up in
       [`COMPLETED.md`](./COMPLETED.md) §20.
-- [ ] **A user must be able to turn the quiet loggers on without a syslog collector.** They already
-      mirror into remote logging at DEBUG (`remote-log.mts`), but that needs a collector the average
-      reporter does not have — so a portal-submitted log is permanently missing the device, ESP and
-      agent lines. A "verbose logging" toggle in the Debug section turns *"send me a log"* into
-      something that actually answers the question. Cheapest shape: a module-level override in
-      `logger.mts` that `Logger` consults alongside its own `disabled` field (`:113`) — there is no
-      instance registry today, `createLogger` just constructs (`:288`). Pairs with the two
-      *Diagnosability* items below.
+- [x] ~~**A user must be able to turn the quiet loggers on without a syslog collector**~~ — added
+      Settings → Debug → **Verbose logging**; write-up in [`COMPLETED.md`](./COMPLETED.md) §21.
 
 ## Diagnosability — "Unavailable / Connected: no" says nothing about *what* failed
 

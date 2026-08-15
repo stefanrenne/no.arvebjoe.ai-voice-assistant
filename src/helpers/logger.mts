@@ -91,6 +91,9 @@ class Logger {
     private disabled: boolean;
     private static homey: Homey | null = null;
     private static homeyLog: any;
+    // When on, loggers created with `disabled: true` write to the app log after
+    // all. See setVerboseLogging() for why this exists.
+    private static verbose = false;
 
     // Sentry throttle: repeats of the same error (same logger + name + code)
     // within the cooldown are not reported again. Keyed on error.code when
@@ -109,12 +112,35 @@ class Logger {
         Logger.homeyLog = homeyLog;
     }
 
+    static setVerbose(enabled: boolean) {
+        if (Logger.verbose === enabled) {
+            return;
+        }
+        Logger.verbose = enabled;
+        // Announce the change through a normal (never-quieted) logger, so a log
+        // reader can see why the volume changed — and, when switching off, that
+        // it was switched off rather than the subsystems having gone silent.
+        new Logger('LOGGER').info(enabled
+            ? 'Verbose logging ON — quieted subsystems (device, ESP, agent) now write to the app log'
+            : 'Verbose logging OFF — quieted subsystems are silent again');
+    }
+
+    static isVerbose(): boolean {
+        return Logger.verbose;
+    }
+
     info(message: string, subFrom: string = '', details: any = null) {
         if (this.disabled) {
             // Quieted subsystem loggers still forward to the remote syslog
             // transport (when configured) — at DEBUG severity, so a collector
             // can capture everything without re-enabling console chatter.
+            // The severity stays DEBUG whatever `verbose` says: it describes
+            // what this logger IS, and existing collector filters depend on it.
             this.emitRemote(SYSLOG_DEBUG, subFrom, message, details);
+            if (!Logger.verbose) {
+                return;
+            }
+            this.write(message, subFrom, details);
             return;
         }
         // Enabled loggers (e.g. CONVO) are the app's normal narrative → INFO.
@@ -287,4 +313,28 @@ class Logger {
 // Export the createLogger function using ES modules
 export function createLogger(from: string, disabled: boolean = false): Logger {
     return new Logger(from, disabled);
+}
+
+/**
+ * Turn the quieted subsystem loggers (ESP, AGENT, PE, the device itself) on or
+ * off at runtime, for every Logger at once.
+ *
+ * Why this exists: those four are exactly the loggers that say whether the
+ * satellite link and the AI engine ever connected, and they are exactly the
+ * ones a user's submitted log does not contain — a reporter wrote "Pas de
+ * connexion" and paired his device six times, and the log he sent could not
+ * say which side had failed (portal log 6abc4a3e). They do reach remote syslog
+ * at DEBUG, but that needs a collector most reporters do not run.
+ *
+ * A module-level flag rather than per-instance state because loggers are
+ * created at import time all over the app and never registered anywhere;
+ * flipping one switch is the only way to reach them all.
+ */
+export function setVerboseLogging(enabled: boolean): void {
+    Logger.setVerbose(enabled);
+}
+
+/** Whether verbose logging is currently on (the settings page reads this back). */
+export function isVerboseLogging(): boolean {
+    return Logger.isVerbose();
 }
