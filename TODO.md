@@ -27,14 +27,57 @@
       rewritten alongside. Users now have a manual escape hatch (switching the tile's *Start
       conversation* off cancels the turn), so this is a robustness item, not an emergency.
 
-## Crash reports (Homey developer portal, seen 2026-08-15)
+## Homey developer portal reports (seen 2026-08-15)
 
 - [x] ~~**`TypeError: Cannot read properties of null (reading 'abort')`**~~ — a deleted device kept
       receiving events from its provider, because `onDeleted()` detached the ESP client's listeners
       but not the provider's. Fixed; full write-up in [`COMPLETED.md`](./COMPLETED.md) §19.
 
-- [ ] **Second portal crash report — trace not captured yet.** Paste it in and triage; noted here so
-      it isn't lost.
+**Second portal report (log ID `6abc4a3e-7738-4bf3-91a3-84c72ca24c27`, 2026-08-12) — not a crash.**
+A user-submitted diagnostic log; user message: *"Pas de connexion"*. The only captured exception is
+the Improv provisioning failure below. Voice PE at 192.168.1.81, Wi-Fi *SFRAD*.
+
+**The log cannot answer the user's own complaint, and that is the finding.** He paired the same
+device (`20f83b0a7655`) **six times** in 20 minutes — manual entry at 12:59, 13:04, 13:18, mDNS list
+at 13:05, 13:07, 13:12 — and *every one succeeded*: `Manual entry … matched: Home Assistant Voice
+0a7655`, then `Paired device connected — playing welcome sound`, which fires on the ESP
+**`capabilities`** event (`voice-assistant-device.mts:781`), i.e. after the full ESPHome handshake,
+and which then plays a sound. So the satellite link **and** playback demonstrably worked every time,
+and "no connection" is something else — most likely the engine side, exactly as the *Diagnosability*
+section above predicts. It cannot be confirmed from this log, because `Voice_Assistant_Device`
+(`:100`), `ESP` (`:145`), `PE` (`:149`) and `AGENT` (`openai-realtime-agent.mts:114`) are all
+constructed with `disabled: true` — the four loggers that would say whether the agent ever connected
+are the four that never print. Only `CONVO`, `APP`, `PAIR`, `IMPROV_*`, `DEVICEMANAGER` and
+`APIHELPER` reach a submitted log. Six re-pairings is the user-side cost of that blind spot.
+
+The one ESP-link error in the whole capture is a single `TCP connection error Error: read ETIMEDOUT`
+at 12:41:46, 18 minutes before the stdout window even starts — not enough to build anything on, but
+worth remembering if he sends a second log.
+
+- [ ] **A dropped BLE link stays invisible until a read or write fails** (`improv-ble-client.mts`).
+      Timeline from the log: peripheral `connected` 13:09:13 → all **three** notification subscribes
+      fail with `Not Connected` (13:09:14.996–15.042) → `refresh()` still reads state fine →
+      `Connected — state=AwaitingAuthorization` → peripheral **`disconnected` 13:09:15.772** → and 21
+      seconds later we log `Awaiting on-device authorization (button press)` and prompt the user to
+      press a button on a link that has been dead the whole time. The write then fails, the
+      reconnect-once path (`improv-pair-handlers.mts:278`) fires, and two 20 s connect attempts time
+      out — ~70 s wasted, ending in the Sentry-captured
+      `Lost BLE connection to the device: Not connected` (`improv-ble-client.mts:558`, the
+      authorization `waitFor` poll). Cause: `isConnected` (`:308`) only tests
+      `peripheral !== null && !this.closed`; nothing subscribes to the peripheral's disconnect
+      event, so a half-open link reads as healthy. Two fixes: watch the disconnect event and fail
+      the wait immediately, and treat **all three** subscribes failing as the link being dead rather
+      than as a cosmetic warning (swallowing them is right when polling is a genuine backstop, but
+      3-of-3 means notifications are simply gone). The user retried and provisioning succeeded at
+      13:11, so this is robustness and wasted user time, not a hard failure.
+- [ ] **A user must be able to turn the quiet loggers on without a syslog collector.** They already
+      mirror into remote logging at DEBUG (`remote-log.mts`), but that needs a collector the average
+      reporter does not have — so a portal-submitted log is permanently missing the device, ESP and
+      agent lines. A "verbose logging" toggle in the Debug section turns *"send me a log"* into
+      something that actually answers the question. Cheapest shape: a module-level override in
+      `logger.mts` that `Logger` consults alongside its own `disabled` field (`:113`) — there is no
+      instance registry today, `createLogger` just constructs (`:288`). Pairs with the two
+      *Diagnosability* items below.
 
 ## Diagnosability — "Unavailable / Connected: no" says nothing about *what* failed
 
@@ -69,6 +112,15 @@ whether he got the Homey notification *"Please set api key in app settings"*
 (`voice-assistant-device.mts:846`); which engine is selected and whether that engine's key is
 filled in; and the startup log — expect `Connecting to <ip>:6053` + `ESP Voice Client healthy`
 to appear while `Agent connection opened` / `Agent connection healthy` do not.
+
+**Correction to that last ask (2026-08-15): those lines never reach a user's log.** All four of
+them come from loggers constructed `disabled: true` — `Voice_Assistant_Device`
+(`voice-assistant-device.mts:100`), `ESP` (`:145`), `PE` (`:149`), `AGENT`
+(`openai-realtime-agent.mts:114`). They mirror into remote syslog at DEBUG, which a reporter
+without a collector does not have. Asking for the startup log gets a log that is silent on exactly
+the question. The second portal report (see *Crash reports* above) is this failure mode in
+practice: a user wrote *"Pas de connexion"* and paired the same device six times, and the log he
+submitted proves the ESP handshake and playback worked while saying nothing about the agent.
 
 Two fixes worth making regardless of what his log says — both small, self-contained, and they
 turn this whole class of report into self-diagnosis (this tester spent an SSH session, a port
