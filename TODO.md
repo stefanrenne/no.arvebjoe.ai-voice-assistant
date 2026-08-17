@@ -126,13 +126,11 @@ Two fixes worth making regardless of what his log says — both small, self-cont
 turn this whole class of report into self-diagnosis (this tester spent an SSH session, a port
 check and a whole HA Core instance on what is probably a settings problem):
 
-- [ ] **Give `setUnavailable()` a reason.** Today it is called bare (`voice-assistant-device.mts:182`
-      and `:1802`), so two completely different faults — satellite unreachable vs. voice engine not
-      connected — render as the same one word on the tile. Pass the message that matches whichever
-      of `isEspClientHealthy` / `isAgentHealthy` is false (and name the engine when it is the
-      agent). Mind that `updateAvailable()` currently only calls `setUnavailable()` on a
-      true → false edge; a reason that can *change* while already unavailable needs that guard
-      rethought.
+- [x] ~~**Give `setUnavailable()` a reason.**~~ Done 2026-08-18 — `unavailableReason()` names the
+      failing side, and the engine by its settings-page label when it is the engine. The
+      true → false edge guard was replaced by a `lastUnavailableReason` comparison, so a reason
+      that changes while the device stays unavailable now reaches the tile. See
+      [`COMPLETED.md`](./COMPLETED.md) §23.
 - [ ] **Split the Debug row into "Device connected" and "Engine connected".** One boolean covering
       two independent links is precisely what misdirected this report. `SeenDevice.available`
       (`seen-devices.mts`) is written from a single AND in `updateAvailable()`; carry the two flags

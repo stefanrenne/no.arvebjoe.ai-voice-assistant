@@ -21,6 +21,8 @@ export class Device extends EventEmitter {
     private _capValues: Record<string, any> = {};
     private _listeners: Record<string, (value: any, opts?: any) => any> = {};
     private _available = false;
+    private _unavailableMessage: string | null = null;
+    private _unavailableMessages: Array<string | null> = [];
 
     constructor(config: FakeDeviceConfig = {}) {
         super();
@@ -59,8 +61,26 @@ export class Device extends EventEmitter {
     }
 
     getAvailable(): boolean { return this._available; }
-    async setAvailable(): Promise<void> { this._available = true; }
-    async setUnavailable(_msg?: string): Promise<void> { this._available = false; }
+    async setAvailable(): Promise<void> {
+        this._available = true;
+        this._unavailableMessage = null;
+        this._unavailableMessages.push(null);
+    }
+    /**
+     * The reason matters as much as the flag — "Unavailable" alone cannot say
+     * whether the satellite or the voice engine is down — so record it, and
+     * keep the history so a test can assert a reason CHANGING while the device
+     * stays unavailable.
+     */
+    async setUnavailable(msg?: string): Promise<void> {
+        this._available = false;
+        this._unavailableMessage = msg ?? null;
+        this._unavailableMessages.push(msg ?? null);
+    }
+    /** Last reason passed to setUnavailable() (null once available again). */
+    get unavailableMessage(): string | null { return this._unavailableMessage; }
+    /** Every availability message in order, for transition assertions. */
+    get unavailableMessages(): Array<string | null> { return this._unavailableMessages; }
 
     log(..._args: any[]) { /* silent in tests */ }
     error(..._args: any[]) { /* silent in tests */ }

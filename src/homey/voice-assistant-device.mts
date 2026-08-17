@@ -155,6 +155,20 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
   private isAgentHealthy: boolean = false;
   private isEspClientHealthy: boolean = false;
 
+  /**
+   * The reason currently shown on the tile, so updateAvailable() can tell a
+   * changed reason from an unchanged one while the device stays unavailable.
+   */
+  private lastUnavailableReason: string | null = null;
+
+  /** Engine ids as the settings page labels them (settings/index.html). */
+  private static readonly ENGINE_LABELS: Record<string, string> = {
+    'openai-realtime': 'OpenAI Realtime',
+    'gemini-realtime': 'Google Gemini Live',
+    'mistral-realtime': 'Mistral (Voxtral)',
+    'local': 'Custom pipeline',
+  };
+
   // 1 Hz interval that pushes the active countdown onto the tile capabilities;
   // only runs while a timer is counting down (cleared on finish/cancel).
   private timerTickInterval: NodeJS.Timeout | null = null;
@@ -179,7 +193,9 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
   async onInit(): Promise<void> {
     this.logger.info('Initializing');
 
-    this.setUnavailable();
+    // Neither link is up yet at this point; updateAvailable() replaces this with
+    // a reason naming whichever side failed as soon as one of them reports.
+    this.setUnavailable('Connecting to the device and the voice engine…');
     this.setCapabilityValue('onoff', false);
     this.RegisterCapabilities();
     await this.ensureTimerCapabilities();
@@ -1792,14 +1808,56 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
 
 
 
+  /**
+   * The engine's name as the settings page spells it, for the unavailable
+   * reason. Falls back to the raw id so an unknown provider still reads
+   * sensibly rather than as "undefined".
+   */
+  private engineLabel(): string {
+    const id = this.currentProviderId || settingsManager.getGlobal('voice_provider', DEFAULT_VOICE_PROVIDER);
+    return VoiceAssistantDevice.ENGINE_LABELS[id as string] ?? String(id);
+  }
+
+  /**
+   * Why the device is unavailable, or null when it isn't.
+   *
+   * Availability is `isAgentHealthy && isEspClientHealthy` — two INDEPENDENT
+   * links behind one word, which is exactly what misdirected the field report
+   * in TODO.md (§ Diagnosability): a tester spent an SSH session, a port check
+   * and a whole Home Assistant install on what was most likely a missing API
+   * key, because "Unavailable" cannot distinguish "the satellite is gone" from
+   * "the engine never connected". Name which side is down, and name the engine
+   * when it is the engine — the satellite being healthy while the engine is not
+   * is the common case, and the one whose cause is a settings field.
+   */
+  private unavailableReason(): string | null {
+    if (this.isEspClientHealthy && this.isAgentHealthy) {
+      return null;
+    }
+    if (!this.isEspClientHealthy && !this.isAgentHealthy) {
+      return `No connection to the device, and the ${this.engineLabel()} voice engine is not connected either.`;
+    }
+    if (!this.isEspClientHealthy) {
+      return 'No connection to the device — check that it is powered on and reachable on the same network as Homey.';
+    }
+    return `The device is connected, but the ${this.engineLabel()} voice engine is not — check that engine's API key in the app settings.`;
+  }
+
   private updateAvailable() {
-    var current = this.getAvailable();
-    if (this.isAgentHealthy && this.isEspClientHealthy) {
+    const current = this.getAvailable();
+    const reason = this.unavailableReason();
+
+    if (reason === null) {
       if (current === false) {
         this.setAvailable();
       }
-    } else if (current === true) {
-      this.setUnavailable();
+      this.lastUnavailableReason = null;
+    } else if (current === true || reason !== this.lastUnavailableReason) {
+      // Deliberately NOT guarded on the true -> false edge alone: the reason can
+      // change while the device stays unavailable (the satellite comes back
+      // while the engine is still down), and the tile must follow.
+      this.setUnavailable(reason);
+      this.lastUnavailableReason = reason;
     }
 
     // Keep the Debug page's "last seen devices" star in sync: for a paired

@@ -1617,3 +1617,39 @@ That is the falsifiable test separating this explanation from his ("recent firmw
 when subscribed", which predicts failure on all three). If old code also fails on 26.6.0, the
 null-deref is real but is not the whole story and something else is in play on 2026.6.x.
 
+## 23. "Unavailable" now names the failing link (2026-08-18)
+
+**Why.** A device's availability is `isAgentHealthy && isEspClientHealthy` — **two independent
+links behind one word**. The satellite being unreachable and the voice engine never connecting
+render identically on the tile. The 2026-08-15 forum report is what that costs: the tester saw
+*Unavailable* next to a Debug entry showing his device paired, probed and accessible, and went
+after his network — an SSH session, a port check from another host, and a whole Home Assistant Core
+install to prove the device worked — for what is most likely a missing or wrong API key.
+`missing_api_key` returns before the websocket is even opened, so `open` never fires,
+`isAgentHealthy` stays false forever, and the ESP link is perfectly healthy the entire time.
+Background: `TODO.md` § *Diagnosability*.
+
+**Shape.** `unavailableReason()` returns the message matching whichever flag is false — engine down
+(named, plus "check that engine's API key"), device down (plus "same network as Homey"), or both.
+The engine is named with the same label the settings dropdown uses (`ENGINE_LABELS`), resolved from
+`currentProviderId`, so it follows a provider switch rather than hardcoding OpenAI. `onInit`'s bare
+`setUnavailable()` became *"Connecting to the device and the voice engine…"*, which is what it
+actually means at that point.
+
+The `updateAvailable()` guard had to change with it. It only called `setUnavailable()` on a
+**true → false edge**, which is correct for a bare call and wrong for one carrying a reason: the
+reason can change while the device stays unavailable — satellite returns, engine still down — and
+the tile would keep blaming the satellite. Now a `lastUnavailableReason` comparison drives it, so a
+*changed* reason is pushed and an unchanged one is not (no repeated writes on a repeated fault).
+
+Tests: `tests/device-availability-reason.test.mts` — both up, each side down alone, both down, the
+engine named from the *selected* provider, the reason changing while unavailable, no repeat on an
+unchanged reason, and recovery clearing it. Two harness gaps surfaced doing it: the mock SDK device
+discarded the `setUnavailable()` message (it now records last + history, which is what makes the
+"changes while unavailable" case assertable), and the shared harness's `webServer` had no
+`reportReachableIp` — the ESP `Healthy` path calls it, so it was unreachable for any test bringing
+the satellite link up.
+
+**Not addressed:** the original report's root cause, which was never established and is not
+established by this. This makes the *next* one self-diagnosing.
+

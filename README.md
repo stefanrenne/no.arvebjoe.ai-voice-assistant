@@ -663,11 +663,11 @@ entirely on the engine you pick — with the local pipeline, nothing does.
 * **No audio/response:** check the device volume and mute state, and confirm the selected
   engine's API key (or local service hosts) are set — use the settings page's **Test** buttons
   for the local pipeline.
-* **The tile says the device is unavailable, or Debug shows "Connected: no":** that needs *two*
-  links to be up — the satellite and the AI engine — and one word covers both. The commonest
-  cause is the selected engine's API key being missing or wrong, which leaves the satellite
-  perfectly healthy and the tile unavailable anyway. Turn on Settings → **Debug** →
-  **Verbose logging**, restart the app, and the log will name which side failed to connect.
+* **The tile says the device is unavailable:** that needs *two* links to be up — the satellite and
+  the AI engine. The tile now names whichever one is down, so read it first: if it blames the
+  engine, the cause is almost always that engine's API key being missing or wrong, which leaves the
+  satellite perfectly healthy and the tile unavailable anyway. If you need more than that, turn on
+  Settings → **Debug** → **Verbose logging** and restart the app.
 * **The assistant reacts to its own wake word sound:** increase the device's *Initial audio
   skip* setting slightly.
 * **The device wakes but doesn't hear what you say (or only up close):** raise the device's

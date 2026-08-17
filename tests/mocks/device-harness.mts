@@ -94,6 +94,12 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
         buildStaticUrl(filename: string) {
             return 'http://x/' + filename;
         },
+        // Called on the ESP client's 'Healthy' event, so any test that brings
+        // the satellite link up reaches it.
+        reportedIps: [] as Array<string | null>,
+        reportReachableIp(ip: string | null) {
+            this.reportedIps.push(ip);
+        },
         async buildStream(audioData: any) {
             const data: Buffer = audioData.data;
             buildStreamCalls.push(data);
