@@ -132,3 +132,42 @@ describe('unavailable reason names the failing side', () => {
         expect((h.device as any).unavailableMessage).toBeNull();
     });
 });
+
+describe('the Debug list carries the two links separately', () => {
+    beforeEach(() => {
+        __resetProviderRegistry();
+    });
+
+    it('reports device up / engine down as two distinct flags', async () => {
+        const h = await createHarness();
+        bothUp(h);
+        h.provider.emit('Unhealthy');
+
+        const entry = seenDevices.get(String(h.device.getData().id));
+        expect(entry).toBeDefined();
+        expect(entry!.available).toBe(false);
+        expect(entry!.deviceConnected).toBe(true);
+        expect(entry!.engineConnected).toBe(false);
+        expect(entry!.engineName).toBe('OpenAI Realtime');
+    });
+
+    it('reports device down / engine up the other way round', async () => {
+        const h = await createHarness();
+        bothUp(h);
+        h.esp.emit('Unhealthy');
+
+        const entry = seenDevices.get(String(h.device.getData().id));
+        expect(entry!.deviceConnected).toBe(false);
+        expect(entry!.engineConnected).toBe(true);
+    });
+
+    it('marks both connected when the device is available', async () => {
+        const h = await createHarness();
+        bothUp(h);
+
+        const entry = seenDevices.get(String(h.device.getData().id));
+        expect(entry!.available).toBe(true);
+        expect(entry!.deviceConnected).toBe(true);
+        expect(entry!.engineConnected).toBe(true);
+    });
+});

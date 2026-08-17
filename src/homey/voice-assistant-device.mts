@@ -1862,11 +1862,15 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
 
     // Keep the Debug page's "last seen devices" star in sync: for a paired
     // satellite, its live connection is a better accessibility signal than an
-    // old discovery probe.
+    // old discovery probe. The two links are carried separately as well, so the
+    // page can say which one is down (one AND is what hid that distinction).
     seenDevices.markPaired(String(this.getData().id), {
       name: this.getName(),
       address: this.getStoreValue('address'),
       available: this.isAgentHealthy && this.isEspClientHealthy,
+      deviceConnected: this.isEspClientHealthy,
+      engineConnected: this.isAgentHealthy,
+      engineName: this.engineLabel(),
     });
   }
 

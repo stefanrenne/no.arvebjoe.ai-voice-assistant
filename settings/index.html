@@ -2146,7 +2146,16 @@
           row(dl, "Probe", probeText(d, now));
           if (d.paired) {
             row(dl, "Paired as", d.pairedName || "(this app)");
-            row(dl, "Connected", d.available === null ? "unknown" : (d.available ? "yes" : "no"));
+            // Two rows, not one: availability is the AND of two independent
+            // links, and collapsing them into a single "Connected: no" is what
+            // sends people looking at the network when the engine's API key is
+            // the actual problem.
+            var yesNo = function (v) {
+              return (v === null || v === undefined) ? "unknown" : (v ? "yes" : "no");
+            };
+            row(dl, "Device connected", yesNo(d.deviceConnected));
+            row(dl, "Engine connected",
+              yesNo(d.engineConnected) + (d.engineName ? " (" + d.engineName + ")" : ""));
           }
           row(dl, "First seen", ago(now - d.firstSeen));
           row(dl, "Seen", d.seenCount + "x");

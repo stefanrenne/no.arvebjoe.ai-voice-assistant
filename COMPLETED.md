@@ -1653,3 +1653,19 @@ the satellite link up.
 **Not addressed:** the original report's root cause, which was never established and is not
 established by this. This makes the *next* one self-diagnosing.
 
+## 24. The Debug list tells the satellite from the engine (2026-08-18)
+
+The other half of §23: the Debug page's *Last seen devices* showed a single `Connected` row, itself
+the AND of the same two links, so the one screen a user is told to check could not answer "which
+side is down" either.
+
+`SeenDevice` gained `deviceConnected` / `engineConnected` / `engineName` beside the existing
+`available`. **`available` is unchanged** and still drives the star and `recordProbe`'s
+accessibility logic — the split is purely additive, so nothing that reads the AND had to move.
+`updateAvailable()` pushes all three through `markPaired`, and the page renders two rows in place of
+`Connected`, the engine row naming the engine. Both are `null` → *"unknown"* until the device
+reports, which is the honest state for an entry that has only ever been seen over mDNS (and for
+`markUnpaired`, which clears them alongside `available`).
+
+Tests: the `Debug list carries the two links separately` block in
+`tests/device-availability-reason.test.mts` — device up / engine down, the reverse, and both up.

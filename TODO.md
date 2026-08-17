@@ -122,6 +122,11 @@ the question. The second portal report (see *Crash reports* above) is this failu
 practice: a user wrote *"Pas de connexion"* and paired the same device six times, and the log he
 submitted proves the ESP handshake and playback worked while saying nothing about the agent.
 
+**Both fixes below are now done (2026-08-18, [`COMPLETED.md`](./COMPLETED.md) §23-24), as is the
+logging gap in the correction above ([`COMPLETED.md`](./COMPLETED.md) §21).** What remains open is
+only the original report itself: its root cause was never established, and the reporter was never
+asked the questions above. If he resurfaces, the tile and the Debug tab now answer them for him.
+
 Two fixes worth making regardless of what his log says — both small, self-contained, and they
 turn this whole class of report into self-diagnosis (this tester spent an SSH session, a port
 check and a whole HA Core instance on what is probably a settings problem):
@@ -131,10 +136,10 @@ check and a whole HA Core instance on what is probably a settings problem):
       true → false edge guard was replaced by a `lastUnavailableReason` comparison, so a reason
       that changes while the device stays unavailable now reaches the tile. See
       [`COMPLETED.md`](./COMPLETED.md) §23.
-- [ ] **Split the Debug row into "Device connected" and "Engine connected".** One boolean covering
-      two independent links is precisely what misdirected this report. `SeenDevice.available`
-      (`seen-devices.mts`) is written from a single AND in `updateAvailable()`; carry the two flags
-      separately through `markPaired` and render both rows in `settings/index.html:2126`.
+- [x] ~~**Split the Debug row into "Device connected" and "Engine connected".**~~ Done 2026-08-18 —
+      `SeenDevice` carries `deviceConnected` / `engineConnected` / `engineName` alongside the
+      existing `available` AND (which still drives the star), and the page renders both rows with
+      the engine named. See [`COMPLETED.md`](./COMPLETED.md) §24.
 
 ## ReSpeaker XVF3800 driver — needs hardware verification
 

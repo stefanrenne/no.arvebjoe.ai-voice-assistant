@@ -72,6 +72,17 @@ export interface SeenDevice {
     pairedName: string;
     /** Paired-device availability (its ESP client + provider are healthy); null when not paired. */
     available: boolean | null;
+    /**
+     * The two INDEPENDENT links behind `available`, carried separately so the
+     * Debug page can say which one is down. `available` is a single AND, and
+     * that is exactly what sent a field reporter after the network when the
+     * engine's API key was the problem (TODO.md, § Diagnosability).
+     * Null when not paired, or when nothing has reported yet.
+     */
+    deviceConnected: boolean | null;
+    engineConnected: boolean | null;
+    /** Which engine `engineConnected` refers to (e.g. "OpenAI Realtime"). */
+    engineName: string;
     probe: SeenDeviceProbe | null;
 }
 
@@ -182,7 +193,13 @@ export class SeenDevicesRegistry {
      */
     markPaired(
         id: string,
-        info: { name?: string; address?: string; port?: number; mac?: string; available?: boolean | null },
+        info: {
+            name?: string; address?: string; port?: number; mac?: string;
+            available?: boolean | null;
+            deviceConnected?: boolean | null;
+            engineConnected?: boolean | null;
+            engineName?: string;
+        },
         now: number = Date.now(),
     ): void {
         const entry = this.devices.get(id) ?? this.blank(id, now);
@@ -195,6 +212,9 @@ export class SeenDevicesRegistry {
         if (info.port) entry.port = info.port;
         if (info.mac && !entry.mac) entry.mac = info.mac;
         entry.available = info.available ?? entry.available ?? null;
+        entry.deviceConnected = info.deviceConnected ?? entry.deviceConnected ?? null;
+        entry.engineConnected = info.engineConnected ?? entry.engineConnected ?? null;
+        if (info.engineName) entry.engineName = info.engineName;
         this.devices.set(id, entry);
         this.evict();
     }
@@ -205,6 +225,8 @@ export class SeenDevicesRegistry {
         if (!entry) return;
         entry.paired = false;
         entry.available = null;
+        entry.deviceConnected = null;
+        entry.engineConnected = null;
     }
 
     get(id: string): SeenDevice | undefined {
@@ -264,6 +286,9 @@ export class SeenDevicesRegistry {
             paired: false,
             pairedName: '',
             available: null,
+            deviceConnected: null,
+            engineConnected: null,
+            engineName: '',
             probe: null,
         };
     }

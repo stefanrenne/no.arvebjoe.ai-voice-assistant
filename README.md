@@ -475,9 +475,11 @@ language-model and speech stages can also be set to **None** to switch them off 
   `platform`, the ESPHome version and project, and whether the device has an API encryption key.
   A **★** marks devices that answered the probe and can serve as a voice satellite; 🔒 means it
   needs an encryption key, ✕ that it answered but isn't a satellite, ⚠ that it didn't answer, and
-  **?** that it hasn't been probed yet. **Probe** re-checks a device on the spot. If a device you
-  own never shows up in this list at all, the problem is mDNS on your network, not the pairing
-  dialog.
+  **?** that it hasn't been probed yet. **Probe** re-checks a device on the spot. For a device you
+  have already paired it also shows **Device connected** and **Engine connected** separately — a
+  satellite that is reachable while the AI engine is not is by far the commonest cause of an
+  unavailable tile, and those two rows tell them apart. If a device you own never shows up in this
+  list at all, the problem is mDNS on your network, not the pairing dialog.
 * **What did I just say?** *(opt-in, off by default)* — keeps the raw microphone audio of each
   turn for 5 minutes to an hour (your choice; the last 20 recordings are kept and they're deleted
   automatically). Press **Play** next to any recording in the list and it plays back on the
@@ -666,8 +668,9 @@ entirely on the engine you pick — with the local pipeline, nothing does.
 * **The tile says the device is unavailable:** that needs *two* links to be up — the satellite and
   the AI engine. The tile now names whichever one is down, so read it first: if it blames the
   engine, the cause is almost always that engine's API key being missing or wrong, which leaves the
-  satellite perfectly healthy and the tile unavailable anyway. If you need more than that, turn on
-  Settings → **Debug** → **Verbose logging** and restart the app.
+  satellite perfectly healthy and the tile unavailable anyway. Settings → **Debug** → **Last seen
+  devices** shows the same split as **Device connected** / **Engine connected**. If you need more
+  than that, turn on Settings → **Debug** → **Verbose logging** and restart the app.
 * **The assistant reacts to its own wake word sound:** increase the device's *Initial audio
   skip* setting slightly.
 * **The device wakes but doesn't hear what you say (or only up close):** raise the device's
