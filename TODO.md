@@ -59,6 +59,26 @@ worth remembering if he sends a second log.
 - [x] ~~**A user must be able to turn the quiet loggers on without a syslog collector**~~ — added
       Settings → Debug → **Verbose logging**; write-up in [`COMPLETED.md`](./COMPLETED.md) §21.
 
+## Forum: pairing probe rebooted the satellite — one open question
+
+Fixed (full write-up: [`COMPLETED.md`](./COMPLETED.md) §22). The pairing probe asked for the
+voice-assistant configuration, which null-derefs and **reboots** ESPHome 2025.8 - 2026.5; the probe
+now settles from `DeviceInfoResponse.voice_assistant_feature_flags` instead. Verified on a real
+Voice PE, patched build, three firmwares — 25.12.4 (ESPHome 2025.12.2, affected), 26.4.0 (2026.3.2,
+affected) and 26.6.0 (2026.6.2, already safe upstream) all pair, and a command works afterwards.
+
+- [ ] **Did the reporter's 26.6.0 really fail?** He listed it among the failures, but 26.6.0 carries
+      ESPHome 2026.6.2, which has the upstream fix and answers an unsubscribed request harmlessly —
+      so on this diagnosis **old app code + PE 26.6.0 should pair fine**. Cheap test, only worth
+      running while a PE is already on 26.6.0: install the unpatched build and pair.
+      - *Pairs* → diagnosis complete; he mis-attributed that one.
+      - *Times out* → the null-deref is real but not the whole story on 2026.6.x; reopen before
+        telling anyone this is solved.
+      **Most likely explanation, no test needed:** his *original* report was "stuck Unavailable
+      **despite successful pairing**" — a different symptom from the pairing timeout, and quite
+      possibly the availability/API-key confusion in the section below. The follow-up may simply
+      have merged his two symptoms into one firmware list.
+
 ## Diagnosability — "Unavailable / Connected: no" says nothing about *what* failed
 
 **Field report 2026-08-15 (forum), Voice PE firmware 26.6.0, app v1.4.11, Homey Pro Early 2023,
@@ -106,8 +126,8 @@ Two fixes worth making regardless of what his log says — both small, self-cont
 turn this whole class of report into self-diagnosis (this tester spent an SSH session, a port
 check and a whole HA Core instance on what is probably a settings problem):
 
-- [ ] **Give `setUnavailable()` a reason.** Today it is called bare (`voice-assistant-device.mts:176`
-      and `:1791`), so two completely different faults — satellite unreachable vs. voice engine not
+- [ ] **Give `setUnavailable()` a reason.** Today it is called bare (`voice-assistant-device.mts:182`
+      and `:1802`), so two completely different faults — satellite unreachable vs. voice engine not
       connected — render as the same one word on the tile. Pass the message that matches whichever
       of `isEspClientHealthy` / `isAgentHealthy` is false (and name the engine when it is the
       agent). Mind that `updateAvailable()` currently only calls `setUnavailable()` on a

@@ -761,8 +761,9 @@ class EspVoiceAssistantClient extends (EventEmitter as new () => TypedEmitter<Es
       // A discovery probe must NOT subscribe: ESPHome tracks a single voice-assistant
       // API subscriber, so subscribing here would re-bind an already-paired device's
       // voice pipeline to this short-lived probe connection and break the real one
-      // until it reconnects. Identification only needs DeviceInfo + VA config (below),
-      // which drive the counts the pairing capability check reads.
+      // until it reconnects. Identification only needs the entity list plus
+      // DeviceInfoResponse (below), which drive the counts the pairing capability
+      // check reads.
       if (!this.isDiscoveryProbe) {
         const subscribe = {
           subscribe: true,
@@ -810,6 +811,41 @@ class EspVoiceAssistantClient extends (EventEmitter as new () => TypedEmitter<Es
       const featureFlags = message?.voiceAssistantFeatureFlags ?? 0;
       this.timersSupported = (featureFlags & 8) !== 0;
       this.logger.info(`Voice assistant feature flags: ${featureFlags} (timers ${this.timersSupported ? 'supported' : 'NOT advertised'})`);
+
+      // A discovery probe must NOT ask for the voice-assistant configuration:
+      // on ESPHome 2025.8.0 - 2026.5.0 that request CRASHES an unsubscribed
+      // device. VoiceAssistantConfigurationResponse.active_wake_words became a
+      // POINTER in 2025.8.0 (`const std::vector<std::string> *`, default null),
+      // and the unsubscribed branch of
+      // APIConnection::send_voice_assistant_get_configuration_response_() sends
+      // the response without ever setting it — so calculate_size() runs
+      // `this->active_wake_words->empty()` on nullptr and the ESP32 panics with
+      // LoadProhibited and reboots. That is the "sent the request, then total
+      // silence until the probe times out" field report; the satellite is not
+      // ignoring us, it is rebooting. 2026.6.0 fixed it by pointing the field at
+      // a stack-local empty vector, and <= 2025.7.0 was safe because the field
+      // was still a by-value vector.
+      //
+      // Subscribing first would also avoid the crash, but a probe must never
+      // subscribe: ESPHome tracks a single voice-assistant API subscriber, so
+      // probing an ALREADY-PAIRED device (which pairing does — list_devices
+      // probes everything mDNS returns) would re-bind its pipeline to this
+      // short-lived connection and leave it deaf until it reconnects.
+      //
+      // Nothing is lost: DeviceInfoResponse.voice_assistant_feature_flags is
+      // sent unconditionally, needs no subscription, and is non-zero for every
+      // voice satellite — get_feature_flags() always ORs in FEATURE_VOICE_
+      // ASSISTANT | FEATURE_API_AUDIO when the component is compiled in. The
+      // wake-word list is the only extra the config response carries, and a
+      // probe has no use for it; the real (subscribed) connection still asks.
+      if (this.isDiscoveryProbe) {
+        const legacyVersion = message?.legacyVoiceAssistantVersion ?? 0;
+        const isVoiceSatellite = featureFlags !== 0 || legacyVersion !== 0;
+        this.voiceAssistantConfigurationCount = isVoiceSatellite ? 1 : 0;
+        this.logger.info(`Probe: voice assistant ${isVoiceSatellite ? 'supported' : 'NOT supported'} (flags ${featureFlags}, legacy version ${legacyVersion})`);
+        this.emit('capabilities', this.mediaPlayersCount, this.subscribeVoiceAssistantCount, this.voiceAssistantConfigurationCount, this.deviceType);
+        return;
+      }
 
       this.send('VoiceAssistantConfigurationRequest', {});
 

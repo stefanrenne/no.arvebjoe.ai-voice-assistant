@@ -641,6 +641,15 @@ entirely on the engine you pick — with the local pipeline, nothing does.
   Settings → **Debug** → **Last seen devices** shows everything discovery has found, so you can
   tell "Homey never saw it" (a network/mDNS problem) from "Homey saw it but it isn't a
   satellite" (the probe result is right there).
+* **Pairing finds the device but always times out on it:** update the app — older versions asked
+  the device for its wake-word configuration during the pairing probe, which crashes and reboots
+  the device on **ESPHome 2025.8 through 2026.5**, so it went silent mid-handshake. Updating the app
+  is enough to pair. Note that the ESPHome version is *not* the same number as your device's
+  firmware version — a Voice PE on firmware 26.4.0 reports ESPHome 2026.3.2, and 25.12.4 reports
+  2025.12.2 (both affected), while firmware 26.6.0 reports 2026.6.2 (fixed upstream). Settings →
+  **Debug** → **Last seen devices** shows the actual ESPHome version. Updating the device firmware
+  past the affected range is worth doing anyway, since any other tool that asks the same question
+  will still reboot it.
 * **Scan times out even though the device is reachable:** discovery uses mDNS/multicast, which
   doesn't always reach the Homey (e.g. a Wi-Fi-only Homey Pro, or multicast not forwarded on
   your network). Use **Enter IP address manually** in the pairing wizard to add it directly by

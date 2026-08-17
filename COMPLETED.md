@@ -1540,3 +1540,80 @@ changes only, no effect on never-quieted loggers, and warnings still written whi
 `afterEach` resets the flag, since a leaked module-level `true` would change every later test's
 output. README's Debug section (now four tools) and a new troubleshooting entry for
 *"the tile says unavailable / Connected: no"* point at it; `README.txt` deliberately untouched.
+
+## 22. The pairing probe was rebooting the satellite — ESPHome's null `active_wake_words` (2026-08-17)
+
+**Report.** A forum follow-up to the *"Voice PE stuck Unavailable despite successful pairing"*
+thread, from a reporter who had run the app from source with the `ESP` logger re-enabled. His log
+pinned the exact stall — TCP connect OK → Hello OK → `DeviceInfoResponse` OK →
+`VoiceAssistantConfigurationRequest` sent → **total silence** → 8 s timeout — and he had bisected
+it by firmware age: older firmware paired, 25.12.4 / 26.4.0 / 26.6.0 did not. His diagnosis was
+that recent firmware *"only replies to `VoiceAssistantConfigurationRequest` if the client is
+subscribed"*, and his fix was to make the probe always subscribe.
+
+**The symptom and the bisection were right; the mechanism was not — and the difference matters.**
+ESPHome answers an unsubscribed configuration request in every version we support. Checked against
+the real sources (`api_connection.cpp` + generated `api_pb2.{h,cpp}`, tags 2025.7.0 → 2026.7.0):
+
+- **≤ 2025.7.0** — `VoiceAssistantConfigurationResponse.active_wake_words` is a by-value
+  `std::vector<std::string>`. An unsubscribed request encodes fine and returns an empty response.
+  **Probe works.** This is the "older firmware" the reporter saw succeed.
+- **2025.8.0 – 2026.5.0** — the field became `const std::vector<std::string> *`, default **null**.
+  The unsubscribed branch of `send_voice_assistant_get_configuration_response_()` sends the
+  response *without ever setting it*, and `calculate_size()` then runs
+  `this->active_wake_words->empty()` on nullptr. The ESP32 takes a `LoadProhibited` exception and
+  **reboots**. The satellite is not ignoring the request — it is crashing on it.
+- **2026.6.0+** — fixed upstream by pointing the field at a stack-local empty vector
+  (*"send_message encodes synchronously, so this stack local outlives the encode"*).
+  **Probe works again.**
+
+So we were rebooting people's satellites: every pair-time `list_devices` probes **everything** mDNS
+returns, including already-paired devices, and the discovery watcher probes up to three un-paired
+devices a minute. That is a much worse bug than a pairing timeout, and it is the likely engine
+behind the original *"paired but stuck Unavailable"* complaint — the device keeps getting knocked
+over underneath a working pairing.
+
+**Why we did not take the offered fix.** Subscribing during the probe does avoid the crash, but
+ESPHome tracks a **single** voice-assistant API subscriber per device, so probing an already-paired
+satellite would re-bind its pipeline to the short-lived probe connection and leave it deaf until it
+reconnected. The reporter would not have seen this — it needs a second, already-paired device to
+show up. The existing "a discovery probe must NOT subscribe" comment was right and stays.
+
+**Fix (his own third suggestion, and the cheapest).** The probe no longer sends
+`VoiceAssistantConfigurationRequest` at all. `DeviceInfoResponse.voice_assistant_feature_flags` is
+sent unconditionally, needs no subscription, cannot crash anything, and is non-zero for every voice
+satellite — `VoiceAssistant::get_feature_flags()` always ORs in `FEATURE_VOICE_ASSISTANT |
+FEATURE_API_AUDIO` when the component is compiled in. `legacy_voice_assistant_version` is accepted
+as a fallback for pre-flags firmware. The probe emits `capabilities` straight from
+`DeviceInfoResponse`; the real (subscribed) connection still asks for the config, because the
+wake-word list is the one thing the response carries that we actually use — and a probe has no use
+for it. `esp-probe.mts` and its contract are untouched: same event, same four arguments.
+
+Tests: `tests/esp-probe-no-va-config.test.mts` — the probe never sends the request (nor a
+subscribe), settles capabilities from device info, honours the legacy version field, reports a
+non-voice ESPHome node as incapable, and the non-probe path still asks.
+
+**Not fixable from our side for affected firmware in general:** any *other* API client that asks an
+unsubscribed 2025.8–2026.5 device for its VA configuration will still reboot it. Users on those
+builds should update to 2026.6.0+ regardless.
+
+**Device firmware version != ESPHome version (measured, 2026-08-17).** Read off a real Voice PE's
+`esphome_version` in Settings -> Debug after flashing each build:
+
+| Voice PE firmware | reports ESPHome | verdict |
+|---|---|---|
+| 25.12.4 | 2025.12.2 | **affected** |
+| 26.4.0  | 2026.3.2  | **affected** |
+| 26.6.0  | 2026.6.2  | safe (fixed upstream) |
+
+The PE bundles an ESPHome one to two months older than its own version number, so the affected
+range must never be quoted to users in PE-firmware terms. README's troubleshooting entry states the
+ESPHome range and points at the Debug tab for the real value.
+
+**Open question the reporter's account does not survive.** He listed 26.6.0 among the firmwares that
+failed for him — but 26.6.0 carries ESPHome 2026.6.2, which has the upstream fix and answers an
+unsubscribed request harmlessly. On this diagnosis, **old app code + PE 26.6.0 should pair fine**.
+That is the falsifiable test separating this explanation from his ("recent firmware only replies
+when subscribed", which predicts failure on all three). If old code also fails on 26.6.0, the
+null-deref is real but is not the whole story and something else is in play on 2026.6.x.
+
