@@ -85,9 +85,26 @@ Verified on hardware 2026-08-18 across all four satellites (2× PE, TR, XiaoZhi)
 in particular the answer to the feature-flags question, is in [`COMPLETED.md`](./COMPLETED.md) §25.
 Three cheap checks were never looked at. None is a gate — nothing observed suggests they fail.
 
-- [ ] **A paired device's uptime after a pair scan.** The satellite kept working throughout a scan,
-      but a silent reboot plus a fast recovery looks identical by eye. One look at the uptime sensor
-      settles it.
+- [ ] **Did a pair scan silently reboot the live device?** The satellite kept working throughout a
+      scan, but that is consistent with two different worlds: it never rebooted, or it rebooted and
+      recovered inside the ~5–10 s it takes ESPHome to boot, rejoin Wi-Fi and reconnect. §22's bug
+      was precisely a *reboot*, so the two need separating. **There is no uptime value to read** —
+      nothing in the app surfaces one — so read the log instead, which is stronger evidence anyway
+      (it also catches a link drop that is *not* a reboot):
+      1. Turn on Settings → **Debug** → **Verbose logging** (the `ESP` logger is `disabled: true`,
+         so it prints nothing otherwise), or run `homey app run --remote`.
+      2. With device A paired and working, start a pair scan and let it run over A.
+      3. Watch A's `ESP` lines. A reboot cannot hide — the TCP link has to drop and return:
+         `TCP connection closed unexpectedly`
+         (`src/voice_assistant/esp-voice-assistant-client.mts:273`) → `Scheduling reconnection
+         attempt` (`:313`) → `Connected to <ip>:6053` (`:323`) → a burst of `Registered media
+         player / switch / number / select / sensor …` (`:680` onward) as the entity list is
+         re-read. None of that during the scan = A did not reboot.
+
+      Put A on a PE running **25.12.4 or 26.4.0** — the firmwares that actually crashed; on 26.6.0
+      ESPHome already has the upstream fix, so a pass proves much less. Do **not** wait for the
+      welcome sound as a reboot marker: it is one-shot on the `justPaired` store flag
+      (`src/homey/voice-assistant-device.mts:794`) and deliberately never replays on a reconnect.
 - [ ] **Wake words still list and still switch** on a paired PE, and **timers are still offered**
       where the device advertises them (`feature_flags & 8`). The probe changed but the real
       (subscribed) connection did not, and it is still where the wake-word list comes from — an
