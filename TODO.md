@@ -79,79 +79,22 @@ affected) and 26.6.0 (2026.6.2, already safe upstream) all pair, and a command w
       possibly the availability/API-key confusion in the section below. The follow-up may simply
       have merged his two symptoms into one firmware list.
 
-## Hardware verification for 98f9629 / a967204 / e5d7b7b — PE, TR, XiaoZhi
+## Hardware verification for 98f9629 / a967204 / e5d7b7b — three checks left
 
-Three commits landed on `dev` on 2026-08-18 that touch **every** driver's pairing path and the
-availability of every paired device. Only the **PE** has been exercised (patched build, firmwares
-25.12.4 / 26.4.0 / 26.6.0, all paired + one command). The **TR** and **XiaoZhi** have not been
-touched at all, and one of them carries real risk. Run these on the hardware already on hand.
+Verified on hardware 2026-08-18 across all four satellites (2× PE, TR, XiaoZhi); the record, and
+in particular the answer to the feature-flags question, is in [`COMPLETED.md`](./COMPLETED.md) §25.
+Three cheap checks were never looked at. None is a gate — nothing observed suggests they fail.
 
-### The one that can actually regress: does each device report `voice_assistant_feature_flags`?
-
-The probe no longer asks for the voice-assistant configuration; it decides "this is a voice
-satellite" from `DeviceInfoResponse.voice_assistant_feature_flags` (falling back to
-`legacy_voice_assistant_version`). **If a device reports 0 for both, it will now be rejected as
-`not_a_match` and become unpairable** — a regression this change would have introduced.
-
-Confidence per device, and what that means for testing:
-
-| Device | Basis | Risk |
-|---|---|---|
-| **PE** | ESPHome — `get_feature_flags()` always ORs in `VOICE_ASSISTANT \| API_AUDIO`. Observed working. | none |
-| **TR** | Not ESPHome — a *Linux* reimplementation of the API. `docs/thirdreality-voice-and-music/README.md:93` says it sets bits 0\|2\|3\|4\|5, but that was **read from its source, never observed**. | **medium** |
-| **XiaoZhi** | **Unverified — no doc, no capture, no source reading.** If its firmware is not ESPHome-derived, or omits the field, it stops pairing. | **highest — test first** |
-
-- [ ] **XiaoZhi: pair it from scratch.** Delete it from Homey, then add it via the network scan.
-      Expect it to be found and listed as before. If it is *not* listed, this change is the cause:
-      capture `voice_assistant_feature_flags` from its `DeviceInfoResponse` (Settings → **Debug** →
-      **Verbose logging**, then re-probe) and report the value — the fix is to widen the signal, not
-      to revert.
-- [ ] **TR: pair it from scratch.** Same procedure, same expectation.
-- [ ] **PE: pair it from scratch once more** on whichever firmware is currently flashed. Already
-      done for all three firmwares, so this is a smoke test, not a gate.
-
-### The probe must no longer disturb an already-paired device
-
-This is the bug the first commit fixes, and the case no test so far has covered — it needs **two**
-devices, which is why it was not run.
-
-- [ ] **Pair device A, leave it working, then start a new pair scan** (which re-probes everything
-      mDNS returns, A included) and leave the scan running. **A must keep working throughout** — no
-      reboot, no drop to Unavailable, and it must still answer its wake word during and after the
-      scan. Any pairing of A + B combination will do; A on the PE with **25.12.4 or 26.4.0** is the
-      most meaningful, since those are the firmwares that used to crash.
-- [ ] **Same, but check A's uptime afterwards** if the device exposes it — a silent reboot and a
-      quick recovery are hard to tell apart by eye.
-
-### Nothing downstream of pairing broke
-
-The probe changed; the real (subscribed) connection did **not**, and it still requests the
-voice-assistant configuration. That is where the wake-word list comes from, so:
-
-- [ ] **Wake words still list and still switch** on a paired PE (Settings → the device's wake-word
-      selector). An empty list means the real connection stopped getting the config response — a
-      different fault from the probe change, but this is where it would show.
-- [ ] **One command end to end per device** (PE, TR, XiaoZhi) — wake, ask, get an answer, and for
-      the TR/PE confirm audio plays back.
-- [ ] **Timers still offered** where the device advertises them (`feature_flags & 8`) — the same
-      field the probe now leans on, read on the real connection.
-
-### The new availability reason and the split Debug rows
-
-- [ ] **Tile blames the engine.** With a device paired and working, clear the selected engine's API
-      key in settings. The tile must go unavailable reading *"The device is connected, but the
-      &lt;engine&gt; voice engine is not — check that engine's API key…"*, naming the engine actually
-      selected. Restore the key and it must recover on its own.
-- [ ] **Tile blames the device.** Power the satellite off. The tile must read *"No connection to the
-      device — check that it is powered on…"* and must **not** mention an API key.
-- [ ] **The reason updates while still unavailable.** Kill both (bad key + device off), then power
-      the device back on *without* fixing the key. The tile must switch from the both-down wording
-      to blaming the engine — it must not stay stuck on the first message. This is the case the old
-      true → false edge guard got wrong, and it is only observable on hardware.
-- [ ] **Debug rows.** Settings → **Debug** → **Last seen devices** on a paired device shows
-      **Device connected** and **Engine connected** as separate rows, with the engine named, and
-      they disagree in the two states above. Devices that are merely *seen* (not paired) must still
-      render without them.
+- [ ] **A paired device's uptime after a pair scan.** The satellite kept working throughout a scan,
+      but a silent reboot plus a fast recovery looks identical by eye. One look at the uptime sensor
+      settles it.
+- [ ] **Wake words still list and still switch** on a paired PE, and **timers are still offered**
+      where the device advertises them (`feature_flags & 8`). The probe changed but the real
+      (subscribed) connection did not, and it is still where the wake-word list comes from — an
+      empty selector is where a broken config response would show.
+- [ ] **One command end to end on the XiaoZhi**, audio playback included. It paired cleanly but was
+      never driven through a full turn. (The TR's is done — a whole multi-turn quiz with playback,
+      §25.)
 
 ## Diagnosability — "Unavailable / Connected: no" says nothing about *what* failed
 

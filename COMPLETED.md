@@ -1669,3 +1669,53 @@ reports, which is the honest state for an entry that has only ever been seen ove
 
 Tests: the `Debug list carries the two links separately` block in
 `tests/device-availability-reason.test.mts` — device up / engine down, the reverse, and both up.
+
+## 25. Hardware verification of the pairing probe and the availability changes (2026-08-18)
+
+The checklist for 98f9629 / a967204 / e5d7b7b (§22, §23, §24), run the same day on the owner's four
+satellites — two Voice PE, one ThirdReality, one XiaoZhi. Kept because most of it cannot be re-run
+without that hardware, and because two of these were open **questions**, not confirmations.
+
+**The feature-flags question is answered: the TR and the XiaoZhi both report a usable
+`voice_assistant_feature_flags`.** Both were deleted from Homey and re-added via the network scan;
+both were found, listed and paired without incident. This was the one genuine regression risk in
+§22's fix — the probe stopped asking for the voice-assistant configuration and now decides "this is
+a voice satellite" from that field (falling back to `legacy_voice_assistant_version`), so a device
+reporting 0 for both would have become **unpairable**. It was safe by construction only on ESPHome
+(`get_feature_flags()` always ORs in `VOICE_ASSISTANT | API_AUDIO`); the TR is a *Linux*
+reimplementation of the API whose bits were read from its source and never observed, and the
+XiaoZhi had no doc, no capture and no source reading behind it at all. Both fill the field. **No
+device on hand needs the signal widened**, which is what the contingency plan would have been.
+
+**The probe no longer disturbs an already-paired device.** With one device paired and working, a
+new pair scan (which re-probes everything mDNS returns, the live device included) ran to completion
+with no disruption, and a request to the already-paired device immediately after adding a new one
+answered normally. That is the bug 98f9629 fixes and the case **no automated test can reach** — it
+needs two physical devices.
+
+**Both availability changes behave on hardware.** §23's reasons name the right side in each state,
+including the transition the old true → false edge guard got wrong (device restored, engine still
+down → the tile re-blames the engine instead of staying stuck), and §24's split *Device connected* /
+*Engine connected* rows in the Debug list read correctly alongside them.
+
+**Two satellites hold simultaneous, independent sessions.** A PE and a TR share the wake word
+*"ok nabu"*, so one utterance woke both, and both were asked for a three-question quiz. Each
+understood the request and ran its **own** quiz — different questions, at the same time. Everything
+downstream of the device is an app-level singleton (`WebServer` audio URLs, `FileHelper`, the
+recording registry), and nothing automated runs two turns concurrently, so this is the only evidence
+that a second live session does not collide with the first.
+
+**A satellite lost mid-session does not disturb the others, and recovers itself.** The PE was
+unplugged **during** the quiz, not while idle; the TR carried its own conversation through to the
+end unaffected. Plugging the PE back in — including a ~1 s flap — reconnected without disturbing the
+TR, which stayed responsive throughout, and the **PE then behaved normally**, so a session torn down
+mid-turn leaves nothing wedged behind it. Run **in both directions** (TR pulled instead, PE
+continuing), same result. This is §19's isolation exercised on the live path rather than on delete.
+
+**Not repeated:** PE pairing from scratch, already covered by §22's firmware sweep (25.12.4 /
+26.4.0 / 26.6.0, each paired plus a command afterwards).
+
+**Not run**, carried in `TODO.md` and not gates: the paired device's uptime after a scan (a silent
+reboot with a fast recovery is invisible by eye), the wake-word list/switch and timer offer on a PE,
+and a full turn on the freshly re-paired XiaoZhi. (The TR's is covered — it ran a whole multi-turn
+quiz with playback.)
