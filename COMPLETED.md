@@ -1715,7 +1715,62 @@ continuing), same result. This is §19's isolation exercised on the live path ra
 **Not repeated:** PE pairing from scratch, already covered by §22's firmware sweep (25.12.4 /
 26.4.0 / 26.6.0, each paired plus a command afterwards).
 
-**Not run**, carried in `TODO.md` and not gates: the paired device's uptime after a scan (a silent
-reboot with a fast recovery is invisible by eye), the wake-word list/switch and timer offer on a PE,
-and a full turn on the freshly re-paired XiaoZhi. (The TR's is covered — it ran a whole multi-turn
+### The probe cannot reboot the satellite — proved on the wire, 2026-08-19
+
+The reboot question was reopened the next day with a syslog collector on the LAN
+(`remote_log_*` pointed at a laptop, level DEBUG, which is enough on its own — the quieted `ESP`
+and `Discovery` loggers mirror into remote logging at DEBUG, so **Verbose logging is not needed**).
+The intended test — watch a live device's link across a pair scan — turned out not to be runnable
+as written, and the reason is worth keeping:
+
+- **An encrypted device is never probed at all.** The paired PE advertises `api_encryption`, so the
+  scan logs `… advertises api_encryption — listing without probing` and skips it
+  (`voice-assistant-driver.mts:426`). No connection, so no reboot is possible — but also no test.
+- **The background watcher would not do it either.** `probeUnknown()` only considers
+  `registry.unprobed()` (`discovery-watcher.mts:109`), so a device probed once — even one that
+  merely failed as `unreachable` — is off the candidate list forever and never re-probed.
+- The pair view's ~8 s re-probe loop only runs while the list is **empty** (Homey retrying
+  `list_devices`); it stops as soon as a device is listed, and it stops when the dialog closes.
+
+The answer came from the **second, unencrypted PE** (`093b27`, ESPHome **2026.3.2** = firmware
+26.4.0, an *affected* version) as the scan probed it. Its complete conversation:
+
+```
+Connected → [TX] HelloRequest → [RX] HelloResponse
+            [TX] ConnectRequest
+            [TX] ListEntitiesRequest → … → ListEntitiesDoneResponse
+            [TX] DeviceInfoRequest   → [RX] DeviceInfoResponse
+→ Probed … { status: 'accessible', deviceType: 'pe' }
+```
+
+**No `SubscribeVoiceAssistantRequest`, no `VoiceAssistantConfigurationRequest`.** The message whose
+null-deref reboots ESPHome 2025.8–2026.5 is never sent, on the firmware that used to crash. That
+rules out the *mechanism*, which is a stronger result than any number of "the device seemed fine"
+observations — and it is why the uptime check this replaced is gone rather than deferred.
+
+**A coincidence that cost twenty minutes, recorded so it is not re-diagnosed:** the paired PE went
+`EHOSTUNREACH` during the same session and it looked like the scan had killed it. It had not — the
+device's last `PingResponse` was **2 m 45 s before the scan started**, and its reconnect loop was
+already at attempt 3 when the pair session opened. It dropped its own Wi-Fi (different power outlet
+from the device being powered on at the time) and needed a manual reboot. Note for the
+*Diagnosability* section: the health check reported `Connection is healthy` twice while the device
+was already silent, because it measures against its own **sent** ping — only the `Last ping received
+110s ago` in the message hinted at the truth.
+
+**Nothing downstream of pairing broke**, confirmed on the paired PE's reconnect at the end of the
+same session (it is encrypted, so this also re-exercised the Noise path):
+
+```
+Encrypted link established with 'home-assistant-voice-0908d1' (20f83b0908d1)
+Voice assistant feature flags: 125 (timers supported)
+[RX] VoiceAssistantConfigurationResponse
+Wake words: available=[hey_homey, okay_nabu, hey_jarvis, hey_mycroft], active=[okay_nabu], max=1
+```
+
+The probe stopped asking for the voice-assistant configuration; the **real** connection still asks
+and still gets it, which is where the wake-word list comes from, and timers are still advertised
+(`125 & 8`). The write side is fine too — **switching the active wake word was used repeatedly**
+throughout this testing.
+
+**Not run**, carried in `TODO.md` and not a gate: a full turn on the freshly re-paired XiaoZhi. (The TR's is covered — it ran a whole multi-turn
 quiz with playback.)
