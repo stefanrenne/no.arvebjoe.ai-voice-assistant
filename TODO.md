@@ -79,16 +79,6 @@ affected) and 26.6.0 (2026.6.2, already safe upstream) all pair, and a command w
       possibly the availability/API-key confusion in the section below. The follow-up may simply
       have merged his two symptoms into one firmware list.
 
-## Hardware verification for 98f9629 / a967204 / e5d7b7b — one check left
-
-Verified on hardware 2026-08-18/19 across all four satellites (2× PE, TR, XiaoZhi); the record —
-the feature-flags answer, the concurrency results, and the probe's wire trace — is in
-[`COMPLETED.md`](./COMPLETED.md) §25. One thing was never looked at, and it is not a gate.
-
-- [ ] **One command end to end on the XiaoZhi**, audio playback included. It paired cleanly but was
-      never driven through a full turn. (The TR's is done — a whole multi-turn quiz with playback,
-      §25.)
-
 ## Diagnosability — "Unavailable / Connected: no" says nothing about *what* failed
 
 **Field report 2026-08-15 (forum), Voice PE firmware 26.6.0, app v1.4.11, Homey Pro Early 2023,

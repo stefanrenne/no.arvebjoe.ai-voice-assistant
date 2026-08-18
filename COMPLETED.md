@@ -1772,5 +1772,7 @@ and still gets it, which is where the wake-word list comes from, and timers are 
 (`125 & 8`). The write side is fine too — **switching the active wake word was used repeatedly**
 throughout this testing.
 
-**Not run**, carried in `TODO.md` and not a gate: a full turn on the freshly re-paired XiaoZhi. (The TR's is covered — it ran a whole multi-turn
+**The checklist is complete.** The last item — a full turn on the freshly re-paired XiaoZhi, audio
+playback included — was run on 2026-08-19 and worked. Every device on hand (2× PE, TR, XiaoZhi) has
+now been paired from scratch and driven through a conversation on this code. (The TR's is covered — it ran a whole multi-turn
 quiz with playback.)
