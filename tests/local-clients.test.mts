@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { WhisperClient } from '../src/llm/providers/local/whisper-client.mjs';
 import { OllamaClient, DEFAULT_NUM_CTX } from '../src/llm/providers/local/ollama-client.mjs';
 import { MistralClient } from '../src/llm/providers/local/mistral-client.mjs';
+import { ClaudeClient, claudeModelOptions, toAnthropicMessages, DEFAULT_CLAUDE_MODEL } from '../src/llm/providers/local/claude-client.mjs';
 import { MistralSttClient } from '../src/llm/providers/local/mistral-stt-client.mjs';
 import { MistralTtsClient, listMistralTtsVoices, mistralVoiceOptions } from '../src/llm/providers/local/mistral-tts-client.mjs';
 import { generateToolCallId, sanitizeToolCallId } from '../src/llm/providers/local/llm-client.mjs';
@@ -310,6 +311,228 @@ describe('MistralClient', () => {
         const client = new MistralClient({ apiKey: 'bad', model: '' });
         fetchImpl = () => jsonResponse({ message: 'Unauthorized' }, 401);
         await expect(client.check()).rejects.toThrow(/API key was rejected/);
+    });
+});
+
+/** Anthropic Claude ------------------------------------------------------------- */
+
+/**
+ * Anthropic SSE body. Unlike the OpenAI helpers above this returns a REAL
+ * Response: the Anthropic SDK reads response.headers / response.body itself,
+ * so a hand-rolled stub object is not enough.
+ */
+function anthropicStream(events: any[]) {
+    const body = events.map((e) => `event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join('');
+    return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+}
+
+/** message_start … message_stop around the given content blocks. */
+function claudeReply(blocks: any[], stopReason = 'end_turn', stopDetails: any = null) {
+    const events: any[] = [{
+        type: 'message_start',
+        message: {
+            id: 'msg_1', type: 'message', role: 'assistant', model: 'claude-opus-5',
+            content: [], stop_reason: null, stop_sequence: null,
+            usage: { input_tokens: 10, output_tokens: 0 },
+        },
+    }];
+    blocks.forEach((block, index) => {
+        if (block.type === 'text') {
+            events.push({ type: 'content_block_start', index, content_block: { type: 'text', text: '' } });
+            for (const piece of block.pieces as string[]) {
+                events.push({ type: 'content_block_delta', index, delta: { type: 'text_delta', text: piece } });
+            }
+        } else {
+            events.push({
+                type: 'content_block_start', index,
+                content_block: { type: 'tool_use', id: block.id, name: block.name, input: {} },
+            });
+            for (const piece of block.pieces as string[]) {
+                events.push({ type: 'content_block_delta', index, delta: { type: 'input_json_delta', partial_json: piece } });
+            }
+        }
+        events.push({ type: 'content_block_stop', index });
+    });
+    events.push({
+        type: 'message_delta',
+        delta: { stop_reason: stopReason, stop_sequence: null, ...(stopDetails ? { stop_details: stopDetails } : {}) },
+        usage: { output_tokens: 20 },
+    });
+    events.push({ type: 'message_stop' });
+    return anthropicStream(events);
+}
+
+describe('toAnthropicMessages', () => {
+    it('hoists system messages out of the conversation', () => {
+        const { system, messages } = toAnthropicMessages([
+            { role: 'system', content: 'You are helpful' },
+            { role: 'user', content: 'hi' },
+        ]);
+        expect(system).toBe('You are helpful');
+        expect(messages).toEqual([{ role: 'user', content: 'hi' }]);
+    });
+
+    it('merges one round of tool results into a single user message', () => {
+        const { messages } = toAnthropicMessages([
+            { role: 'user', content: 'lights?' },
+            {
+                role: 'assistant', content: '', toolCalls: [
+                    { id: 'toolu_1', name: 'get_devices', args: { zone: 'Kitchen' } },
+                    { id: 'toolu_2', name: 'get_time', args: {} },
+                ],
+            },
+            { role: 'tool', toolCallId: 'toolu_1', toolName: 'get_devices', content: '[]' },
+            { role: 'tool', toolCallId: 'toolu_2', toolName: 'get_time', content: '12:00' },
+        ]);
+
+        // The tool-call turn carries no empty text block (the API rejects those).
+        expect(messages[1]).toEqual({
+            role: 'assistant',
+            content: [
+                { type: 'tool_use', id: 'toolu_1', name: 'get_devices', input: { zone: 'Kitchen' } },
+                { type: 'tool_use', id: 'toolu_2', name: 'get_time', input: {} },
+            ],
+        });
+        // Both results ride in ONE user message, as parallel tool use requires.
+        expect(messages.length).toBe(3);
+        expect(messages[2]).toEqual({
+            role: 'user',
+            content: [
+                { type: 'tool_result', tool_use_id: 'toolu_1', content: '[]' },
+                { type: 'tool_result', tool_use_id: 'toolu_2', content: '12:00' },
+            ],
+        });
+    });
+
+    it('drops leading assistant turns so the conversation starts on user', () => {
+        // Trimming history to a fixed message count can cut mid-exchange.
+        const { messages } = toAnthropicMessages([
+            { role: 'system', content: 'sys' },
+            { role: 'assistant', content: 'earlier reply' },
+            { role: 'user', content: 'and now?' },
+        ]);
+        expect(messages).toEqual([{ role: 'user', content: 'and now?' }]);
+    });
+});
+
+describe('ClaudeClient', () => {
+    it('streams text deltas and sends system, tools and the effort hint', async () => {
+        const client = new ClaudeClient({ apiKey: 'sk-ant-test', model: '' });
+        fetchImpl = () => claudeReply([{ type: 'text', pieces: ['God ', 'dag!'] }]);
+
+        const deltas: string[] = [];
+        const result = await client.chat(
+            [{ role: 'system', content: 'Be brief' }, { role: 'user', content: 'hei' }],
+            [{ name: 'get_time', description: 'the time', parameters: { type: 'object', properties: {} } }],
+            (d) => deltas.push(d),
+        );
+
+        expect(result.content).toBe('God dag!');
+        expect(deltas).toEqual(['God ', 'dag!']);
+        expect(result.toolCalls).toEqual([]);
+
+        const call = fetchCalls[0];
+        expect(call.url).toBe('https://api.anthropic.com/v1/messages');
+        expect(new Headers(call.init.headers).get('x-api-key')).toBe('sk-ant-test');
+        const body = JSON.parse(call.init.body);
+        expect(body.model).toBe(DEFAULT_CLAUDE_MODEL);
+        expect(body.stream).toBe(true);
+        expect(body.system).toBe('Be brief');
+        expect(body.messages).toEqual([{ role: 'user', content: 'hei' }]);
+        // Anthropic tools use input_schema, not OpenAI's function/parameters.
+        expect(body.tools).toEqual([{ name: 'get_time', description: 'the time', input_schema: { type: 'object', properties: {} } }]);
+        expect(body.output_config).toEqual({ effort: 'low' });
+    });
+
+    it('returns tool_use blocks with parsed arguments', async () => {
+        const client = new ClaudeClient({ apiKey: 'sk-ant-test', model: 'claude-opus-5' });
+        fetchImpl = () => claudeReply([
+            { type: 'text', pieces: ['One moment'] },
+            { type: 'tool_use', id: 'toolu_01ABC', name: 'set_device', pieces: ['{"id":"a', '","on":true}'] },
+        ], 'tool_use');
+
+        const result = await client.chat([{ role: 'user', content: 'lights on' }], []);
+        expect(result.content).toBe('One moment');
+        expect(result.toolCalls).toEqual([{ id: 'toolu_01ABC', name: 'set_device', args: { id: 'a', on: true } }]);
+    });
+
+    it('omits output_config on models that reject it', async () => {
+        const client = new ClaudeClient({ apiKey: 'sk-ant-test', model: 'claude-haiku-4-5' });
+        fetchImpl = () => claudeReply([{ type: 'text', pieces: ['ok'] }]);
+
+        await client.chat([{ role: 'user', content: 'hi' }], []);
+        const body = JSON.parse(fetchCalls[0].init.body);
+        expect(body.model).toBe('claude-haiku-4-5');
+        expect(body.output_config).toBeUndefined();
+    });
+
+    it('surfaces a refusal instead of returning silence', async () => {
+        const client = new ClaudeClient({ apiKey: 'sk-ant-test', model: '' });
+        fetchImpl = () => claudeReply([], 'refusal', { type: 'refusal', category: 'cyber', explanation: 'no' });
+
+        await expect(client.chat([{ role: 'user', content: 'hi' }], [])).rejects.toThrow(/declined/);
+    });
+
+    it('reports missing credentials and a rejected key clearly', async () => {
+        const noKey = new ClaudeClient({ apiKey: '', model: '' });
+        expect(noKey.isConfigured()).toBe(false);
+        expect(noKey.hasCredentials()).toBe(false);
+
+        const client = new ClaudeClient({ apiKey: 'bad', model: '' });
+        fetchImpl = () => new Response(JSON.stringify({ error: { message: 'invalid x-api-key' } }), {
+            status: 401, headers: { 'content-type': 'application/json' },
+        });
+        await expect(client.check()).rejects.toThrow(/API key was rejected/);
+    });
+});
+
+describe('claudeModelOptions', () => {
+    // The model list is cached per API key, so every case uses its own key.
+    function modelsResponse(models: any[], status = 200) {
+        return new Response(JSON.stringify({ data: models, has_more: false, first_id: null, last_id: null }), {
+            status, headers: { 'content-type': 'application/json' },
+        });
+    }
+
+    it('lists the account\'s models behind the default sentinel', async () => {
+        fetchImpl = (url) => {
+            expect(url).toContain('/v1/models');
+            return modelsResponse([
+                { id: 'claude-opus-5', display_name: 'Claude Opus 5', type: 'model', created_at: '2026-01-01T00:00:00Z' },
+                { id: 'claude-haiku-4-5', display_name: 'Claude Haiku 4.5', type: 'model', created_at: '2025-10-01T00:00:00Z' },
+            ]);
+        };
+
+        const { options, message } = await claudeModelOptions('sk-ant-list');
+        expect(message).toBe('');
+        // "" first: it is what an unset claude_model already means.
+        expect(options[0]).toEqual({ value: '', name: `Default (${DEFAULT_CLAUDE_MODEL})` });
+        expect(options.slice(1)).toEqual([
+            { value: 'claude-opus-5', name: 'Claude Opus 5' },
+            { value: 'claude-haiku-4-5', name: 'Claude Haiku 4.5' },
+        ]);
+    });
+
+    it('caches per key so keystroke-settled edits do not re-fetch', async () => {
+        fetchImpl = () => modelsResponse([{ id: 'claude-opus-5', display_name: 'Claude Opus 5', type: 'model', created_at: '2026-01-01T00:00:00Z' }]);
+        await claudeModelOptions('sk-ant-cache');
+        const after = fetchCalls.length;
+        await claudeModelOptions('sk-ant-cache');
+        expect(fetchCalls.length).toBe(after);
+    });
+
+    it('asks for the key instead of calling out when none is set', async () => {
+        const { options, message } = await claudeModelOptions('  ');
+        expect(fetchCalls.length).toBe(0);
+        expect(options).toEqual([{ value: '', name: `Default (${DEFAULT_CLAUDE_MODEL})` }]);
+        expect(message).toMatch(/API key/i);
+    });
+
+    it('still offers the default when the key is rejected', async () => {
+        fetchImpl = () => modelsResponse({ error: { message: 'invalid x-api-key' } } as any, 401);
+        const { options, message } = await claudeModelOptions('sk-ant-bad');
+        expect(options).toEqual([{ value: '', name: `Default (${DEFAULT_CLAUDE_MODEL})` }]);
+        expect(message).toMatch(/API key was rejected/);
     });
 });
 

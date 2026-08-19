@@ -900,11 +900,12 @@
               <option value="ollama">Ollama (local)</option>
               <option value="lmstudio">LM Studio (local)</option>
               <option value="mistral">Mistral (cloud API)</option>
+              <option value="claude">Claude — Anthropic (cloud API)</option>
               <option value="openai">OpenAI-compatible (cloud or custom)</option>
               <option value="none">None — hand the transcript to a Flow</option>
             </select>
-            <div class="help-text">Which model answers you. Ollama runs on your own machine; Mistral is a cloud API
-              (only the text of the conversation goes to Mistral).</div>
+            <div class="help-text">Which model answers you. Ollama runs on your own machine; Mistral and Claude are
+              cloud APIs (only the text of the conversation goes to them).</div>
           </div>
           <div id="local_llm_ollama">
             <div class="local-host-port">
@@ -967,6 +968,28 @@
                 placeholder="mistral-small-latest" />
               <div class="help-text">Empty = <code>mistral-small-latest</code>. Any tool-calling Mistral model works
                 (e.g. <code>mistral-medium-latest</code>, <code>mistral-large-latest</code>).</div>
+            </div>
+          </div>
+          <div id="local_llm_claude" style="display: none;">
+            <div class="homey-form-group">
+              <label class="homey-form-label" for="claude_api_key">Anthropic API key</label>
+              <div class="secret-wrap">
+                <input type="password" class="homey-form-input" id="claude_api_key" autocomplete="off"
+                  placeholder="Enter your Anthropic API key here..." />
+                <button type="button" class="secret-toggle" data-for="claude_api_key">Show</button>
+              </div>
+              <div class="help-text">Visit https://console.anthropic.com to get one. Only the text of the
+                conversation is sent to Anthropic — the speech never leaves your speech-to-text backend.</div>
+            </div>
+            <div class="homey-form-group">
+              <label class="homey-form-label" for="claude_model">Model</label>
+              <!-- Populated live from GET /v1/models with the key above, so the
+                   list is whatever this account can actually use. -->
+              <select class="homey-form-input" id="claude_model"></select>
+              <div class="help-text" id="claude_model_help"></div>
+              <div class="help-text">The default (<code>claude-opus-5</code>) is the most capable;
+                <code>claude-haiku-4-5</code> answers fastest and costs least, which suits short spoken
+                commands, and <code>claude-sonnet-5</code> sits in between.</div>
             </div>
           </div>
           <div id="local_llm_openai" style="display: none;">
@@ -1518,6 +1541,7 @@
         "local_stt_provider", "local_stt_host", "local_stt_port", "mistral_stt_model", "mistral_stt_realtime_model",
         "wyoming_stt_host", "wyoming_stt_port",
         "local_llm_provider", "local_llm_host", "local_llm_port", "local_llm_model", "local_llm_num_ctx", "mistral_model",
+        "claude_api_key", "claude_model",
         "lmstudio_host", "lmstudio_port", "lmstudio_model",
         "local_tts_provider", "local_tts_host", "local_tts_port", "mistral_tts_model",
         "wyoming_tts_host", "wyoming_tts_port",
@@ -1755,7 +1779,7 @@
         // (<lan default> / mistral / openai) based on its dropdown.
         var stages = [
           { select: sttProviderSelectElement, blocks: { whisper: "local_stt_whisper", wyoming: "local_stt_wyoming", mistral: "local_stt_mistral", "mistral-realtime": "local_stt_mistral_realtime", openai: "local_stt_openai" }, def: "whisper" },
-          { select: llmProviderSelectElement, blocks: { ollama: "local_llm_ollama", lmstudio: "local_llm_lmstudio", mistral: "local_llm_mistral", openai: "local_llm_openai", none: "local_llm_none" }, def: "ollama" },
+          { select: llmProviderSelectElement, blocks: { ollama: "local_llm_ollama", lmstudio: "local_llm_lmstudio", mistral: "local_llm_mistral", claude: "local_llm_claude", openai: "local_llm_openai", none: "local_llm_none" }, def: "ollama" },
           { select: ttsProviderSelectElement, blocks: { piper: "local_tts_piper", wyoming: "local_tts_wyoming", mistral: "local_tts_mistral", openai: "local_tts_openai", none: "local_tts_none" }, def: "piper" }
         ];
         var anyMistral = false;
@@ -1816,6 +1840,73 @@
       });
       llmProviderSelectElement.addEventListener("change", refreshLmStudioContext);
 
+      /* ------------- Claude model dropdown (live from the key) -------------
+         Anthropic lists the models a key can use (GET /v1/models), so the
+         model is a dropdown rather than a typed id. Fetched via the app —
+         the webview has no key of its own — using the CURRENT (possibly
+         unsaved) key field, like the Test buttons.
+
+         The saved model is ALWAYS kept as an option even when the list can't
+         be loaded (no key yet, network down, key rejected): otherwise the
+         select would fall back to "" and silently change the user's model on
+         the next Save. */
+
+      var claudeModelElement = document.getElementById("claude_model");
+      var claudeModelHelpElement = document.getElementById("claude_model_help");
+      // The chosen model id, kept outside the <select> because the options
+      // arrive asynchronously: settings load sets it, the user's pick updates
+      // it, and every re-render restores it. "" means the app default.
+      var claudeSelectedModel = "";
+      var claudeModelsSeq = 0; // ignore out-of-order replies
+
+      function claudeDefaultOption() {
+        return [{ value: "", name: "Default (claude-opus-5)" }];
+      }
+
+      function renderClaudeModels(options, message) {
+        var list = (options || []).slice();
+        // Keep a saved-but-unlisted model selectable rather than losing it.
+        if (claudeSelectedModel && !list.some(function (o) { return o.value === claudeSelectedModel; })) {
+          list.push({ value: claudeSelectedModel, name: claudeSelectedModel });
+        }
+        claudeModelElement.innerHTML = "";
+        list.forEach(function (o) {
+          var opt = document.createElement("option");
+          opt.value = o.value;
+          opt.textContent = o.name;
+          claudeModelElement.appendChild(opt);
+        });
+        claudeModelElement.value = claudeSelectedModel;
+        claudeModelHelpElement.textContent = message || "";
+      }
+
+      function refreshClaudeModels() {
+        var seq = ++claudeModelsSeq;
+        var key = document.getElementById("claude_api_key").value.trim();
+        // Show something valid immediately; the fetch only ever widens the list.
+        renderClaudeModels(claudeDefaultOption(),
+          key ? "Loading models…" : "Enter your Anthropic API key above to list the models your account can use.");
+        if (!key) return;
+        Homey.api("POST", "/claude-models", { key: key }, function (err, result) {
+          if (seq !== claudeModelsSeq) return;
+          if (err) return renderClaudeModels(claudeDefaultOption(), String(err.message || err));
+          renderClaudeModels(result.options, result.message);
+        });
+      }
+
+      var claudeModelsTimer = null;
+      function refreshClaudeModelsSoon() {
+        clearTimeout(claudeModelsTimer);
+        claudeModelsTimer = setTimeout(refreshClaudeModels, 600);
+      }
+      claudeModelElement.addEventListener("change", function () {
+        claudeSelectedModel = claudeModelElement.value;
+      });
+      document.getElementById("claude_api_key").addEventListener("input", refreshClaudeModelsSoon);
+      llmProviderSelectElement.addEventListener("change", function () {
+        if (llmProviderSelectElement.value === "claude") refreshClaudeModels();
+      });
+
       // The Mistral provider's inputs in General edit the SAME settings as the
       // Custom pipeline's Mistral fields (one key/model for both) — the pipeline
       // element is the one that loads and saves; its *_rt twin mirrors it live.
@@ -1839,6 +1930,15 @@
           if (id === "local_stt_provider" || id === "local_llm_provider" || id === "local_tts_provider") {
             refreshStageVisibility();
           }
+          // The model dropdown's options arrive later (they depend on the
+          // key), so remember the saved id and re-render once both are known.
+          if (id === "claude_model") {
+            claudeSelectedModel = value || "";
+            renderClaudeModels(claudeDefaultOption(), "");
+          }
+          // Both the key and the model feed the same debounced fetch, so it
+          // runs once, after whichever of the two settings lands last.
+          if (id === "claude_model" || id === "claude_api_key") refreshClaudeModelsSoon();
           if (id === "local_llm_num_ctx" || id === "local_llm_provider") {
             refreshBudget();
           }
@@ -1892,9 +1992,10 @@
             host: llmBackend === "lmstudio" ? v("lmstudio_host") : v("local_llm_host"),
             port: llmBackend === "lmstudio" ? v("lmstudio_port") : v("local_llm_port"),
             model: llmBackend === "mistral" ? v("mistral_model")
-              : llmBackend === "openai" ? v("openai_llm_model")
-                : llmBackend === "lmstudio" ? v("lmstudio_model") : v("local_llm_model"),
-            mistralApiKey: v("mistral_api_key"),
+              : llmBackend === "claude" ? v("claude_model")
+                : llmBackend === "openai" ? v("openai_llm_model")
+                  : llmBackend === "lmstudio" ? v("lmstudio_model") : v("local_llm_model"),
+            mistralApiKey: v("mistral_api_key"), claudeApiKey: v("claude_api_key"),
             url: v("openai_llm_url"), key: v("openai_llm_key")
           };
         }
