@@ -78,3 +78,92 @@ const OPENAI_TTS_VOICE_IDS = new Set(OPENAI_TTS_VOICES.map((v) => v.value));
 export function isOpenAiTtsVoice(voice: string | undefined | null): boolean {
     return !!voice && OPENAI_TTS_VOICE_IDS.has(voice);
 }
+
+/**
+ * A ready-made server for one pipeline stage.
+ *
+ * Typing `https://api.openai.com/v1` by hand to use OpenAI itself is a poor
+ * first experience for the most obvious choice, so the settings page offers
+ * these as a "Server" dropdown per stage: picking one fills in the base URL
+ * and a sensible model, and only the "Custom" entry (empty `baseUrl`) shows
+ * the free-text URL field. The table lives here rather than in the settings
+ * HTML so the app and the page agree on which hosts are cloud services that
+ * need a key — see `openAiCompatNeedsKey`.
+ */
+export interface OpenAiCompatPreset {
+    /** Stable id, used as the dropdown value. `custom` = type your own URL. */
+    id: string;
+    /** Dropdown label. */
+    name: string;
+    /** Base URL to fill in; empty means "let the user type one". */
+    baseUrl: string;
+    /** Model prefilled with the preset (empty = leave the field alone). */
+    model: string;
+    /** True when the server rejects unauthenticated requests. */
+    requiresKey: boolean;
+    /** Where the user gets a key, shown under the key field. */
+    keyUrl: string;
+}
+
+const CUSTOM_PRESET: OpenAiCompatPreset = {
+    id: 'custom',
+    name: 'Custom / self-hosted — enter a URL',
+    baseUrl: '',
+    model: '',
+    requiresKey: false,
+    keyUrl: '',
+};
+
+const OPENAI_URL = 'https://api.openai.com/v1';
+const OPENAI_KEY_URL = 'https://platform.openai.com/api-keys';
+const GROQ_URL = 'https://api.groq.com/openai/v1';
+const GROQ_KEY_URL = 'https://console.groq.com/keys';
+
+/**
+ * Presets per stage. They differ because the stages need different endpoints:
+ * Groq serves transcription and chat but its speech API is a different beast,
+ * and OpenRouter/DeepSeek are chat-only.
+ */
+export const OPENAI_COMPAT_PRESETS: Record<'stt' | 'llm' | 'tts', OpenAiCompatPreset[]> = {
+    stt: [
+        { id: 'openai', name: 'OpenAI', baseUrl: OPENAI_URL, model: 'gpt-4o-mini-transcribe', requiresKey: true, keyUrl: OPENAI_KEY_URL },
+        { id: 'groq', name: 'Groq', baseUrl: GROQ_URL, model: 'whisper-large-v3-turbo', requiresKey: true, keyUrl: GROQ_KEY_URL },
+        CUSTOM_PRESET,
+    ],
+    llm: [
+        { id: 'openai', name: 'OpenAI', baseUrl: OPENAI_URL, model: 'gpt-5-mini', requiresKey: true, keyUrl: OPENAI_KEY_URL },
+        { id: 'groq', name: 'Groq', baseUrl: GROQ_URL, model: 'llama-3.3-70b-versatile', requiresKey: true, keyUrl: GROQ_KEY_URL },
+        { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o-mini', requiresKey: true, keyUrl: 'https://openrouter.ai/keys' },
+        { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', requiresKey: true, keyUrl: 'https://platform.deepseek.com/api_keys' },
+        CUSTOM_PRESET,
+    ],
+    tts: [
+        { id: 'openai', name: 'OpenAI', baseUrl: OPENAI_URL, model: 'gpt-4o-mini-tts', requiresKey: true, keyUrl: OPENAI_KEY_URL },
+        CUSTOM_PRESET,
+    ],
+};
+
+/** host+path of a base URL, scheme- and trailing-slash-insensitive, `/v1` implied. */
+function baseUrlKey(raw: string): string {
+    const url = (raw ?? '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    if (!url) return '';
+    return url.includes('/') ? url : `${url}/v1`;
+}
+
+/** The hosts of every preset that authenticates — see `openAiCompatNeedsKey`. */
+const KEYED_HOSTS = new Set<string>(
+    Object.values(OPENAI_COMPAT_PRESETS)
+        .flat()
+        .filter((p) => p.requiresKey && p.baseUrl)
+        .map((p) => baseUrlKey(p.baseUrl).split('/')[0]),
+);
+
+/**
+ * True when the base URL points at a known cloud service that rejects
+ * unauthenticated requests. Lets a stage report "no credentials" up front
+ * (the missing-key error sound) instead of failing mid-turn with a 401, while
+ * keyless LAN servers keep working with an empty key.
+ */
+export function openAiCompatNeedsKey(baseUrl: string): boolean {
+    return KEYED_HOSTS.has(baseUrlKey(baseUrl).split('/')[0]);
+}

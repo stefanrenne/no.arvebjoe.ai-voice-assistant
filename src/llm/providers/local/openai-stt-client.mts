@@ -1,7 +1,7 @@
 import { pcmToWav } from '../../../helpers/wav.mjs';
 import { createLogger } from '../../../helpers/logger.mjs';
 import { ISttClient } from './stt-client.mjs';
-import { normalizeOpenAiBaseUrl, openAiAuthHeaders, checkOpenAiCompatServer } from './openai-compat.mjs';
+import { normalizeOpenAiBaseUrl, openAiAuthHeaders, checkOpenAiCompatServer, openAiCompatNeedsKey } from './openai-compat.mjs';
 
 /**
  * ISttClient for any OpenAI-compatible transcription server.
@@ -49,9 +49,13 @@ export class OpenAiSttClient implements ISttClient {
         return !!this.config.baseUrl;
     }
 
-    /** The key is optional here — a keyed server rejecting us surfaces via check(). */
+    /**
+     * Keyless LAN servers are fine, but a known cloud host (OpenAI, Groq, …)
+     * without a key can only ever 401 — report that as missing credentials so
+     * the device says so up front instead of failing mid-turn.
+     */
     hasCredentials(): boolean {
-        return true;
+        return !!this.config.apiKey || !openAiCompatNeedsKey(this.config.baseUrl);
     }
 
     async check(): Promise<void> {

@@ -147,6 +147,10 @@
       cursor: pointer;
     }
 
+    .key-reuse-btn {
+      margin-top: 8px;
+    }
+
     .stage-test-btn:disabled {
       opacity: 0.6;
       cursor: wait;
@@ -866,26 +870,38 @@
             </div>
           </div>
           <div id="local_stt_openai" style="display: none;">
+            <!-- Server presets (filled from GET /openai-presets): picking a
+                 cloud service fills the base URL and a known-good model, so
+                 only a genuinely custom server needs a typed URL. -->
             <div class="homey-form-group">
+              <label class="homey-form-label" for="openai_stt_server">Server</label>
+              <select class="homey-form-input" id="openai_stt_server"></select>
+              <div class="help-text" id="openai_stt_server_help"></div>
+            </div>
+            <div class="homey-form-group" id="openai_stt_url_group">
               <label class="homey-form-label" for="openai_stt_url">Base URL</label>
               <input type="text" class="homey-form-input" id="openai_stt_url" autocomplete="off"
-                placeholder="e.g. https://api.groq.com/openai/v1" />
+                placeholder="e.g. 192.168.1.50:8000 or https://api.example.com/v1" />
+              <div class="help-text">Any server speaking OpenAI's <code>/audio/transcriptions</code> API — speaches,
+                LocalAI, … A bare host gets <code>/v1</code> appended automatically.</div>
             </div>
             <div class="homey-form-group">
-              <label class="homey-form-label" for="openai_stt_key">API key (optional)</label>
+              <label class="homey-form-label" for="openai_stt_key" id="openai_stt_key_label">API key</label>
               <div class="secret-wrap">
                 <input type="password" class="homey-form-input" id="openai_stt_key" autocomplete="off"
                   placeholder="Leave empty for keyless local servers" />
                 <button type="button" class="secret-toggle" data-for="openai_stt_key">Show</button>
               </div>
+              <div class="help-text" id="openai_stt_key_help"></div>
+              <button type="button" class="stage-test-btn key-reuse-btn" id="openai_stt_key_reuse"
+                style="display: none;">Use my OpenAI key from General</button>
             </div>
             <div class="homey-form-group">
               <label class="homey-form-label" for="openai_stt_model">Model</label>
               <input type="text" class="homey-form-input" id="openai_stt_model" autocomplete="off"
                 placeholder="e.g. whisper-large-v3-turbo or gpt-4o-transcribe" />
-              <div class="help-text">Any server speaking OpenAI's <code>/audio/transcriptions</code> API: OpenAI
-                (https://api.openai.com), Groq, speaches, … A bare host gets <code>/v1</code> appended automatically.
-              </div>
+              <div class="help-text">The transcription model. Cloud services need an explicit id; local servers
+                usually accept an empty field and use whatever they loaded.</div>
             </div>
           </div>
           <div class="stage-test">
@@ -994,25 +1010,35 @@
           </div>
           <div id="local_llm_openai" style="display: none;">
             <div class="homey-form-group">
+              <label class="homey-form-label" for="openai_llm_server">Server</label>
+              <select class="homey-form-input" id="openai_llm_server"></select>
+              <div class="help-text" id="openai_llm_server_help"></div>
+            </div>
+            <div class="homey-form-group" id="openai_llm_url_group">
               <label class="homey-form-label" for="openai_llm_url">Base URL</label>
               <input type="text" class="homey-form-input" id="openai_llm_url" autocomplete="off"
-                placeholder="e.g. https://api.groq.com/openai/v1 or 192.168.1.50:1234" />
+                placeholder="e.g. 192.168.1.50:1234 or https://api.example.com/v1" />
+              <div class="help-text">Any server speaking OpenAI's <code>/chat/completions</code> API with tool
+                calling — LM Studio, llama.cpp, vLLM, … A bare host gets <code>/v1</code> appended automatically.
+              </div>
             </div>
             <div class="homey-form-group">
-              <label class="homey-form-label" for="openai_llm_key">API key (optional)</label>
+              <label class="homey-form-label" for="openai_llm_key" id="openai_llm_key_label">API key</label>
               <div class="secret-wrap">
                 <input type="password" class="homey-form-input" id="openai_llm_key" autocomplete="off"
                   placeholder="Leave empty for keyless local servers" />
                 <button type="button" class="secret-toggle" data-for="openai_llm_key">Show</button>
               </div>
+              <div class="help-text" id="openai_llm_key_help"></div>
+              <button type="button" class="stage-test-btn key-reuse-btn" id="openai_llm_key_reuse"
+                style="display: none;">Use my OpenAI key from General</button>
             </div>
             <div class="homey-form-group">
               <label class="homey-form-label" for="openai_llm_model">Model</label>
               <input type="text" class="homey-form-input" id="openai_llm_model" autocomplete="off"
                 placeholder="e.g. llama-3.3-70b-versatile or gpt-5-mini" />
-              <div class="help-text">Any server speaking OpenAI's <code>/chat/completions</code> API with tool calling:
-                OpenAI, Groq, OpenRouter, DeepSeek, LM Studio, llama.cpp, vLLM, … A bare host gets <code>/v1</code>
-                appended automatically. Model is required.</div>
+              <div class="help-text">Required, and it must support tool calling — a model that can't call tools
+                can talk, but it cannot control your home.</div>
             </div>
           </div>
           <div id="local_llm_none" style="display: none;">
@@ -1096,17 +1122,27 @@
           </div>
           <div id="local_tts_openai" style="display: none;">
             <div class="homey-form-group">
+              <label class="homey-form-label" for="openai_tts_server">Server</label>
+              <select class="homey-form-input" id="openai_tts_server"></select>
+              <div class="help-text" id="openai_tts_server_help"></div>
+            </div>
+            <div class="homey-form-group" id="openai_tts_url_group">
               <label class="homey-form-label" for="openai_tts_url">Base URL</label>
               <input type="text" class="homey-form-input" id="openai_tts_url" autocomplete="off"
-                placeholder="e.g. https://api.openai.com/v1 or 192.168.1.50:8880" />
+                placeholder="e.g. 192.168.1.50:8880 or https://api.example.com/v1" />
+              <div class="help-text">Any server speaking OpenAI's <code>/audio/speech</code> API — kokoro-fastapi,
+                LocalAI, … A bare host gets <code>/v1</code> appended automatically.</div>
             </div>
             <div class="homey-form-group">
-              <label class="homey-form-label" for="openai_tts_key">API key (optional)</label>
+              <label class="homey-form-label" for="openai_tts_key" id="openai_tts_key_label">API key</label>
               <div class="secret-wrap">
                 <input type="password" class="homey-form-input" id="openai_tts_key" autocomplete="off"
                   placeholder="Leave empty for keyless local servers" />
                 <button type="button" class="secret-toggle" data-for="openai_tts_key">Show</button>
               </div>
+              <div class="help-text" id="openai_tts_key_help"></div>
+              <button type="button" class="stage-test-btn key-reuse-btn" id="openai_tts_key_reuse"
+                style="display: none;">Use my OpenAI key from General</button>
             </div>
             <div class="homey-form-group">
               <label class="homey-form-label" for="openai_tts_model">Model</label>
@@ -1117,9 +1153,9 @@
               <label class="homey-form-label" for="openai_tts_voice">Voice override (optional)</label>
               <input type="text" class="homey-form-input" id="openai_tts_voice" autocomplete="off"
                 placeholder="e.g. af_heart for Kokoro — empty uses the Voice dropdown in General" />
-              <div class="help-text">Any server speaking OpenAI's <code>/audio/speech</code> API: OpenAI itself,
-                kokoro-fastapi, … For OpenAI pick a voice in the <b>Voice</b> dropdown in General; for custom servers
-                whose voices aren't OpenAI's, type the voice name here (it wins when set).</div>
+              <div class="help-text">For OpenAI pick a voice in the <b>Voice</b> dropdown in General; for custom
+                servers whose voices aren't OpenAI's (Kokoro's <code>af_heart</code>, …) type the voice name here —
+                it wins when set.</div>
             </div>
           </div>
           <div class="stage-test">
@@ -1802,6 +1838,156 @@
         refreshVoices(providerSelectElement.value, voiceSelectElement.value, ttsProviderSelectElement.value);
       });
 
+      /* ---------- OpenAI-compatible stages: server presets ----------
+         Every stage can point at any server speaking OpenAI's dialect, but
+         the most obvious choice — OpenAI itself — used to mean typing
+         "https://api.openai.com/v1" from memory. The Server dropdown offers
+         the known cloud services and fills in their base URL and a
+         known-good model; only "Custom / self-hosted" shows the URL field.
+
+         The pick is NOT a stored setting: it is derived from the saved base
+         URL, so the saved shape is unchanged and a hand-typed URL that
+         happens to be OpenAI's still shows up as the OpenAI preset. The
+         table itself comes from the app (GET /openai-presets) so the page
+         and the pipeline agree on which hosts need an API key. */
+
+      var OPENAI_STAGES = ["stt", "llm", "tts"];
+      var openaiPresets = { stt: [], llm: [], tts: [] };
+
+      function stageEl(stage, suffix) {
+        return document.getElementById("openai_" + stage + "_" + suffix);
+      }
+
+      // host+path, scheme- and trailing-slash-insensitive with "/v1" implied.
+      // Mirrors baseUrlKey() in openai-compat.mts so a bare "api.openai.com"
+      // still matches the OpenAI preset.
+      function openaiUrlKey(raw) {
+        var url = String(raw || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+        if (!url) return "";
+        return url.indexOf("/") >= 0 ? url : url + "/v1";
+      }
+
+      function openaiPresetById(stage, id) {
+        var list = openaiPresets[stage] || [];
+        for (var i = 0; i < list.length; i++) {
+          if (list[i].id === id) return list[i];
+        }
+        return null;
+      }
+
+      // Which preset a saved URL belongs to. An unconfigured stage starts on
+      // the first preset (OpenAI) rather than "Custom" — nothing is lost,
+      // and it is the answer for anyone who just wants the cloud service.
+      function openaiPresetIdForUrl(stage, url) {
+        var list = openaiPresets[stage] || [];
+        if (!String(url || "").trim()) return list.length ? list[0].id : "custom";
+        var key = openaiUrlKey(url);
+        for (var i = 0; i < list.length; i++) {
+          if (list[i].baseUrl && openaiUrlKey(list[i].baseUrl) === key) return list[i].id;
+        }
+        return "custom";
+      }
+
+      // A model value we may overwrite when the user switches server: empty,
+      // or still another preset's suggestion (never something hand-typed).
+      function openaiModelIsPreset(stage, value) {
+        if (!String(value || "").trim()) return true;
+        var list = openaiPresets[stage] || [];
+        for (var i = 0; i < list.length; i++) {
+          if (list[i].model && list[i].model === value) return true;
+        }
+        return false;
+      }
+
+      // The General section's OpenAI key, offered for reuse by the OpenAI
+      // preset so the same key isn't typed three times.
+      function generalOpenAiKey() {
+        return apiKeyElement.value.trim();
+      }
+
+      function refreshOpenAiKeyReuse(stage) {
+        var preset = openaiPresetById(stage, stageEl(stage, "server").value);
+        var key = generalOpenAiKey();
+        var show = !!preset && preset.id === "openai" && !!key && stageEl(stage, "key").value.trim() !== key;
+        stageEl(stage, "key_reuse").style.display = show ? "" : "none";
+      }
+
+      // `mayFillModel`: overwrite the model field with the preset's suggestion
+      // when it holds nothing of the user's own (a deliberate server change, or
+      // a stage that was never configured).
+      function applyOpenAiPreset(stage, mayFillModel) {
+        var preset = openaiPresetById(stage, stageEl(stage, "server").value);
+        if (!preset) return;
+
+        // A preset owns the URL; only "Custom" shows the field.
+        stageEl(stage, "url_group").style.display = preset.baseUrl ? "none" : "";
+        if (preset.baseUrl) stageEl(stage, "url").value = preset.baseUrl;
+
+        var modelInput = stageEl(stage, "model");
+        if (mayFillModel && preset.model && openaiModelIsPreset(stage, modelInput.value)) {
+          modelInput.value = preset.model;
+        }
+
+        stageEl(stage, "server_help").textContent = preset.baseUrl
+          ? preset.baseUrl + " — filled in for you. Pick \u201cCustom / self-hosted\u201d to type your own."
+          : "Your own server: LM Studio, llama.cpp, vLLM, speaches, kokoro-fastapi, LocalAI, \u2026";
+
+        var requiresKey = !!preset.requiresKey;
+        stageEl(stage, "key_label").textContent = requiresKey ? "API key" : "API key (optional)";
+        stageEl(stage, "key").placeholder = requiresKey
+          ? "Required — paste your " + preset.name + " API key"
+          : "Leave empty for keyless local servers";
+        stageEl(stage, "key_help").textContent = requiresKey
+          ? "Get one at " + preset.keyUrl + ". " + preset.name + " bills your account per request."
+          : "";
+
+        refreshOpenAiKeyReuse(stage);
+      }
+
+      // Re-derive the dropdown from the current URL (after a settings load, or
+      // once the preset table arrives — whichever lands last).
+      function syncOpenAiPresetSelect(stage) {
+        var select = stageEl(stage, "server");
+        if (!select.options.length) return; // table not fetched yet
+        var savedUrl = stageEl(stage, "url").value;
+        select.value = openaiPresetIdForUrl(stage, savedUrl);
+        // A stage that was never configured lands on OpenAI complete with its
+        // model, so it only wants a key; a configured one keeps what it has.
+        applyOpenAiPreset(stage, !String(savedUrl || "").trim());
+      }
+
+      OPENAI_STAGES.forEach(function (stage) {
+        stageEl(stage, "server").addEventListener("change", function () {
+          applyOpenAiPreset(stage, true);
+        });
+        stageEl(stage, "key").addEventListener("input", function () {
+          refreshOpenAiKeyReuse(stage);
+        });
+        stageEl(stage, "key_reuse").addEventListener("click", function () {
+          stageEl(stage, "key").value = generalOpenAiKey();
+          refreshOpenAiKeyReuse(stage);
+        });
+      });
+      apiKeyElement.addEventListener("input", function () {
+        OPENAI_STAGES.forEach(refreshOpenAiKeyReuse);
+      });
+
+      Homey.api("GET", "/openai-presets", null, function (err, presets) {
+        if (err) return Homey.alert(err);
+        OPENAI_STAGES.forEach(function (stage) {
+          openaiPresets[stage] = (presets && presets[stage]) || [];
+          var select = stageEl(stage, "server");
+          select.innerHTML = "";
+          openaiPresets[stage].forEach(function (preset) {
+            var option = document.createElement("option");
+            option.value = preset.id;
+            option.textContent = preset.name;
+            select.appendChild(option);
+          });
+          syncOpenAiPresetSelect(stage);
+        });
+      });
+
       /* ---------- LM Studio context window (for the budget meter) ----------
          LM Studio's window is configured in the LM Studio UI, so it's read
          back live from its REST API — via the app, because the settings
@@ -1945,6 +2131,13 @@
           if (id === "local_llm_provider" || id.indexOf("lmstudio_") === 0) {
             refreshLmStudioContextSoon(); // debounced: the load burst coalesces into one probe
           }
+          // The Server dropdown is derived from the saved base URL, and the
+          // key-reuse button from the saved key — resolve both once loaded.
+          var openaiStage = /^openai_(stt|llm|tts)_(url|key)$/.exec(id);
+          if (openaiStage) {
+            if (openaiStage[2] === "url") syncOpenAiPresetSelect(openaiStage[1]);
+            else refreshOpenAiKeyReuse(openaiStage[1]);
+          }
         });
       });
 
@@ -2036,6 +2229,8 @@
       Homey.get("openai_api_key", function (err, apiKey) {
         if (err) return Homey.alert(err);
         if (apiKey) apiKeyElement.value = apiKey;
+        // This key can be reused by the OpenAI-preset pipeline stages.
+        OPENAI_STAGES.forEach(refreshOpenAiKeyReuse);
       });
 
       Homey.get("gemini_api_key", function (err, apiKey) {

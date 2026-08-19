@@ -1,7 +1,7 @@
 import { wavToPcm, toMonoPcm16 } from '../../../helpers/wav.mjs';
 import { createLogger } from '../../../helpers/logger.mjs';
 import { ITtsClient } from './tts-client.mjs';
-import { normalizeOpenAiBaseUrl, openAiAuthHeaders, checkOpenAiCompatServer, isOpenAiTtsVoice } from './openai-compat.mjs';
+import { normalizeOpenAiBaseUrl, openAiAuthHeaders, checkOpenAiCompatServer, openAiCompatNeedsKey, isOpenAiTtsVoice } from './openai-compat.mjs';
 
 /**
  * ITtsClient for any OpenAI-compatible speech server.
@@ -55,9 +55,13 @@ export class OpenAiTtsClient implements ITtsClient {
         return !!this.config.baseUrl;
     }
 
-    /** The key is optional here — a keyed server rejecting us surfaces via check(). */
+    /**
+     * Keyless LAN servers are fine, but a known cloud host (OpenAI, Groq, …)
+     * without a key can only ever 401 — report that as missing credentials so
+     * the device says so up front instead of failing mid-turn.
+     */
     hasCredentials(): boolean {
-        return true;
+        return !!this.config.apiKey || !openAiCompatNeedsKey(this.config.baseUrl);
     }
 
     setVoice(voice: string): void {
