@@ -103,43 +103,34 @@ When finishing a feature, check both before committing — stale READMEs have al
 
 ## Branching workflow
 
-**Two branches, `main` and `dev`. That is the target steady state — commit new work straight to `dev`.**
+**One branch: `main`. Commit all new work straight to `main`.** There is no `dev` branch any more.
 
-- **`main`** — the released / in-certification line. Only certification fixes and release commits land here directly.
-- **`dev`** — the integration branch for new work. Branched from `main`; merged back into `main` once certification is done. **Default place to commit.**
+### Why one branch is enough
 
-### Why two branches, and why a feature branch needs justifying
+Publishing is **versioned**: every `homey app publish` needs a version number that has not been published before, and each version carries its own changelog entry. The build that comes out is a **test** version — only people who have the link to that exact version can install it. Certifying that test version makes it **live**, which auto-updates everyone who has the app installed. **Every publication gets certified to live** — that is the whole point of publishing here.
 
-Homey's App Store has **no per-branch or per-version test channel**. `homey app publish` **overwrites the previously published test version** — only the *certified* version survives alongside it, and it stays the live one until a newer test build itself gets certified. There is exactly one test slot, so parallel long-lived branches cannot be published or tested side by side. A feature branch therefore buys nothing on the testing side while still costing merge conflicts in the hotspots below.
+Because each published version is separately addressable and separately certifiable, there is no scarce test slot to schedule around and no reason to keep an integration line apart from a release line. Two branches only bought merge conflicts in the hotspots below.
 
-So: **`feature/*` branches need a good reason.** Legitimate ones are narrow —
+`feature/*` branches therefore need a good reason. Legitimate ones are narrow —
 
 - work that must be **abandonable** (a spike / prototype that may never land), or
-- a change so invasive it would leave `dev` unpublishable for days, when `dev` must stay publishable for an unrelated test build.
+- a change so invasive it would leave `main` unpublishable for days.
 
-If neither applies — and usually neither does — commit to `dev`. When a feature branch genuinely is warranted: branch from `dev`, merge back into `dev`, **never branch off `main`**, and delete it as soon as it lands (`git branch -d`, which refuses anything unmerged — never `-D`). Do not let it outlive the reason it was created.
+If neither applies — and usually neither does — commit to `main`. When a feature branch genuinely is warranted: branch from `main`, merge back into `main`, and delete it as soon as it lands (`git branch -d`, which refuses anything unmerged — never `-D`). Do not let it outlive the reason it was created.
 
-**Merge `main` into `dev` immediately after every commit to `main`.** One small fix resolved today is trivial; weeks of accumulated certification fixes resolved at the end is not. Done consistently, the eventual `dev` → `main` merge is a fast-forward.
+### If a feature branch is in flight
 
-If a fix belongs on both branches, fix it **once on `main`** and merge down — never apply the same fix twice on both branches, that is what produces genuinely nasty conflicts.
+`.homeycompose/app.json`, `app.json`, `package.json` (all three version fields) and `.homeychangelog.json` conflict whenever two lines of work touch them, so keep version bumps and changelog entries on `main` only. And **never hand-merge `app.json`** — it is generated. Take either side and regenerate:
 
-### Conflict hotspots
-
-`.homeycompose/app.json`, `app.json`, `package.json` (all three version fields) and `.homeychangelog.json` conflict whenever both branches touch them. Two rules keep that surface near zero:
-
-- **Do version bumps and changelog entries only on `main`** while a certification is in flight. `dev` stays on the current version and receives those changes one-way via the merge down.
-- **Never hand-merge `app.json`** — it is generated. Take either side and regenerate:
-  ```bash
-  git checkout --theirs app.json   # --ours works equally well
-  homey app build
-  git add app.json
-  ```
-
-`TODO.md` and `COMPLETED.md` churn on both branches too; the same one-way principle applies where practical.
+```bash
+git checkout --theirs app.json   # --ours works equally well
+homey app build
+git add app.json
+```
 
 ## Releasing
 
-The app version lives in **three** places and they must be bumped together:
+**Every publication needs a new version number.** The version lives in **three** places and they must be bumped together:
 
 1. `.homeycompose/app.json` — the source of truth. Everything else follows this.
 2. `app.json` — generated; refresh it with `homey app build` after step 1 and commit the regenerated file.
@@ -147,7 +138,7 @@ The app version lives in **three** places and they must be bumped together:
 
 Then add the release's entry to `.homeychangelog.json` (user-facing wording — what changed for the user, not the commit subjects; skip anything that only touches `emulator/` or docs) and run `homey app validate --level publish` before committing. The `homey:manager:api` permission warning it prints is expected and not an error.
 
-**There is only one test slot.** `homey app publish` **overwrites the previous published test version** — it is not additive, and there is no way to keep two test builds available at once. The certified version stays live alongside it until a newer test build is itself certified. Consequences: a publish discards whatever test build was there before, so don't publish speculatively while someone is mid-test on the old build; and this is the reason the repo runs on two branches (see "Branching workflow").
+Each published version stands on its own: `homey app publish` uploads it as a **test** version reachable only by its own link, and **certifying it promotes that version to live**, auto-updating every existing install. The standing plan is to certify every publication, so treat a publish as "this is going to all users shortly" rather than as a private build. Nothing is overwritten by publishing — an older version is superseded only when a newer one is certified.
 
 ## Outstanding work
 
