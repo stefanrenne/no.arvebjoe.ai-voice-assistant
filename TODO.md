@@ -626,6 +626,28 @@ un-dropped 2026-07-31** (see "Start a Homey flow by voice" below).
 - [ ] **"Morning briefing" flow card** — one flow-card action ("Play briefing on device") where
       the LLM composes weather + today's calendar + spot-price note + shopping list into one
       short spoken update. Pure composition of existing tools (plus calendar/spot prices).
+- [ ] **Deferred / scheduled actions — "do this later, or when a condition holds"** — owner idea,
+      recorded 2026-08-20 when the abandoned `feature/job-manager-executor` branch was deleted
+      (that branch was an *idea sketch*, `src/helpers/job-manager.mts` + `job-executor.mts` +
+      tool-manager wiring, ~1965 lines, never working code — treat it as inspiration only, not a
+      starting point; recover it from the reflog/GitHub if the shape is ever wanted).
+      The user tells the assistant to do something at a later time or on a schedule, and the LLM
+      writes **half-baked instructions for its own future self** — a stored natural-language job
+      plus whatever structured trigger info it can pin down. A **Flow card** kicks off the future
+      event (so the schedule/trigger lives in Homey, where it belongs, rather than in a timer we
+      have to keep alive); when it fires, the app checks whether any stored job is ready for
+      execution, and if so hands that half-baked instruction back to the LLM, which then acts on
+      it — evaluating the condition itself, calling the normal tools, and producing a result. The
+      result can be returned as text or spoken on a speaker (the existing *Say* / reply-audio
+      paths cover both).
+      Examples: *"if it's cold tomorrow at 7, turn on the heater in my Tesla"*, *"if nobody is home
+      at 08:00 tomorrow and the door is unlocked, then lock the main door and arm the alarm"*.
+      Open questions to settle before speccing: where jobs persist and how many are kept; how the
+      LLM's stored instruction is bounded (prompt cost at execution time, cost-of-growth rule 1);
+      whether a job is one-shot or recurring, and what expires it; which Flow card shape drives it
+      (a single "check pending assistant jobs" action the user schedules however they like is the
+      cheapest start); and the safety gate — these jobs run unattended, so anything touching locks
+      or alarms must respect the `allow_unlock_via_voice` precedent.
 
 ### Stretch / just-plain-cool
 
