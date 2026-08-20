@@ -55,5 +55,8 @@
   },
   "1.4.12": {
     "en": "Replies sent to a Flow as an audio link are now MP3 instead of FLAC, so they play on far more speakers — a Sonos in particular. The app's own sounds now come through the same trigger: a short cue when the device starts listening, plus the error, missing-key and post-pairing sounds, which devices without their own speaker could not play before. A new \"Is a sound effect\" tag lets a Flow tell those apart from a spoken reply. Fix: the audio link could point at an address your speaker was unable to reach, so nothing played. Fix: on newer ESPHome firmware the volume and mute controls, and playing music on the device, could stop working."
+  },
+  "1.5.0": {
+    "en": "New: the Custom pipeline can now run on Anthropic's Claude, with the model picked from a live list, and the cloud services for its speech and text stages — OpenAI, Groq, OpenRouter, DeepSeek — are now a dropdown that fills in the address and a working model for you. The pipeline settings are reorganised into one card per stage, and speech-to-text can be given hints (a context sentence and expected words) so short commands and names come back right. Important fix: adding a device could reboot your voice satellite on some ESPHome firmware versions, which showed up as pairing timing out or a device stuck Unavailable. An unavailable device now says which side is down — the device or the voice engine — and the Debug page shows the two separately, alongside a new Verbose logging switch for when you need to send in a log. Setting up Wi-Fi over Bluetooth now notices straight away if the device drops the link. Fixes a crash when a device was deleted, and the Home Assistant Voice PE now trims the wake word from the start of a command by default."
   }
 }
