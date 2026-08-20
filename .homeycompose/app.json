@@ -70,6 +70,10 @@
       "method": "GET",
       "path": "/voices"
     },
+    "getOpenAiPresets": {
+      "method": "GET",
+      "path": "/openai-presets"
+    },
     "testLocalStage": {
       "method": "POST",
       "path": "/test-local-stage"

@@ -1,6 +1,6 @@
 import { createLogger } from '../../../helpers/logger.mjs';
 import { ChatMessage, ChatToolCall, ILlmClient, LlmChatResult, LlmToolDef, generateToolCallId } from './llm-client.mjs';
-import { normalizeOpenAiBaseUrl, openAiAuthHeaders, checkOpenAiCompatServer } from './openai-compat.mjs';
+import { normalizeOpenAiBaseUrl, openAiAuthHeaders, checkOpenAiCompatServer, openAiCompatNeedsKey } from './openai-compat.mjs';
 
 /**
  * ILlmClient for any OpenAI-compatible chat-completions server.
@@ -63,9 +63,13 @@ export class OpenAiLlmClient implements ILlmClient {
         return !!this.config.baseUrl && !!this.model;
     }
 
-    /** The key is optional here — a keyed server rejecting us surfaces via check(). */
+    /**
+     * Keyless LAN servers are fine, but a known cloud host (OpenAI, Groq, …)
+     * without a key can only ever 401 — report that as missing credentials so
+     * the device says so up front instead of failing mid-turn.
+     */
     hasCredentials(): boolean {
-        return true;
+        return !!this.config.apiKey || !openAiCompatNeedsKey(this.config.baseUrl);
     }
 
     async check(): Promise<void> {

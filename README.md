@@ -316,6 +316,15 @@ Each stage has its own host/port (or URL/key/model) settings, and a **Test butto
 real mini-request from your Homey — wrong ports, model names, keys and voices show up immediately
 with the actual error and latency.
 
+The **OpenAI-compatible** backend has a **Server** dropdown so you don't have to remember any
+URLs: pick *OpenAI* (or *Groq*, *OpenRouter*, *DeepSeek* on the language-model stage) and the base
+URL and a known-good model are filled in for you — all that's left is the API key, with a link to
+where you get one. Pick **Custom / self-hosted** instead and the URL field appears, for your own
+LM Studio, llama.cpp, vLLM, speaches or kokoro-fastapi. If you already use the *OpenAI Realtime*
+engine, a **Use my OpenAI key from General** button copies that key across, so you only type it
+once. A stage pointed at a cloud service with no key reports itself as unconfigured up front
+rather than failing mid-sentence.
+
 > **Setup recipes:** [docs/custom-pipeline-setup-guide.md](./docs/custom-pipeline-setup-guide.md)
 > has a copy-paste Docker Compose for every backend of every stage (Whisper, Wyoming,
 > Voxtral, OpenAI-compatible for STT · Ollama, LM Studio, Jan, llama.cpp, vLLM, Mistral, Claude

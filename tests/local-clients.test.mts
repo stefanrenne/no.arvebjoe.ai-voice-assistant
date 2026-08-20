@@ -11,7 +11,7 @@ import { OpenAiLlmClient } from '../src/llm/providers/local/openai-llm-client.mj
 import { LmStudioClient } from '../src/llm/providers/local/lmstudio-client.mjs';
 import { OpenAiSttClient } from '../src/llm/providers/local/openai-stt-client.mjs';
 import { OpenAiTtsClient } from '../src/llm/providers/local/openai-tts-client.mjs';
-import { normalizeOpenAiBaseUrl } from '../src/llm/providers/local/openai-compat.mjs';
+import { normalizeOpenAiBaseUrl, openAiCompatNeedsKey, OPENAI_COMPAT_PRESETS } from '../src/llm/providers/local/openai-compat.mjs';
 import { pcmToWav } from '../src/helpers/wav.mjs';
 
 /** fetch-mock helpers -------------------------------------------------------- */
@@ -548,6 +548,45 @@ describe('normalizeOpenAiBaseUrl', () => {
     it('keeps an explicit path verbatim (Groq style)', () => {
         expect(normalizeOpenAiBaseUrl('https://api.groq.com/openai/v1')).toBe('https://api.groq.com/openai/v1');
         expect(normalizeOpenAiBaseUrl('https://api.groq.com/openai/v1/')).toBe('https://api.groq.com/openai/v1');
+    });
+});
+
+describe('OPENAI_COMPAT_PRESETS', () => {
+    it('offers OpenAI itself plus a custom entry for every stage', () => {
+        for (const stage of ['stt', 'llm', 'tts'] as const) {
+            const presets = OPENAI_COMPAT_PRESETS[stage];
+            const openai = presets.find((p) => p.id === 'openai');
+            expect(openai?.baseUrl).toBe('https://api.openai.com/v1');
+            expect(openai?.model).toBeTruthy();  // the settings page prefills it
+            expect(openai?.requiresKey).toBe(true);
+            // The free-text escape hatch is last, and is the only keyless one.
+            expect(presets[presets.length - 1].id).toBe('custom');
+            expect(presets[presets.length - 1].baseUrl).toBe('');
+        }
+    });
+});
+
+describe('openAiCompatNeedsKey', () => {
+    it('is true for the cloud hosts, however the URL was written', () => {
+        expect(openAiCompatNeedsKey('https://api.openai.com/v1')).toBe(true);
+        expect(openAiCompatNeedsKey('api.openai.com')).toBe(true);
+        expect(openAiCompatNeedsKey('https://api.groq.com/openai/v1/')).toBe(true);
+    });
+
+    it('is false for LAN servers, which are usually keyless', () => {
+        expect(openAiCompatNeedsKey('192.168.1.50:1234')).toBe(false);
+        expect(openAiCompatNeedsKey('http://localhost:8880/v1')).toBe(false);
+        expect(openAiCompatNeedsKey('')).toBe(false);
+    });
+
+    it('gates hasCredentials() on every stage, so a keyless cloud stage says so up front', () => {
+        const cloud = 'https://api.openai.com/v1';
+        expect(new OpenAiLlmClient({ baseUrl: cloud, apiKey: '', model: 'gpt-5-mini' }).hasCredentials()).toBe(false);
+        expect(new OpenAiLlmClient({ baseUrl: cloud, apiKey: 'sk-x', model: 'gpt-5-mini' }).hasCredentials()).toBe(true);
+        expect(new OpenAiSttClient({ baseUrl: cloud, apiKey: '', model: 'gpt-4o-mini-transcribe' }).hasCredentials()).toBe(false);
+        expect(new OpenAiTtsClient({ baseUrl: cloud, apiKey: '', model: 'gpt-4o-mini-tts', voice: '', voiceOverride: '' }).hasCredentials()).toBe(false);
+        // A keyless LAN server stays usable.
+        expect(new OpenAiSttClient({ baseUrl: '192.168.1.50:8000', apiKey: '', model: '' }).hasCredentials()).toBe(true);
     });
 });
 

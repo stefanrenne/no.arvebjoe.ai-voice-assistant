@@ -2,6 +2,7 @@ import { getVoicesForProvider, DEFAULT_VOICE_PROVIDER } from './src/llm/voice-pr
 import { testLocalStage, StageTestRequest, StageTestResult } from './src/llm/providers/local/stage-tester.mjs';
 import { getLmStudioContext, LmStudioContextResult } from './src/llm/providers/local/lmstudio-context.mjs';
 import { claudeModelOptions, ClaudeModelOption } from './src/llm/providers/local/claude-client.mjs';
+import { OPENAI_COMPAT_PRESETS, OpenAiCompatPreset } from './src/llm/providers/local/openai-compat.mjs';
 import { computeFeatureCosts, FeatureCostReport } from './src/settings/feature-costs.mjs';
 import { sendTestLogLine, RemoteLogTestRequest, RemoteLogTestResult } from './src/helpers/remote-log.mjs';
 import { seenDevices, SeenDeviceView } from './src/helpers/seen-devices.mjs';
@@ -26,6 +27,17 @@ export default {
     async getVoices({ query }: { query: Record<string, string> }): Promise<{ value: string; name: string }[]> {
         const provider = query?.provider || DEFAULT_VOICE_PROVIDER;
         return getVoicesForProvider(provider, query?.tts || undefined);
+    },
+
+    /**
+     * GET /openai-presets — the ready-made servers for the OpenAI-compatible
+     * pipeline backends, per stage, so the settings page can offer a "Server"
+     * dropdown that fills in the base URL instead of making the user type
+     * `https://api.openai.com/v1` from memory. Served from the app so the
+     * page and the pipeline agree on which hosts need an API key.
+     */
+    async getOpenAiPresets(): Promise<Record<string, OpenAiCompatPreset[]>> {
+        return OPENAI_COMPAT_PRESETS;
     },
 
     /**

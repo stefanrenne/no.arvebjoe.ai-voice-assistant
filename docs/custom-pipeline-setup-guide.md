@@ -41,16 +41,16 @@ wrong IP, port, model or key shows up immediately with the actual error and late
 | | Wyoming — faster-whisper (local) | Host, Port | 10300 |
 | | Mistral Voxtral (cloud) | Mistral API key, Model | — |
 | | Mistral Voxtral Realtime (cloud) | Mistral API key, Model | — |
-| | OpenAI-compatible (cloud/custom) | Base URL, API key, Model | — |
+| | OpenAI-compatible (cloud/custom) | Server (preset or custom URL), API key, Model | — |
 | **LLM** | Ollama (local) | Host, Port, Model, Context window | 11434 |
 | | LM Studio (local) | Host, Port, Model | 1234 |
 | | Mistral (cloud) | Mistral API key, Model | — |
 | | Claude — Anthropic (cloud) | Anthropic API key, Model (dropdown, live) | — |
-| | OpenAI-compatible (cloud/custom) | Base URL, API key, Model | — |
+| | OpenAI-compatible (cloud/custom) | Server (preset or custom URL), API key, Model | — |
 | **TTS** | Piper — HTTP (local) | Host, Port | 5000 |
 | | Wyoming — Piper (local) | Host, Port | 10200 |
 | | Mistral Voxtral (cloud) | Mistral API key, Model, Voice | — |
-| | OpenAI-compatible (cloud/custom) | Base URL, API key, Model, Voice override | — |
+| | OpenAI-compatible (cloud/custom) | Server (preset or custom URL), API key, Model, Voice override | — |
 
 All Mistral-backed stages share the **one** `Mistral API key` field at the top of the
 Custom pipeline section.
@@ -232,23 +232,21 @@ moment you stop talking.
 ### 1e. OpenAI-compatible STT *(cloud or custom server)*
 
 Anything speaking OpenAI's `/audio/transcriptions` API: OpenAI itself, Groq, speaches, etc.
-A bare host gets `/v1` appended automatically.
 
-**Groq (very fast, cloud):**
+The **Server** dropdown does the typing for you — pick a cloud service and its base URL and a
+known-good model are filled in, leaving only the API key (with a link to where you get one). The
+Base URL field only appears for **Custom / self-hosted**, where a bare host gets `/v1` appended
+automatically.
 
-- STT backend = **OpenAI-compatible (cloud or custom)**
-- Base URL = `https://api.groq.com/openai/v1`
-- API key = your Groq key
-- Model = `whisper-large-v3-turbo`
+**OpenAI (cloud):** Server = **OpenAI** → Model `gpt-4o-mini-transcribe` (or `gpt-4o-transcribe`,
+`whisper-1`). Already using the OpenAI Realtime engine? **Use my OpenAI key from General** copies
+the key you already saved.
 
-**OpenAI (cloud):**
+**Groq (very fast, cloud):** Server = **Groq** → Model `whisper-large-v3-turbo`, plus your Groq
+key from [console.groq.com/keys](https://console.groq.com/keys).
 
-- Base URL = `https://api.openai.com/v1`
-- API key = your OpenAI key
-- Model = `gpt-4o-transcribe` (or `whisper-1`)
-
-**Keyless local server:** leave the API key empty and point Base URL at your LAN server
-(e.g. `http://192.168.1.50:8000/v1`).
+**Keyless local server:** Server = **Custom / self-hosted**, leave the API key empty and point
+Base URL at your LAN server (e.g. `http://192.168.1.50:8000/v1`).
 
 ---
 
@@ -339,16 +337,15 @@ the audio still never leaves your LAN.
 ### 2e. OpenAI-compatible LLM *(cloud or custom server)*
 
 Any server speaking OpenAI's `/chat/completions` **with tool calling**. Model is **required**
-here. A bare host gets `/v1` appended.
+here. The **Server** dropdown fills in the base URL and a starting model for the cloud services;
+**Custom / self-hosted** shows the Base URL field, where a bare host gets `/v1` appended.
 
-**Groq (cloud, fast):**
+**Cloud, from the Server dropdown:**
 
-- Base URL = `https://api.groq.com/openai/v1`, key = your Groq key, Model = `llama-3.3-70b-versatile`
-
-**OpenRouter / DeepSeek / OpenAI (cloud):**
-
-- OpenRouter: `https://openrouter.ai/api/v1` · DeepSeek: `https://api.deepseek.com` ·
-  OpenAI: `https://api.openai.com/v1` (Model e.g. `gpt-5-mini`)
+- **OpenAI** → `gpt-5-mini` · **Groq** → `llama-3.3-70b-versatile` ·
+  **OpenRouter** → `openai/gpt-4o-mini` · **DeepSeek** → `deepseek-chat`
+- Each fills its own base URL and links to where its key comes from; swap the model for any other
+  tool-calling model that service offers.
 
 **Self-hosted OpenAI-compatible servers** — llama.cpp, vLLM, or the Jan desktop app all work
 through this backend:
@@ -389,11 +386,12 @@ services:
 ```
 
 > **Jan desktop app:** enable its local API server (Settings → Local API Server), default port
-> `1337`. Then LLM backend = **OpenAI-compatible**, Base URL = `http://192.168.1.50:1337/v1`,
+> `1337`. Then LLM backend = **OpenAI-compatible**, Server = **Custom / self-hosted**,
+> Base URL = `http://192.168.1.50:1337/v1`,
 > no key, Model = the loaded model id. Make sure the chosen model supports tools.
 
-For all of these: Base URL = `http://<LAN-IP>:<port>/v1`, API key empty (keyless local),
-Model = the served model id. `--jinja` (llama.cpp) / `--enable-auto-tool-choice` (vLLM) are what
+For all of these: Server = **Custom / self-hosted**, Base URL = `http://<LAN-IP>:<port>/v1`,
+API key empty (keyless local), Model = the served model id. `--jinja` (llama.cpp) / `--enable-auto-tool-choice` (vLLM) are what
 turn on tool calling — without them the assistant can't control the home.
 
 ---
@@ -476,15 +474,16 @@ services:
     restart: unless-stopped
 ```
 
-- TTS backend = **OpenAI-compatible**, Base URL = `http://192.168.1.50:8880/v1`, API key empty,
-  Model = `kokoro`, **Voice override** = e.g. `af_heart` (Kokoro's voices aren't OpenAI's, so type
-  the name in the override field — it wins over the General dropdown).
+- TTS backend = **OpenAI-compatible**, Server = **Custom / self-hosted**, Base URL =
+  `http://192.168.1.50:8880/v1`, API key empty, Model = `kokoro`, **Voice override** = e.g.
+  `af_heart` (Kokoro's voices aren't OpenAI's, so type the name in the override field — it wins
+  over the General dropdown).
 
 **OpenAI (cloud):**
 
-- Base URL = `https://api.openai.com/v1`, key = your OpenAI key, Model = `gpt-4o-mini-tts`,
-  and pick a standard voice (Alloy, Nova, …) in the **Voice** dropdown in General — leave the
-  override empty.
+- Server = **OpenAI** (base URL and Model `gpt-4o-mini-tts` are filled in), add your OpenAI key —
+  or click **Use my OpenAI key from General** — and pick a standard voice (Alloy, Nova, …) in the
+  **Voice** dropdown in General, leaving the override empty.
 
 ---
 
