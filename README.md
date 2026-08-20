@@ -325,6 +325,21 @@ engine, a **Use my OpenAI key from General** button copies that key across, so y
 once. A stage pointed at a cloud service with no key reports itself as unconfigured up front
 rather than failing mid-sentence.
 
+If the OpenAI-compatible **speech-to-text** stage keeps hearing the wrong language — a two-word
+command like *"skru av lyset"* coming back as Danish or English — open **Advanced: transcription
+hints** under the model field. The language you picked in General is always sent, but on the
+one-second clips a satellite records it is only a hint; these two fields are the documented fix:
+
+* **Context** — one sentence about what the microphone hears, e.g. *"Short Norwegian smart-home
+  commands."*
+* **Expected words** — comma-separated names it keeps mishearing: your rooms, devices, people.
+
+On OpenAI the Server preset picks `whisper-1` for exactly this reason — it holds the chosen
+language far more strictly than the `gpt-…-transcribe` models. (Expected words are sent as
+the API's `keywords` on the `gpt-…-transcribe` models, which have that field, and appended to the
+context on `whisper-1` and other servers, which is how those take spellings — either way you just
+type the names.)
+
 > **Setup recipes:** [docs/custom-pipeline-setup-guide.md](./docs/custom-pipeline-setup-guide.md)
 > has a copy-paste Docker Compose for every backend of every stage (Whisper, Wyoming,
 > Voxtral, OpenAI-compatible for STT · Ollama, LM Studio, Jan, llama.cpp, vLLM, Mistral, Claude
@@ -453,6 +468,11 @@ length you configured when loading the model).
 * **Optional AI instructions** — personality or behaviour tweaks. Be careful: this **will**
   affect the AI (and counts toward the token budget). Write it in English.
 
+With the **Custom pipeline** provider the last two move to the *Custom pipeline* section, next to
+the stage they belong to: **AI instructions** under the language model, **Voice** under the
+text-to-speech backend. A stage set to **None** hides its setting — no model, nothing to instruct;
+no speech, no voice.
+
 **Features** — each has an on/off switch and shows its token cost. Disabled features aren't
 loaded at all: no tools, no prompt text, no cost.
 
@@ -480,7 +500,11 @@ loaded at all: no tools, no prompt text, no cost.
   says something like *"let me look that up"* while it works instead of going silent.
 
 **Custom pipeline** *(Custom provider only)* — per-stage backend choice plus host/port or
-URL/key/model for each, with Test buttons, and the Ollama context-window size (num_ctx). The
+URL/key/model for each, with Test buttons, the Ollama context-window size (num_ctx) and, on the
+OpenAI-compatible speech-to-text stage, **Advanced: transcription hints** (context sentence +
+expected words) for when short commands come back in the wrong language. The
+**AI instructions** box sits with the language model and the **Voice** dropdown with the
+text-to-speech backend, since that is the stage each one actually configures. The
 language-model and speech stages can also be set to **None** to switch them off — see
 [Switching a stage off](#switching-a-stage-off-none).
 

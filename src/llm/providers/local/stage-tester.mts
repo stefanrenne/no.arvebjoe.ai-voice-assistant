@@ -43,6 +43,8 @@ export interface StageTestRequest {
     url?: string;           // openai-compatible backends
     key?: string;
     language?: string;      // stt: transcription language
+    prompt?: string;        // stt openai: free-text context
+    keywords?: string;      // stt openai: expected terms, comma-separated
     voice?: string;         // tts: the Voice dropdown value
     voiceOverride?: string; // tts openai: free-text voice
 }
@@ -81,7 +83,7 @@ const num = (v: unknown, fallback: number): number => Number(v) || fallback;
 const MAX_FIELD_CHARS = 2048;
 const STRING_FIELDS = [
     'stage', 'backend', 'host', 'model', 'mistralApiKey', 'claudeApiKey',
-    'url', 'key', 'language', 'voice', 'voiceOverride',
+    'url', 'key', 'language', 'prompt', 'keywords', 'voice', 'voiceOverride',
 ] as const;
 
 export function validateStageTestRequest(req: unknown): string | null {
@@ -138,7 +140,10 @@ export function buildSttClient(req: StageTestRequest): ISttClient {
         case 'wyoming': return new WyomingSttClient({ host: str(req.host), port: num(req.port, LOCAL_DEFAULT_PORTS.wyomingStt) });
         case 'mistral': return new MistralSttClient({ apiKey: str(req.mistralApiKey), model: str(req.model) });
         case 'mistral-realtime': return new MistralRealtimeSttClient({ apiKey: str(req.mistralApiKey), model: str(req.model) });
-        case 'openai': return new OpenAiSttClient({ baseUrl: str(req.url), apiKey: str(req.key), model: str(req.model) });
+        case 'openai': return new OpenAiSttClient({
+            baseUrl: str(req.url), apiKey: str(req.key), model: str(req.model),
+            prompt: str(req.prompt), keywords: str(req.keywords),
+        });
         default: return new WhisperClient({ host: str(req.host), port: num(req.port, LOCAL_DEFAULT_PORTS.stt) });
     }
 }

@@ -133,7 +133,10 @@ function readLocalConfigs(): LocalConfigs {
         mistralTtsModel: s('mistral_tts_model'),
         // Generic OpenAI-compatible backends: each stage may point at a
         // different server (Groq STT + LM Studio LLM + OpenAI TTS, etc.).
-        openaiStt: { baseUrl: s('openai_stt_url'), apiKey: s('openai_stt_key'), model: s('openai_stt_model') },
+        openaiStt: {
+            baseUrl: s('openai_stt_url'), apiKey: s('openai_stt_key'), model: s('openai_stt_model'),
+            prompt: s('openai_stt_prompt'), keywords: s('openai_stt_keywords'),
+        },
         openaiLlm: { baseUrl: s('openai_llm_url'), apiKey: s('openai_llm_key'), model: s('openai_llm_model') },
         openaiTts: { baseUrl: s('openai_tts_url'), apiKey: s('openai_tts_key'), model: s('openai_tts_model'), voiceOverride: s('openai_tts_voice') },
     };

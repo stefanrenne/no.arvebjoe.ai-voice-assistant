@@ -116,14 +116,6 @@
       width: 110px;
     }
 
-    .local-section-title {
-      font-weight: 600;
-      font-size: 15px;
-      margin: 18px 0 8px;
-      padding-top: 10px;
-      border-top: 1px solid #e9ecef;
-    }
-
     .local-section-help {
       margin-top: -8px;
       margin-bottom: 15px;
@@ -220,6 +212,14 @@
     }
 
     .card> :last-child {
+      margin-bottom: 0;
+    }
+
+    /* The Voice / AI-instructions groups move between General and the Custom
+       pipeline stages (refreshExtrasPlacement), so in General they sit inside a
+       slot div rather than directly in the card — carry the card's
+       "no margin on the last thing" rule through it. */
+    #general_extras_slot> :last-child {
       margin-bottom: 0;
     }
 
@@ -762,19 +762,29 @@
             </div>
           </div>
 
-          <div class="homey-form-group">
-            <label class="homey-form-label" for="voice_select">Voice</label>
-            <select class="homey-form-input" id="voice_select"></select>
-            <div class="help-text">The AI voice used for speech responses (list depends on the selected provider)</div>
-          </div>
+          <!-- Voice and AI instructions live here for the speech-to-speech
+               providers, whose one API key covers the whole pipeline. On the
+               Custom pipeline they belong to individual stages instead, so
+               refreshLocalVisibility() MOVES these two groups into the slots
+               in that section (see general_extras_slot / pipeline_*_slot).
+               They are moved, never duplicated — every JS reference and the
+               save handler keep working on the same elements. -->
+          <div id="general_extras_slot">
+            <div class="homey-form-group" id="voice_group">
+              <label class="homey-form-label" for="voice_select">Voice</label>
+              <select class="homey-form-input" id="voice_select"></select>
+              <div class="help-text">The AI voice used for speech responses (list depends on the selected provider)
+              </div>
+            </div>
 
-          <div class="homey-form-group">
-            <label class="homey-form-label" for="ai_instructions">AI Instructions (Optional)</label>
-            <textarea class="homey-form-input" id="ai_instructions" rows="4"
-              placeholder="Enter optional instructions for the AI, such as personality traits, behavior guidelines, or specific responses you'd like..."></textarea>
-            <div class="help-text">Customize the AI's personality and behavior with additional instructions. Examples:
-              "You act like Santa Claus" or "Be super sarcastic like GLaDOS." This text also counts toward the token
-              budget below.</div>
+            <div class="homey-form-group" id="ai_instructions_group">
+              <label class="homey-form-label" for="ai_instructions">AI Instructions (Optional)</label>
+              <textarea class="homey-form-input" id="ai_instructions" rows="4"
+                placeholder="Enter optional instructions for the AI, such as personality traits, behavior guidelines, or specific responses you'd like..."></textarea>
+              <div class="help-text">Customize the AI's personality and behavior with additional instructions. Examples:
+                "You act like Santa Claus" or "Be super sarcastic like GLaDOS." This text also counts toward the token
+                budget below.</div>
+            </div>
           </div>
         </div>
       </section>
@@ -782,25 +792,36 @@
       <!-- ======================== Custom pipeline ======================== -->
       <!-- Only reachable when the AI provider is 'Custom pipeline' (the dropdown
            option is disabled otherwise). Each stage (STT / LLM / TTS) picks its
-           own backend: a LAN service or a cloud API. -->
+           own backend: a LAN service or a cloud API, and gets its own card (like
+           the Debug section): backend dropdown, its settings, its Test button. -->
       <section class="section" data-section="pipeline">
-        <div class="card" id="local_settings">
 
-          <!-- Shared Mistral credentials — shown when ANY stage below selects Mistral. -->
-          <div id="local_mistral_key" style="display: none;">
-            <div class="local-section-title">Mistral API key</div>
-            <div class="homey-form-group">
-              <div class="secret-wrap">
-                <input type="password" class="homey-form-input" id="mistral_api_key" autocomplete="off"
-                  placeholder="Enter your Mistral API key here..." />
-                <button type="button" class="secret-toggle" data-for="mistral_api_key">Show</button>
-              </div>
-              <div class="help-text">One key for every Mistral-backed stage below. Visit https://console.mistral.ai to
-                get one.</div>
+        <!-- Shared Mistral credentials — its own card because it belongs to no
+             single stage; shown when ANY stage below selects Mistral. -->
+        <div class="card" id="local_mistral_key" style="display: none;">
+          <div class="feature-head">
+            <div>
+              <div class="feature-title">Mistral API key</div>
+              <div class="feature-sub">One key for every Mistral-backed stage below</div>
             </div>
           </div>
+          <div class="homey-form-group">
+            <div class="secret-wrap">
+              <input type="password" class="homey-form-input" id="mistral_api_key" autocomplete="off"
+                placeholder="Enter your Mistral API key here..." />
+              <button type="button" class="secret-toggle" data-for="mistral_api_key">Show</button>
+            </div>
+            <div class="help-text">Visit https://console.mistral.ai to get one.</div>
+          </div>
+        </div>
 
-          <div class="local-section-title">Speech-to-text</div>
+        <div class="card">
+          <div class="feature-head">
+            <div>
+              <div class="feature-title">Speech-to-text</div>
+              <div class="feature-sub">Turns what you say into text</div>
+            </div>
+          </div>
           <div class="homey-form-group">
             <label class="homey-form-label" for="local_stt_provider">STT backend</label>
             <select class="homey-form-input" id="local_stt_provider">
@@ -899,17 +920,49 @@
             <div class="homey-form-group">
               <label class="homey-form-label" for="openai_stt_model">Model</label>
               <input type="text" class="homey-form-input" id="openai_stt_model" autocomplete="off"
-                placeholder="e.g. whisper-large-v3-turbo or gpt-4o-transcribe" />
+                placeholder="e.g. whisper-1 or whisper-large-v3-turbo" />
               <div class="help-text">The transcription model. Cloud services need an explicit id; local servers
-                usually accept an empty field and use whatever they loaded.</div>
+                usually accept an empty field and use whatever they loaded. On OpenAI the preset picks
+                <code>whisper-1</code>: it sticks to the language you chose far more strictly than the
+                <code>gpt-…-transcribe</code> models, which matters on short spoken commands.</div>
             </div>
+
+            <!-- Transcription context. The language hint alone is weak on the
+                 1–2 second commands a satellite sends; these are the fields
+                 OpenAI documents for exactly that. -->
+            <details class="advanced-settings">
+              <summary>Advanced: transcription hints</summary>
+              <div class="homey-form-group">
+                <label class="homey-form-label" for="openai_stt_prompt">Context (optional)</label>
+                <input type="text" class="homey-form-input" id="openai_stt_prompt" autocomplete="off"
+                  placeholder="e.g. Short Norwegian smart-home commands." />
+                <div class="help-text">One sentence about what the microphone hears. Helps most when short
+                  commands keep coming back in the wrong language. Sent as the API's <code>prompt</code>.</div>
+              </div>
+              <div class="homey-form-group">
+                <label class="homey-form-label" for="openai_stt_keywords">Expected words (optional)</label>
+                <input type="text" class="homey-form-input" id="openai_stt_keywords" autocomplete="off"
+                  placeholder="e.g. stuen, soverom, taklampe, Sonos" />
+                <div class="help-text">Comma-separated names the assistant keeps mishearing — your rooms,
+                  devices, people. Sent as <code>keywords</code> on the <code>gpt-…-transcribe</code> models;
+                  on <code>whisper-1</code> and other servers they are added to the context above, which is
+                  how those models take spellings.</div>
+              </div>
+            </details>
           </div>
           <div class="stage-test">
             <button type="button" class="stage-test-btn" data-stage="stt" id="stt_test_btn">Test</button>
             <span class="stage-test-result" id="stt_test_result"></span>
           </div>
+        </div>
 
-          <div class="local-section-title">Language model</div>
+        <div class="card">
+          <div class="feature-head">
+            <div>
+              <div class="feature-title">Language model</div>
+              <div class="feature-sub">Answers you and controls your home</div>
+            </div>
+          </div>
           <div class="homey-form-group">
             <label class="homey-form-label" for="local_llm_provider">LLM backend</label>
             <select class="homey-form-input" id="local_llm_provider">
@@ -1050,12 +1103,24 @@
               weather, timers, shopping list, music) are gone — the Flow is the assistant now.
             </div>
           </div>
+          <!-- Filled with the AI Instructions group from General while the
+               Custom pipeline is the selected provider — the instructions are
+               this stage's prompt, so they belong with the model that reads
+               them. Empty (and invisible) for every other provider. -->
+          <div id="pipeline_instructions_slot"></div>
           <div class="stage-test">
             <button type="button" class="stage-test-btn" data-stage="llm" id="llm_test_btn">Test</button>
             <span class="stage-test-result" id="llm_test_result"></span>
           </div>
+        </div>
 
-          <div class="local-section-title">Text-to-speech</div>
+        <div class="card">
+          <div class="feature-head">
+            <div>
+              <div class="feature-title">Text-to-speech</div>
+              <div class="feature-sub">Speaks the reply on the satellite</div>
+            </div>
+          </div>
           <div class="homey-form-group">
             <label class="homey-form-label" for="local_tts_provider">TTS backend</label>
             <select class="homey-form-input" id="local_tts_provider">
@@ -1116,7 +1181,7 @@
               <input type="text" class="homey-form-input" id="mistral_tts_model" autocomplete="off"
                 placeholder="voxtral-mini-tts-2603" />
               <div class="help-text">Mistral's Voxtral TTS. Empty = <code>voxtral-mini-tts-2603</code>; set an explicit
-                id to pin a different one. The <b>Voice</b> dropdown in General lists Mistral's voice library —
+                id to pin a different one. The <b>Voice</b> dropdown below lists Mistral's voice library —
                 save the API key first, then it fills in on Save.</div>
             </div>
           </div>
@@ -1152,12 +1217,16 @@
             <div class="homey-form-group">
               <label class="homey-form-label" for="openai_tts_voice">Voice override (optional)</label>
               <input type="text" class="homey-form-input" id="openai_tts_voice" autocomplete="off"
-                placeholder="e.g. af_heart for Kokoro — empty uses the Voice dropdown in General" />
-              <div class="help-text">For OpenAI pick a voice in the <b>Voice</b> dropdown in General; for custom
+                placeholder="e.g. af_heart for Kokoro — empty uses the Voice dropdown below" />
+              <div class="help-text">For OpenAI pick a voice in the <b>Voice</b> dropdown below; for custom
                 servers whose voices aren't OpenAI's (Kokoro's <code>af_heart</code>, …) type the voice name here —
                 it wins when set.</div>
             </div>
           </div>
+          <!-- Filled with the Voice group from General while the Custom
+               pipeline is the selected provider — which voices exist is a
+               property of the TTS backend chosen right above. -->
+          <div id="pipeline_voice_slot"></div>
           <div class="stage-test">
             <button type="button" class="stage-test-btn" data-stage="tts" id="tts_test_btn">Test</button>
             <span class="stage-test-result" id="tts_test_result"></span>
@@ -1583,6 +1652,7 @@
         "wyoming_tts_host", "wyoming_tts_port",
         "mistral_api_key",
         "openai_stt_url", "openai_stt_key", "openai_stt_model",
+        "openai_stt_prompt", "openai_stt_keywords",
         "openai_llm_url", "openai_llm_key", "openai_llm_model",
         "openai_tts_url", "openai_tts_key", "openai_tts_model", "openai_tts_voice"
       ];
@@ -1828,6 +1898,9 @@
         });
         // The shared Mistral key is only needed while some stage uses Mistral.
         document.getElementById("local_mistral_key").style.display = anyMistral ? "" : "none";
+        // Voice and instructions belong to the TTS/LLM stages here, and a
+        // stage set to "none" has no use for either.
+        refreshExtrasPlacement();
       }
       sttProviderSelectElement.addEventListener("change", refreshStageVisibility);
       llmProviderSelectElement.addEventListener("change", refreshStageVisibility);
@@ -2141,6 +2214,34 @@
         });
       });
 
+      // Voice and AI instructions apply to every provider, but where they
+      // belong differs: a speech-to-speech provider is one box, so they sit in
+      // General next to its key; the Custom pipeline splits that box into
+      // three stages, so they move next to the stage that owns them — the
+      // instructions after the LLM's model, the voice after the TTS model.
+      // The groups are MOVED between slots, never copied, so their ids, event
+      // listeners and the save handler all keep working on the same elements.
+      //
+      // In the pipeline a stage set to "none" has no use for its group: with no
+      // model there is nothing to instruct, with no speech there is no voice.
+      // (The settings themselves are still saved — only the inputs are hidden.)
+      function refreshExtrasPlacement() {
+        var local = providerSelectElement.value === "local";
+        var voiceGroup = document.getElementById("voice_group");
+        var instructionsGroup = document.getElementById("ai_instructions_group");
+        if (local) {
+          document.getElementById("pipeline_voice_slot").appendChild(voiceGroup);
+          document.getElementById("pipeline_instructions_slot").appendChild(instructionsGroup);
+        } else {
+          // Back to General, in their original order (voice first).
+          var generalSlot = document.getElementById("general_extras_slot");
+          generalSlot.appendChild(voiceGroup);
+          generalSlot.appendChild(instructionsGroup);
+        }
+        voiceGroup.style.display = local && ttsProviderSelectElement.value === "none" ? "none" : "";
+        instructionsGroup.style.display = local && llmProviderSelectElement.value === "none" ? "none" : "";
+      }
+
       // Only the selected provider's settings are shown in General, and the
       // Custom pipeline section is only reachable while that provider is
       // selected (its dropdown option is disabled otherwise).
@@ -2152,6 +2253,7 @@
           provider === "gemini-realtime" ? "" : "none";
         document.getElementById("mistral_realtime_settings").style.display =
           provider === "mistral-realtime" ? "" : "none";
+        refreshExtrasPlacement();
         pipelineOptionElement.disabled = provider !== "local";
         if (provider !== "local" && sectionSelectElement.value === "pipeline") {
           showSection("general");
@@ -2175,6 +2277,7 @@
               : sttBackend === "mistral-realtime" ? v("mistral_stt_realtime_model") : v("openai_stt_model"),
             mistralApiKey: v("mistral_api_key"),
             url: v("openai_stt_url"), key: v("openai_stt_key"),
+            prompt: v("openai_stt_prompt"), keywords: v("openai_stt_keywords"),
             language: languageSelectElement.value
           };
         }

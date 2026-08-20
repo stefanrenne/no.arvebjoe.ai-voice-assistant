@@ -126,7 +126,13 @@ const GROQ_KEY_URL = 'https://console.groq.com/keys';
  */
 export const OPENAI_COMPAT_PRESETS: Record<'stt' | 'llm' | 'tts', OpenAiCompatPreset[]> = {
     stt: [
-        { id: 'openai', name: 'OpenAI', baseUrl: OPENAI_URL, model: 'gpt-4o-mini-transcribe', requiresKey: true, keyUrl: OPENAI_KEY_URL },
+        // whisper-1, not a gpt-*-transcribe: it holds the `language` hint far
+        // more strictly, and satellite utterances are the 1-2 second clips where
+        // the gpt transcribers drift into neighbouring languages (verified on
+        // hardware, Norwegian, 2026-08-20). Changing this only affects new
+        // setups and anyone re-picking the preset — a saved model id is a
+        // stored setting and openaiModelIsPreset() leaves it alone.
+        { id: 'openai', name: 'OpenAI', baseUrl: OPENAI_URL, model: 'whisper-1', requiresKey: true, keyUrl: OPENAI_KEY_URL },
         { id: 'groq', name: 'Groq', baseUrl: GROQ_URL, model: 'whisper-large-v3-turbo', requiresKey: true, keyUrl: GROQ_KEY_URL },
         CUSTOM_PRESET,
     ],

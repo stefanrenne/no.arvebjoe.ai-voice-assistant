@@ -564,6 +564,15 @@ describe('OPENAI_COMPAT_PRESETS', () => {
             expect(presets[presets.length - 1].baseUrl).toBe('');
         }
     });
+
+    // Deliberate, not just "the current model": the gpt-*-transcribe family
+    // drifts into neighbouring languages on the 1-2 second clips a satellite
+    // records, where whisper-1 honours the `language` hint. Don't "modernize"
+    // this to a gpt transcriber without re-testing on hardware.
+    it('prefills whisper-1 for OpenAI STT, which honours the language hint', () => {
+        const openai = OPENAI_COMPAT_PRESETS.stt.find((p) => p.id === 'openai');
+        expect(openai?.model).toBe('whisper-1');
+    });
 });
 
 describe('openAiCompatNeedsKey', () => {
@@ -706,6 +715,62 @@ describe('OpenAiSttClient (generic)', () => {
             return jsonResponse({ text: 'ok' });
         };
         expect(await client.transcribe(pcm, 'en')).toBe('ok');
+    });
+
+    // The language hint alone is weak on 1-2 second commands; prompt/keywords
+    // are the documented fix. keywords[] exists ONLY on the gpt-transcribe
+    // family — sending it to whisper-1 is a 400, so it folds into the prompt.
+    it('sends keywords[] as its own field on the gpt-transcribe family', async () => {
+        const client = new OpenAiSttClient({
+            baseUrl: 'https://api.openai.com/v1', apiKey: 'sk-x', model: 'gpt-4o-mini-transcribe',
+            prompt: 'Short Norwegian smart-home commands.', keywords: 'stuen, taklampe , stuen',
+        });
+        fetchImpl = (_url, init) => {
+            const form = init.body as FormData;
+            expect(form.get('prompt')).toBe('Short Norwegian smart-home commands.');
+            expect(form.getAll('keywords[]')).toEqual(['stuen', 'taklampe']); // de-duplicated
+            return jsonResponse({ text: 'slå av lyset' });
+        };
+        await client.transcribe(pcm, 'no');
+    });
+
+    it('folds keywords into the prompt for whisper-1 and other servers', async () => {
+        const client = new OpenAiSttClient({
+            baseUrl: 'https://api.openai.com/v1', apiKey: 'sk-x', model: 'whisper-1',
+            prompt: 'Short Norwegian smart-home commands.', keywords: 'stuen, taklampe',
+        });
+        fetchImpl = (_url, init) => {
+            const form = init.body as FormData;
+            expect(form.get('prompt')).toBe('Short Norwegian smart-home commands. stuen, taklampe');
+            expect(form.getAll('keywords[]')).toEqual([]);
+            return jsonResponse({ text: 'ok' });
+        };
+        await client.transcribe(pcm, 'no');
+    });
+
+    it('sends neither field when both are empty', async () => {
+        const client = new OpenAiSttClient({ baseUrl: '10.0.0.5:8000', apiKey: '', model: '' });
+        fetchImpl = (_url, init) => {
+            const form = init.body as FormData;
+            expect(form.get('prompt')).toBeNull();
+            expect(form.getAll('keywords[]')).toEqual([]);
+            return jsonResponse({ text: 'ok' });
+        };
+        await client.transcribe(pcm, 'en');
+    });
+
+    it('keeps keywords alone as the prompt when no context sentence is given', () => {
+        const client = new OpenAiSttClient({
+            baseUrl: 'x', apiKey: '', model: 'whisper-1', prompt: '', keywords: 'stuen, Sonos',
+        });
+        expect(client.buildContextFields()).toEqual({ prompt: 'stuen, Sonos', keywords: [] });
+    });
+
+    it('trims an over-long prompt instead of letting the API reject it', () => {
+        const client = new OpenAiSttClient({
+            baseUrl: 'x', apiKey: '', model: 'whisper-1', prompt: 'a'.repeat(2000), keywords: '',
+        });
+        expect(client.buildContextFields().prompt).toHaveLength(800);
     });
 });
 

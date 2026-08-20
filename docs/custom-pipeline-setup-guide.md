@@ -41,7 +41,7 @@ wrong IP, port, model or key shows up immediately with the actual error and late
 | | Wyoming — faster-whisper (local) | Host, Port | 10300 |
 | | Mistral Voxtral (cloud) | Mistral API key, Model | — |
 | | Mistral Voxtral Realtime (cloud) | Mistral API key, Model | — |
-| | OpenAI-compatible (cloud/custom) | Server (preset or custom URL), API key, Model | — |
+| | OpenAI-compatible (cloud/custom) | Server (preset or custom URL), API key, Model, *(advanced)* Context + Expected words | — |
 | **LLM** | Ollama (local) | Host, Port, Model, Context window | 11434 |
 | | LM Studio (local) | Host, Port, Model | 1234 |
 | | Mistral (cloud) | Mistral API key, Model | — |
@@ -238,15 +238,27 @@ known-good model are filled in, leaving only the API key (with a link to where y
 Base URL field only appears for **Custom / self-hosted**, where a bare host gets `/v1` appended
 automatically.
 
-**OpenAI (cloud):** Server = **OpenAI** → Model `gpt-4o-mini-transcribe` (or `gpt-4o-transcribe`,
-`whisper-1`). Already using the OpenAI Realtime engine? **Use my OpenAI key from General** copies
-the key you already saved.
+**OpenAI (cloud):** Server = **OpenAI** → Model `whisper-1` (the preset's pick — it holds the
+language you chose far more strictly than `gpt-4o-transcribe` / `gpt-4o-mini-transcribe`, which
+matters on short spoken commands). Already using the OpenAI Realtime engine? **Use my OpenAI key
+from General** copies the key you already saved.
 
 **Groq (very fast, cloud):** Server = **Groq** → Model `whisper-large-v3-turbo`, plus your Groq
 key from [console.groq.com/keys](https://console.groq.com/keys).
 
 **Keyless local server:** Server = **Custom / self-hosted**, leave the API key empty and point
 Base URL at your LAN server (e.g. `http://192.168.1.50:8000/v1`).
+
+**Wrong language coming back?** The language from General is always sent, but on the one-second
+clips a satellite records it is only a hint, and the `gpt-…-transcribe` models drift more than
+`whisper-1` — try that model first. Then open **Advanced: transcription hints**:
+
+* **Context** — one sentence about the recording, e.g. *"Short Norwegian smart-home commands."*
+* **Expected words** — comma-separated names it mishears: rooms, devices, people.
+
+Both are optional and cost nothing when empty. Expected words go out as the API's `keywords` on
+the `gpt-…-transcribe` models and are appended to the context on `whisper-1` and other servers
+(which is how those models take spellings) — you just type the names either way.
 
 ---
 
