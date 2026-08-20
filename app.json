@@ -738,7 +738,7 @@
           "hint": {
             "en": "Audio trimmed from the start of a wake-word turn to swallow the wake-word sound."
           },
-          "value": 0,
+          "value": 450,
           "min": 0,
           "max": 2000,
           "units": {
