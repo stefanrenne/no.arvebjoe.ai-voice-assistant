@@ -23,6 +23,9 @@ just speak naturally:
 
 * **Control devices** — turn lights, plugs and other devices on/off, dim lights, set thermostat
   temperatures, in any room/zone.
+* **Open & close window coverings** — blinds, curtains and sunshades/awnings, either fully or to a
+  position (*"close the blinds halfway"*). Devices that only support up/down/stop are driven that
+  way instead. For an awning, *"open"* is understood as rolling it out to give shade.
 * **Lock & unlock doors** — control supported smart locks. Locking always works; *unlocking* by
   voice is off by default (anyone within earshot can talk to the device) — enable *Allow unlocking
   by voice* in the app settings if you want it, and even then only one lock can be unlocked per

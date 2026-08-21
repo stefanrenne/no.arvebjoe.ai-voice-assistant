@@ -42,8 +42,8 @@ describe('MockDeviceManager', () => {
 
     it('should return list of device types', () => {
       const deviceTypes = mockDeviceManager.getAllDeviceTypes();
-      expect(deviceTypes).toEqual(['light', 'socket', 'sensor', 'thermostat', 'speaker']);
-      expect(deviceTypes.length).toBe(5);
+      expect(deviceTypes).toEqual(['light', 'socket', 'sensor', 'thermostat', 'speaker', 'blinds', 'curtain']);
+      expect(deviceTypes.length).toBe(7);
     });
 
     it('should return independent copies of arrays', () => {
@@ -59,7 +59,7 @@ describe('MockDeviceManager', () => {
     it('should return all devices without filters', () => {
       const result = mockDeviceManager.getSmartHomeDevices();
       
-      expect(result.devices).toHaveLength(15); // Now we have 15 devices total (13 + 2 new office lights)
+      expect(result.devices).toHaveLength(17); // 13 + 2 office lights + 2 office window coverings
       expect(result.next_page_token).toBeNull();
       
       const deviceNames = result.devices.map(d => d.name);
@@ -141,7 +141,7 @@ describe('MockDeviceManager', () => {
       expect(tooSmall.devices).toHaveLength(1); // Should be clamped to 1
       
       const tooBig = mockDeviceManager.getSmartHomeDevices(undefined, undefined, 200);
-      expect(tooBig.devices).toHaveLength(15); // Should return all 15 available devices
+      expect(tooBig.devices).toHaveLength(17); // Should return all 17 available devices
     });
   });
 
@@ -258,7 +258,7 @@ describe('MockDeviceManager', () => {
       mockDeviceManager.addDevice(newDevice);
       
       const devices = mockDeviceManager.getSmartHomeDevices();
-      expect(devices.devices).toHaveLength(16); // 15 + 1 new device
+      expect(devices.devices).toHaveLength(18); // 17 + 1 new device
       expect(devices.devices.find(d => d.id === 'device-999')).toEqual(newDevice);
     });
 
@@ -266,7 +266,7 @@ describe('MockDeviceManager', () => {
       mockDeviceManager.removeDevice('device-1');
       
       const devices = mockDeviceManager.getSmartHomeDevices();
-      expect(devices.devices).toHaveLength(14); // 15 - 1 removed device
+      expect(devices.devices).toHaveLength(16); // 17 - 1 removed device
       expect(devices.devices.find(d => d.id === 'device-1')).toBeUndefined();
     });
 
@@ -289,7 +289,7 @@ describe('MockDeviceManager', () => {
       // Verify reset
       expect(mockDeviceManager.shouldFailInit).toBe(false);
       expect(mockDeviceManager.initCallCount).toBe(0);
-      expect(mockDeviceManager.getSmartHomeDevices().devices).toHaveLength(15); // Back to 15 devices
+      expect(mockDeviceManager.getSmartHomeDevices().devices).toHaveLength(17); // Back to 17 devices
     });
   });
 });

@@ -48,7 +48,15 @@ Capability scrivibili supportate
 - dim ← “luminosità X% / livello X” → numero in [0,1] (limita; arrotonda a 2 decimali)
 - target_temperature (°C) ← “imposta la temperatura a X” → limita all'intervallo del dispositivo (assumi 5-35°C se sconosciuto)
 - locked ← “blocca / sblocca (la porta)” → booleano (true = blocca, false = sblocca).
+- windowcoverings_set ← “apri/chiudi le tapparelle, le tende, la tenda da sole” → numero in [0,1] (1 = completamente aperto, 0 = completamente chiuso, 0.5 = a metà)
+- windowcoverings_state ← solo per schermature SENZA windowcoverings_set → “up” (aprire), “down” (chiudere), “idle” (fermare)
 - Tutte le capability measure_* e le altre sono in sola lettura o non supportate qui; se richieste, indica brevemente cosa PUOI fare invece.
+
+Schermature (tapparelle, tende, tende da sole)
+- Tre tipi di dispositivo: “blinds”, “curtain”, “sunshade”. “Chiudi le tapparelle” di solito indica tutte le schermature della zona — blocca il tipo solo se l'utente ha nominato un genere preciso.
+- Preferisci windowcoverings_set; usa windowcoverings_state solo sui dispositivi che ne sono privi. “Stop” → windowcoverings_state=“idle”.
+- Tapparelle e tende: aperto = 1 / “up”, chiuso = 0 / “down”.
+- Una tenda da sole è INVERTITA nel linguaggio comune: estenderla per fare ombra vale 0 / “down”, ritrarla vale 1 / “up”.
 
 Semantica dell'ambito predefinito (importante)
 - Se l'utente NON ha indicato una zona, considera la richiesta come **solo zona standard**. NON chiedere delle zone.
@@ -76,6 +84,7 @@ Richieste di CONTROLLO
    • luminosità X% → dim=X/100 (limita a [0,1], round(2))
    • temperatura a X → target_temperature=X (°C)
    • blocca/sblocca → locked=true/false
+   • apri/chiudi una schermatura → windowcoverings_set=1/0, oppure windowcoverings_state=“up”/“down” se il dispositivo non ha una posizione
 2) Se è presente un sostantivo di categoria → imposta device_type (tipo bloccato).
 3) Elenca i candidati:
    • Nessuna zona indicata → get_devices_in_standard_zone(type?)

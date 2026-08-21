@@ -1776,3 +1776,49 @@ throughout this testing.
 playback included — was run on 2026-08-19 and worked. Every device on hand (2× PE, TR, XiaoZhi) has
 now been paired from scratch and driven through a conversation on this code. (The TR's is covered — it ran a whole multi-turn
 quiz with playback.)
+
+## 26. Window coverings — blinds, curtains and sunshades (2026-08-16)
+
+`set_device_capability` could only write `onoff`, `dim`, `target_temperature` and `locked`, so every
+blind, curtain and awning in the house was read-only to the assistant. The read side already
+worked: `DeviceManager.fetchData()` formats *every* capability as `name=value`, so `get_devices` has
+always reported `windowcoverings_set=0`, and the classes already showed up in `get_device_types()`.
+Only the write path was missing.
+
+**Two capability shapes, both required.** Real catalogs carry both, and supporting only the position
+capability leaves state-only devices uncontrollable (the reporter's living-room curtains are exactly
+that):
+
+- `windowcoverings_set` — position, 0..1, 1 = fully open. Coerced by the same helper as `dim`
+  (`ToolManager.coerceFraction`), including the percentage recovery: a model that passes `50` means
+  50%, not "clamp to fully open".
+- `windowcoverings_state` — Homey's motor-direction enum `up` / `idle` / `down`. Lower-cased and
+  whitelisted; `"open"` is the *user's* word and is deliberately rejected.
+
+The instructions tell the model to prefer `windowcoverings_set` and fall back to
+`windowcoverings_state` only on devices that lack it; "stop" maps to `idle`.
+
+**The gotcha worth keeping: a sunshade is inverted in everyday speech.** Homey's convention is
+uniform — 1/`up` is open, 0/`down` is closed — but for an awning the position users call "open" is
+the one where it is rolled *out* to give shade, which is 0/`down`. Left unstated, the model gets
+awnings backwards about half the time while getting blinds right. Every language's instruction
+block calls this out explicitly. The same block also warns against over-narrow type-locking: covers
+are three separate device classes (`blinds`, `curtain`, `sunshade`), so "close the blinds" type-locked
+to `blinds` silently skips the curtains and the awning in the same room.
+
+**`newValue` needed a string branch.** The tool schema's `oneOf` was boolean|number, so a
+`windowcoverings_state` write would have been schema-rejected before reaching the handler that
+validates it.
+
+Touched: `src/llm/tool-manager.mts` (whitelist, schema enum, `get_assistant_capabilities` summary),
+all 12 `src/llm/instructions/agent-instructions.*.mts`, `tests/tool-manager-set-capability.test.mts`
+(+2 cases), `tests/mocks/mock-device-manager.mts` (a position-only blind and a state-only curtain in
+Office, plus the two new types in the hardcoded `deviceTypes` list — `tests/device-manager.test.mts`
+count assertions follow), `emulator/settings.example.json` (curtain + awning, and the pre-existing
+blind's class corrected from `windowcoverings` to `blinds`), README.md. `README.txt` untouched.
+
+**Cost.** No new tool, so this is enum entries plus ~10 instruction lines — but it rides the
+always-on `smart` feature, so it raises the context floor for everyone with no gate to turn it off.
+Roughly +300 tokens for English and +500-600 for Russian/Korean (the same chars-per-token divisors
+the settings budget meter uses). Judged worth it: the inversion note is most of the block, and
+without it the feature is wrong half the time on awnings.

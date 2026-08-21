@@ -206,6 +206,25 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
     }
 
     /**
+     * Coerce a 0..1 fraction capability (dim, windowcoverings_set). A value in
+     * (1,100] is almost certainly a percentage the model forgot to divide (the
+     * instructions define both as X/100), so recover it rather than clamping
+     * every "50%" to fully on.
+     */
+    private static coerceFraction(capabilityId: string, newValue: any): { ok: true; value: number } | { ok: false; message: string } {
+        let n = typeof newValue === "number" ? newValue : (typeof newValue === "string" ? Number(newValue) : NaN);
+        if (!Number.isFinite(n)) {
+            return { ok: false, message: `'${capabilityId}' requires a number in [0,1].` };
+        }
+        if (n > 1 && n <= 100) n = n / 100;
+        n = Math.min(1, Math.max(0, n));
+        return { ok: true, value: Math.round(n * 100) / 100 };
+    }
+
+    /** The values `windowcoverings_state` accepts (Homey's motor-direction enum). */
+    private static readonly WINDOWCOVERINGS_STATES = ["up", "idle", "down"] as const;
+
+    /**
      * S3: code-side whitelist + value coercion for set_device_capability — the
      * schema's enum/oneOf only constrain a model that honors it. Mirrors what
      * the instructions already tell the model (dim in [0,1] rounded to two
@@ -224,16 +243,15 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
                 }
                 return { ok: true, value: b };
             }
-            case "dim": {
-                let n = typeof newValue === "number" ? newValue : (typeof newValue === "string" ? Number(newValue) : NaN);
-                if (!Number.isFinite(n)) {
-                    return { ok: false, message: "'dim' requires a number in [0,1]." };
+            case "dim":
+            case "windowcoverings_set":
+                return ToolManager.coerceFraction(capabilityId, newValue);
+            case "windowcoverings_state": {
+                const s = String(newValue ?? "").trim().toLowerCase();
+                if (!(ToolManager.WINDOWCOVERINGS_STATES as readonly string[]).includes(s)) {
+                    return { ok: false, message: `'windowcoverings_state' requires one of: ${ToolManager.WINDOWCOVERINGS_STATES.join(", ")}.` };
                 }
-                // A value in (1,100] is almost certainly a percentage the model
-                // forgot to divide (the instructions define dim as X/100).
-                if (n > 1 && n <= 100) n = n / 100;
-                n = Math.min(1, Math.max(0, n));
-                return { ok: true, value: Math.round(n * 100) / 100 };
+                return { ok: true, value: s };
             }
             case "target_temperature": {
                 const n = typeof newValue === "number" ? newValue : (typeof newValue === "string" ? Number(newValue) : NaN);
@@ -243,7 +261,7 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
                 return { ok: true, value: Math.min(35, Math.max(5, n)) };
             }
             default:
-                return { ok: false, message: `Capability '${capabilityId}' is not writable. Writable capabilities: onoff, dim, target_temperature, locked.` };
+                return { ok: false, message: `Capability '${capabilityId}' is not writable. Writable capabilities: onoff, dim, target_temperature, locked, windowcoverings_set, windowcoverings_state.` };
         }
     }
 
@@ -636,7 +654,7 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
                 return {
                     ok: true,
                     data: {
-                        summary: "This voice assistant can: control smart home devices (lights, sockets, thermostats, locks — on/off, dim level, target temperature) in any room/zone; " +
+                        summary: "This voice assistant can: control smart home devices (lights, sockets, thermostats, locks, blinds, curtains and awnings — on/off, dim level, target temperature, open/close position) in any room/zone; " +
                             "look up devices and read sensor values (temperature, humidity, motion, etc.); " +
                             (this.weatherActive ? "report the current weather and the forecast for the home's location; " : "") +
                             "tell the current local time and date; " +
@@ -1295,11 +1313,12 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
                 type: "object",
                 properties: {
                     deviceIds: { type: "array", items: { type: "string" }, description: "Array of device IDs to control.", minItems: 1 },
-                    capabilityId: { type: "string", description: "Capability to set.", enum: ["onoff", "dim", "target_temperature", "locked"] },
+                    capabilityId: { type: "string", description: "Capability to set.", enum: ["onoff", "dim", "target_temperature", "locked", "windowcoverings_set", "windowcoverings_state"] },
                     newValue: {
                         oneOf: [
                             { type: "boolean", description: "For 'onoff' and 'locked' (true = locked)." },
-                            { type: "number", description: "For 'dim' (0..1) and 'target_temperature' (°C)." }
+                            { type: "number", description: "For 'dim' (0..1), 'windowcoverings_set' (0..1, 1 = fully open) and 'target_temperature' (°C)." },
+                            { type: "string", description: "For 'windowcoverings_state': 'up', 'down' or 'idle' (idle = stop moving)." }
                         ],
                         description: "New value for the capability."
                     },

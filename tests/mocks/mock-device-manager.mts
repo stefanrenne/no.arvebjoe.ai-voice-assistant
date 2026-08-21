@@ -32,7 +32,7 @@ export class MockDeviceManager implements IDeviceManager {
      */
     private setupDefaultData(): void {
         this.zones = ['Living Room', 'Kitchen', 'Bedroom', 'Office'];
-        this.deviceTypes = ['light', 'socket', 'sensor', 'thermostat', 'speaker'];
+        this.deviceTypes = ['light', 'socket', 'sensor', 'thermostat', 'speaker', 'blinds', 'curtain'];
         
         this.devices = [
             // Living Room devices (4 devices)
@@ -176,6 +176,26 @@ export class MockDeviceManager implements IDeviceManager {
                 type: 'light',
                 capabilities: ['onoff=true', 'dim=0.4'],
                 dataId: 'mac-015'
+            },
+            // Window coverings come in two shapes: with a position capability
+            // and state-only (the real Homey catalog has both).
+            {
+                id: 'device-16',
+                name: 'Office Blinds',
+                zone: 'Office',
+                zones: ['Office'],
+                type: 'blinds',
+                capabilities: ['windowcoverings_set=1'],
+                dataId: 'mac-016'
+            },
+            {
+                id: 'device-17',
+                name: 'Office Curtains',
+                zone: 'Office',
+                zones: ['Office'],
+                type: 'curtain',
+                capabilities: ['windowcoverings_state=up'],
+                dataId: 'mac-017'
             }
         ];
     }

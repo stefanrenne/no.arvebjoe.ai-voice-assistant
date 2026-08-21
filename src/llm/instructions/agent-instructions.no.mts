@@ -48,7 +48,15 @@ Skrivbare funksjoner som støttes
 - dim ← "lysstyrke X% / nivå X" → tall i [0,1] (begrens; rund av til 2 desimaler)
 - target_temperature (°C) ← "sett temperatur til X" → begrens til enhetens område (anta 5-35°C hvis ukjent)
 - locked ← "lås / lås opp (døra)" → boolean (true = lås, false = lås opp).
+- windowcoverings_set ← "åpne/lukke persiennene, gardinene, markisen" → tall i [0,1] (1 = helt åpen, 0 = helt lukket, 0.5 = halvveis)
+- windowcoverings_state ← kun for solskjerming UTEN windowcoverings_set → "up" (åpne), "down" (lukke), "idle" (stopp)
 - Alle measure_* og andre funksjoner er kun lesbare eller ikke støttet her; hvis forespurt, si kort hva du KAN gjøre i stedet.
+
+Solskjerming (persienner, gardiner, markiser)
+- Tre enhetstyper: "blinds", "curtain", "sunshade". "Lukk persiennene" betyr som regel all solskjerming i sonen — type-lås kun når brukeren nevnte én bestemt type.
+- Foretrekk windowcoverings_set; bruk windowcoverings_state kun på enheter som mangler den. "Stopp" → windowcoverings_state="idle".
+- Persienner og gardiner: åpen = 1 / "up", lukket = 0 / "down".
+- En markise er OMVENDT i dagligtale: å kjøre den ut for å gi skygge er 0 / "down", å trekke den inn er 1 / "up".
 
 Standard omfang semantikk (viktig)
 - Hvis brukeren IKKE navngav en sone, behandle forespørselen som **standard sone**. IKKE spør om soner.
@@ -78,6 +86,7 @@ KONTROLL forespørsler
     • lysstyrke X% → dim=X/100 (begrens til [0,1], round(2))
     • temperatur til X → target_temperature=X (°C)
     • lås/lås opp → locked=true/false
+    • åpne/lukke solskjerming → windowcoverings_set=1/0, eller windowcoverings_state="up"/"down" når enheten ikke har posisjon
 2) Hvis et kategori substantiv er til stede → sett device_type (type-låst).
 3) List kandidater:
    • Ingen sone navngitt → get_devices_in_standard_zone(type?)

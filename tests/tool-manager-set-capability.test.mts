@@ -63,6 +63,38 @@ describe('ToolManager set_device_capability safety gates', () => {
         expect(capOf('device-12', 'dim')).toBe('dim=0');
     });
 
+    it('S3 — recovers a percentage windowcoverings_set value and clamps to [0,1]', async () => {
+        // Same percentage recovery as dim: "50%" must not become fully open.
+        let res = await setCapability({ deviceIds: ['device-16'], capabilityId: 'windowcoverings_set', newValue: 50 });
+        expect(res.ok).toBe(true);
+        expect(capOf('device-16', 'windowcoverings_set')).toBe('windowcoverings_set=0.5');
+
+        res = await setCapability({ deviceIds: ['device-16'], capabilityId: 'windowcoverings_set', newValue: -0.3 });
+        expect(res.ok).toBe(true);
+        expect(capOf('device-16', 'windowcoverings_set')).toBe('windowcoverings_set=0');
+
+        // A bare 1 is a legitimate "fully open", not a percentage.
+        res = await setCapability({ deviceIds: ['device-16'], capabilityId: 'windowcoverings_set', newValue: 1 });
+        expect(res.ok).toBe(true);
+        expect(capOf('device-16', 'windowcoverings_set')).toBe('windowcoverings_set=1');
+    });
+
+    it('S3 — accepts the windowcoverings_state enum and rejects anything else', async () => {
+        let res = await setCapability({ deviceIds: ['device-17'], capabilityId: 'windowcoverings_state', newValue: 'Down' });
+        expect(res.ok).toBe(true);
+        expect(capOf('device-17', 'windowcoverings_state')).toBe('windowcoverings_state=down');
+
+        res = await setCapability({ deviceIds: ['device-17'], capabilityId: 'windowcoverings_state', newValue: 'idle' });
+        expect(res.ok).toBe(true);
+        expect(capOf('device-17', 'windowcoverings_state')).toBe('windowcoverings_state=idle');
+
+        // "open" is the user's word, not the capability's — it must not slip through.
+        res = await setCapability({ deviceIds: ['device-17'], capabilityId: 'windowcoverings_state', newValue: 'open' });
+        expect(res.ok).toBe(false);
+        expect(res.error.code).toBe('INVALID_CAPABILITY_WRITE');
+        expect(capOf('device-17', 'windowcoverings_state')).toBe('windowcoverings_state=idle'); // unchanged
+    });
+
     it('S3 — clamps target_temperature to 5-35 °C', async () => {
         let res = await setCapability({ deviceIds: ['device-13'], capabilityId: 'target_temperature', newValue: 500 });
         expect(res.ok).toBe(true);

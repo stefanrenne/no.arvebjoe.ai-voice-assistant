@@ -48,7 +48,15 @@ ${additionalInstructions}` : '';
 - dim ← "밝기 X% / 레벨 X" → [0,1] 범위의 number(범위 제한; 소수점 둘째 자리 반올림)
 - target_temperature (°C) ← "온도를 X로 설정" → 기기 범위로 제한(알 수 없으면 5-35°C로 가정)
 - locked ← "(문) 잠금 / 잠금 해제" → boolean (true = 잠금, false = 잠금 해제).
+- windowcoverings_set ← "블라인드/커튼/차양을 열기·닫기" → [0,1] 범위의 숫자 (1 = 완전히 열림, 0 = 완전히 닫힘, 0.5 = 절반)
+- windowcoverings_state ← windowcoverings_set이 없는 차양 장치에만 → "up"(열기), "down"(닫기), "idle"(정지)
 - 모든 measure_* 및 기타 기능은 여기서 읽기 전용이거나 지원되지 않습니다. 요청받으면 대신 할 수 있는 것을 간단히 말하세요.
+
+차양 장치 (블라인드, 커튼, 차양막)
+- 장치 유형은 세 가지입니다: "blinds", "curtain", "sunshade". "블라인드 닫아"는 보통 해당 구역의 모든 차양 장치를 뜻합니다 — 사용자가 특정 종류를 지목했을 때만 유형을 고정하세요.
+- windowcoverings_set을 우선 사용하고, 그것이 없는 장치에만 windowcoverings_state를 사용하세요. "정지" → windowcoverings_state="idle".
+- 블라인드와 커튼: 열림 = 1 / "up", 닫힘 = 0 / "down".
+- 차양막(어닝)은 일상어에서 반대입니다: 그늘을 만들려고 펼치는 것은 0 / "down", 접는 것은 1 / "up"입니다.
 
 기본 범위 의미 (중요)
 - 사용자가 존을 지정하지 않았다면 요청을 **표준 존 전용**으로 처리하세요. 존에 대해 묻지 마세요.
@@ -76,6 +84,7 @@ ${additionalInstructions}` : '';
    • 밝기 X% → dim=X/100 ([0,1]로 제한, round(2))
    • 온도를 X로 → target_temperature=X (°C)
    • 잠금/잠금 해제 → locked=true/false
+   • 차양 열기/닫기 → windowcoverings_set=1/0, 장치에 위치 값이 없으면 windowcoverings_state="up"/"down"
 2) 카테고리 명사가 있으면 → device_type을 설정하세요(유형 고정).
 3) 후보 목록 작성:
    • 존 미지정 → get_devices_in_standard_zone(type?)
