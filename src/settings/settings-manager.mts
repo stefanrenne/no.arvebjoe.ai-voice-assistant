@@ -164,6 +164,9 @@ export class SettingsManager {
       'weather_enabled', 'timers_enabled',
       // Security gate (default OFF): the assistant refuses locked=false unless enabled
       'allow_unlock_via_voice',
+      // Zone fallback (default ON): nothing of the asked-for type in the device's
+      // own zone -> use the devices from the one other zone that has them
+      'zone_fallback_enabled',
       // Bring! shopping-list integration (opt-in): enable flag + account creds + optional list name
       'bring_enabled', 'bring_email', 'bring_password', 'bring_list_name',
       // Music Assistant integration (opt-in): enable flag + server address (control-plane

@@ -39,6 +39,12 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
     private logger = createLogger('ToolManager', true);
     private standardZone: string;
 
+    // "Nothing here" fallback (setting `zone_fallback_enabled`): the devices
+    // get_devices_in_standard_zone handed back from ANOTHER zone because the
+    // standard zone had none of that type. Remembered so the cross-zone write
+    // guard in set_device_capability lets exactly these ids through.
+    private zoneFallback: { zone: string; ids: Set<string> } | null = null;
+
     // Bring! shopping-list integration (opt-in via settings). The client is
     // created lazily on first use; `shoppingListActive` mirrors whether the
     // four shopping tools below are currently registered.
@@ -120,6 +126,7 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
         if (!zone || zone === this.standardZone) return;
         this.logger.info(`Standard zone updated: ${this.standardZone} -> ${zone}`);
         this.standardZone = zone;
+        this.zoneFallback = null;
     }
 
     registerTool(definition: ToolDefinition): void {
@@ -191,18 +198,56 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
     }
 
     private async listDeviceIdsBy(zone?: string | null, type?: string | null): Promise<string[]> {
-        // Page through getSmartHomeDevices to collect device IDs for safety checks
-        const ids: string[] = [];
+        const devices = await this.listDevicesBy(zone, type);
+        return Array.from(new Set(devices.map(d => d.id).filter(id => typeof id === 'string')));
+    }
+
+    /** Page through getSmartHomeDevices and return every matching device. */
+    private async listDevicesBy(zone?: string | null, type?: string | null): Promise<any[]> {
+        const all: any[] = [];
         let pageToken: string | null = null;
         do {
             const data = await this.deviceManager.getSmartHomeDevices(zone || undefined, type || undefined, 100, pageToken);
             const devices = Array.isArray((data as any)?.devices) ? (data as any).devices : (Array.isArray(data) ? data : []);
             for (const d of devices) {
-                if (d && typeof d.id === 'string') ids.push(d.id);
+                if (d) all.push(d);
             }
             pageToken = (data as any)?.next_page_token ?? null;
         } while (pageToken);
-        return Array.from(new Set(ids));
+        return all;
+    }
+
+    /**
+     * "Nothing here" fallback for get_devices_in_standard_zone (setting
+     * `zone_fallback_enabled`, default on): when the standard zone holds no
+     * device of the asked-for type, look house-wide and hand the result back
+     * ONLY when it is unambiguous — every match sits in ONE other zone. Spread
+     * over several zones we keep the old behavior (empty result, the model
+     * tells the user to say "everywhere"), because "turn off the light" in a
+     * lightless zone must not darken the whole house.
+     *
+     * The matched ids are remembered in `zoneFallback` so the cross-zone write
+     * guard below lets exactly these through — the model neither has to nor
+     * should set allow_cross_zone for them.
+     */
+    private async tryZoneFallback(type?: string): Promise<{ devices: any[]; zone: string } | null> {
+        if (!this.standardZone) return null;
+        if (!ToolManager.boolSetting('zone_fallback_enabled', true)) return null;
+
+        const devices = await this.listDevicesBy(null, type ?? null);
+        if (devices.length === 0) return null;
+
+        const zoneOf = (d: any): string => d?.zone || d?.zones?.[0] || '';
+        const zones = new Set(devices.map(zoneOf).filter(Boolean));
+        if (zones.size !== 1) {
+            this.logger.info(`Zone fallback skipped: ${devices.length} ${type ?? 'device'}(s) across ${zones.size} zones`);
+            return null;
+        }
+
+        const zone = zones.values().next().value as string;
+        this.zoneFallback = { zone, ids: new Set(devices.map(d => d.id).filter(Boolean)) };
+        this.logger.info(`Zone fallback: no ${type ?? 'device'} in ${this.standardZone}, using ${devices.length} in ${zone}`);
+        return { devices, zone };
     }
 
     /**
@@ -1265,6 +1310,22 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
                 const pageTokenSafe = page_token || null;
                 try {
                     const data = await this.deviceManager.getSmartHomeDevices(this.standardZone, typeSafe, pageSizeSafe, pageTokenSafe);
+                    const found = Array.isArray((data as any)?.devices) ? (data as any).devices : [];
+                    if (found.length === 0 && !pageTokenSafe) {
+                        const fallback = await this.tryZoneFallback(typeSafe);
+                        if (fallback) {
+                            return {
+                                ok: true,
+                                data: { devices: fallback.devices, next_page_token: null },
+                                meta: {
+                                    scope: "other_zone",
+                                    standard_zone: this.standardZone,
+                                    zone: fallback.zone,
+                                    note: `No ${typeSafe ?? "devices"} in ${this.standardZone}; ${fallback.zone} is the only zone that has any. You may act on these without allow_cross_zone, but say which zone you acted on.`
+                                }
+                            };
+                        }
+                    }
                     return { ok: true, data };
                 } catch (error: any) {
                     this.logger.error(`Error executing get_devices_in_standard_zone`, error);
@@ -1357,8 +1418,12 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
                 let crossZoneBlocked = 0;
                 if (allow_cross_zone !== true && !expected_zone && this.standardZone) {
                     const inZone = new Set(await this.listDeviceIdsBy(this.standardZone, null));
+                    // Devices handed back by the "nothing here" fallback count as
+                    // in-scope: the standard zone had none of that type and they all
+                    // sit in one single other zone (see tryZoneFallback).
+                    const fromFallback = this.zoneFallback?.ids;
                     const before = filteredIds.length;
-                    filteredIds = filteredIds.filter(id => inZone.has(id));
+                    filteredIds = filteredIds.filter(id => inZone.has(id) || fromFallback?.has(id) === true);
                     crossZoneBlocked = before - filteredIds.length;
                 }
 

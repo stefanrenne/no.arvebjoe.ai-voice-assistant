@@ -479,9 +479,12 @@ no speech, no voice.
 **Features** — each has an on/off switch and shows its token cost. Disabled features aren't
 loaded at all: no tools, no prompt text, no cost.
 
-* **Smart home control** — always on; this is the base cost. Includes the **Allow unlocking by
-  voice** switch (off by default): until you enable it, the assistant will lock doors but refuse
-  to unlock them.
+* **Smart home control** — always on; this is the base cost. Includes two switches:
+  **Look in other zones when this one has none** (on by default) — if you ask for something the
+  voice device's own zone does not have, the assistant uses the matching devices in the *only*
+  other zone that has them, and says which zone that was; when several zones have such devices it
+  still asks you to say *"everywhere"*. And **Allow unlocking by voice** (off by default): until
+  you enable it, the assistant will lock doors but refuse to unlock them.
 * **Weather** — current weather, forecast, rain and outside-light questions (on by default).
 * **Timers & alarms** — countdown timers/alarms on devices whose firmware supports them
   (on by default).
