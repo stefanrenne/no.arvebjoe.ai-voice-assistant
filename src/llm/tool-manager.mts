@@ -43,7 +43,25 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
     // get_devices_in_standard_zone handed back from ANOTHER zone because the
     // standard zone had none of that type. Remembered so the cross-zone write
     // guard in set_device_capability lets exactly these ids through.
-    private zoneFallback: { zone: string; ids: Set<string> } | null = null;
+    //
+    // The ids ACCUMULATE across calls within the grant's lifetime: one utterance
+    // can produce several type-locked listings ("close the blinds and the
+    // curtains"), and replacing the set would silently revoke the earlier
+    // listing's grant — the write then drops those devices as cross-zone while
+    // still reporting success.
+    private zoneFallback: { zones: Set<string>; ids: Set<string>; grantedAt: number } | null = null;
+
+    // Devices of the most recent fallback listing, so a `fb:` page token can
+    // continue paging it (the fallback searches house-wide and would otherwise
+    // have to dump every match in one tool result).
+    private zoneFallbackPage: { type: string; devices: any[] } | null = null;
+
+    // How long a fallback grant stays usable. The grant exists to serve the
+    // utterance that triggered it, so it must not outlive it: without a bound it
+    // is cleared only by setStandardZone and foreign ids stay writable for the
+    // rest of the session. A per-turn hook would be tighter, but there is no
+    // turn seam shared by all three providers, so this is time-boxed instead.
+    private static readonly ZONE_FALLBACK_TTL_MS = 2 * 60_000;
 
     // Bring! shopping-list integration (opt-in via settings). The client is
     // created lazily on first use; `shoppingListActive` mirrors whether the
@@ -127,6 +145,7 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
         this.logger.info(`Standard zone updated: ${this.standardZone} -> ${zone}`);
         this.standardZone = zone;
         this.zoneFallback = null;
+        this.zoneFallbackPage = null;
     }
 
     registerTool(definition: ToolDefinition): void {
@@ -237,17 +256,102 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
         const devices = await this.listDevicesBy(null, type ?? null);
         if (devices.length === 0) return null;
 
-        const zoneOf = (d: any): string => d?.zone || d?.zones?.[0] || '';
-        const zones = new Set(devices.map(zoneOf).filter(Boolean));
-        if (zones.size !== 1) {
-            this.logger.info(`Zone fallback skipped: ${devices.length} ${type ?? 'device'}(s) across ${zones.size} zones`);
+        // Group on the full zone PATH, not the leaf name: two distinct Homey
+        // zones may share a display name (an upstairs and a downstairs
+        // "Bathroom"), and grouping by name collapses them into one — the
+        // ambiguity check then reads "unambiguous" and grants writes across both
+        // physical rooms. `zones` is the ancestor hierarchy, so the paths differ.
+        // (Two same-named zones under the SAME parent are still
+        // indistinguishable here; separating those needs a zone id on Device.)
+        const pathOf = (d: any): string => {
+            const hierarchy = Array.isArray(d?.zones) ? d.zones.filter(Boolean) : [];
+            if (hierarchy.length > 0) return hierarchy.join(' > ');
+            return d?.zone || '';
+        };
+        const paths = new Set(devices.map(pathOf).filter(Boolean));
+        if (paths.size !== 1) {
+            this.logger.info(`Zone fallback skipped: ${devices.length} ${type ?? 'device'}(s) across ${paths.size} zones`);
             return null;
         }
 
-        const zone = zones.values().next().value as string;
-        this.zoneFallback = { zone, ids: new Set(devices.map(d => d.id).filter(Boolean)) };
+        const path = paths.values().next().value as string;
+        const zone = devices.map((d: any) => d?.zone).find(Boolean) || path;
+
+        // Union rather than replace, so an earlier listing in the same utterance
+        // keeps its grant (see the field comment).
+        const previous = this.activeZoneFallback();
+        const ids = new Set(previous ? previous.ids : []);
+        for (const d of devices) {
+            if (d?.id) ids.add(d.id);
+        }
+        const zones = new Set(previous ? previous.zones : []);
+        zones.add(path);
+        this.zoneFallback = { zones, ids, grantedAt: previous ? previous.grantedAt : Date.now() };
+
         this.logger.info(`Zone fallback: no ${type ?? 'device'} in ${this.standardZone}, using ${devices.length} in ${zone}`);
         return { devices, zone };
+    }
+
+    /** The live fallback grant, or null when there is none or it has expired. */
+    private activeZoneFallback(): { zones: Set<string>; ids: Set<string>; grantedAt: number } | null {
+        const grant = this.zoneFallback;
+        if (!grant) return null;
+        if (Date.now() - grant.grantedAt > ToolManager.ZONE_FALLBACK_TTL_MS) {
+            this.logger.info('Zone fallback grant expired');
+            this.zoneFallback = null;
+            return null;
+        }
+        return grant;
+    }
+
+    /** Marks a page token as continuing a fallback listing rather than a standard-zone one. */
+    private static readonly FALLBACK_TOKEN_PREFIX = 'fb:';
+
+    /**
+     * Page the cached fallback listing. The fallback searches house-wide, so
+     * returning every match unpaged puts a whole zone's devices — capability
+     * values included — into a single tool result, which is exactly the kind of
+     * context-budget growth docs/cost-of-growth.md is there to prevent. The
+     * caller's page_size is honored and continuation runs through a `fb:` token,
+     * so nothing is silently dropped either.
+     */
+    private pageZoneFallback(
+        type: string | undefined,
+        pageSize: number | undefined,
+        pageToken: string | null,
+        zoneHint?: string
+    ): { ok: boolean; data?: any; meta?: any; error?: any } {
+        const cache = this.zoneFallbackPage;
+        if (!cache || cache.type !== (type ?? '')) {
+            return {
+                ok: false,
+                error: {
+                    code: "PAGE_TOKEN_EXPIRED",
+                    message: "That page token is no longer valid. Call get_devices_in_standard_zone again without a page_token."
+                }
+            };
+        }
+
+        const size = Math.max(1, Math.min(100, typeof pageSize === 'number' && pageSize > 0 ? pageSize : 25));
+        const offset = pageToken
+            ? (parseInt(pageToken.slice(ToolManager.FALLBACK_TOKEN_PREFIX.length), 10) || 0)
+            : 0;
+        const slice = cache.devices.slice(offset, offset + size);
+        const nextToken = offset + size < cache.devices.length
+            ? `${ToolManager.FALLBACK_TOKEN_PREFIX}${offset + size}`
+            : null;
+
+        const zone = zoneHint || cache.devices.map((d: any) => d?.zone).find(Boolean) || '';
+        return {
+            ok: true,
+            data: { devices: slice, next_page_token: nextToken },
+            meta: {
+                scope: "other_zone",
+                standard_zone: this.standardZone,
+                zone,
+                note: `No ${type ?? "devices"} in ${this.standardZone}; ${zone} is the only zone that has any. You may act on these without allow_cross_zone, but say which zone you acted on.`
+            }
+        };
     }
 
     /**
@@ -1309,21 +1413,18 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
                 const pageSizeSafe = page_size || undefined;
                 const pageTokenSafe = page_token || null;
                 try {
+                    // A `fb:` token continues a fallback listing, not a standard-zone
+                    // one — the standard zone has none of this type by definition.
+                    if (pageTokenSafe && pageTokenSafe.startsWith(ToolManager.FALLBACK_TOKEN_PREFIX)) {
+                        return this.pageZoneFallback(typeSafe, pageSizeSafe, pageTokenSafe);
+                    }
                     const data = await this.deviceManager.getSmartHomeDevices(this.standardZone, typeSafe, pageSizeSafe, pageTokenSafe);
                     const found = Array.isArray((data as any)?.devices) ? (data as any).devices : [];
                     if (found.length === 0 && !pageTokenSafe) {
                         const fallback = await this.tryZoneFallback(typeSafe);
                         if (fallback) {
-                            return {
-                                ok: true,
-                                data: { devices: fallback.devices, next_page_token: null },
-                                meta: {
-                                    scope: "other_zone",
-                                    standard_zone: this.standardZone,
-                                    zone: fallback.zone,
-                                    note: `No ${typeSafe ?? "devices"} in ${this.standardZone}; ${fallback.zone} is the only zone that has any. You may act on these without allow_cross_zone, but say which zone you acted on.`
-                                }
-                            };
+                            this.zoneFallbackPage = { type: typeSafe ?? '', devices: fallback.devices };
+                            return this.pageZoneFallback(typeSafe, pageSizeSafe, null, fallback.zone);
                         }
                     }
                     return { ok: true, data };
@@ -1420,8 +1521,13 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
                     const inZone = new Set(await this.listDeviceIdsBy(this.standardZone, null));
                     // Devices handed back by the "nothing here" fallback count as
                     // in-scope: the standard zone had none of that type and they all
-                    // sit in one single other zone (see tryZoneFallback).
-                    const fromFallback = this.zoneFallback?.ids;
+                    // sit in one single other zone (see tryZoneFallback). The grant
+                    // expires (activeZoneFallback) and the setting is re-read here,
+                    // so a grant cannot outlive the utterance that earned it or
+                    // survive the user switching the feature off mid-session.
+                    const fromFallback = ToolManager.boolSetting('zone_fallback_enabled', true)
+                        ? this.activeZoneFallback()?.ids
+                        : undefined;
                     const before = filteredIds.length;
                     filteredIds = filteredIds.filter(id => inZone.has(id) || fromFallback?.has(id) === true);
                     crossZoneBlocked = before - filteredIds.length;
