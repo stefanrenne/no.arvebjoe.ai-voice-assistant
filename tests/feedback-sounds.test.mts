@@ -8,7 +8,7 @@ import { join } from 'path';
 const audioDir = join(tmpdir(), `feedback-sounds-${process.pid}`);
 process.env.HE_AUDIO_DIR = audioDir;
 
-const { ensureFeedbackSoundMp3, __resetFeedbackSoundCache } = await import('../src/helpers/feedback-sounds.mjs');
+const { ensureFeedbackSoundMp3, prewarmFeedbackSounds, __resetFeedbackSoundCache } = await import('../src/helpers/feedback-sounds.mjs');
 const { pcmToFlacBuffer, flacToPcmBuffer } = await import('../src/helpers/audio-encoders.mjs');
 const { SOUND_URLS } = await import('../src/helpers/sound-urls.mjs');
 
@@ -84,6 +84,31 @@ describe('ensureFeedbackSoundMp3', () => {
 
         expect(connected.filename).not.toBe(error.filename);
         expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('prewarms every clip, so the wake chime costs no WAN round trip', async () => {
+        await prewarmFeedbackSounds();
+        expect(fetchMock).toHaveBeenCalledTimes(Object.keys(SOUND_URLS).length);
+
+        // The first real use is then served from the cache.
+        fetchMock.mockClear();
+        const sound = await ensureFeedbackSoundMp3('wake_word_triggered');
+        expect(sound.filename).toBe('feedback_wake_word_triggered.mp3');
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('reports a clip it could not prewarm and leaves it retryable', async () => {
+        // Prewarming runs at startup; one bad fetch must not reject the whole
+        // pass, and must not disable that sound for the rest of the boot.
+        fetchMock.mockResolvedValueOnce({ ok: false, status: 500 } as any);
+        const failures: string[] = [];
+
+        await expect(prewarmFeedbackSounds((key) => { failures.push(key); })).resolves.toBeUndefined();
+
+        expect(failures).toHaveLength(1);
+        await expect(ensureFeedbackSoundMp3(failures[0] as any)).resolves.toMatchObject({
+            filename: `feedback_${failures[0]}.mp3`,
+        });
     });
 
     it('retries after a failed fetch instead of caching the failure', async () => {

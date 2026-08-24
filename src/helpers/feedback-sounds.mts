@@ -59,6 +59,26 @@ export function ensureFeedbackSoundMp3(key: SoundUrlKey): Promise<FeedbackSoundF
     return pending;
 }
 
+/**
+ * Build every clip up front, sequentially. The lazy path pays a WAN fetch plus a
+ * decode and an MP3 encode on FIRST use, and first use is the worst possible
+ * moment for it: for the wake chime it lands inside the wake the user is waiting
+ * on, and for the error clips it lands exactly when the network is already
+ * unhappy — which is why they are being played at all. Never rejects; a clip
+ * that fails here is simply rebuilt (and re-reported) on first real use.
+ */
+export async function prewarmFeedbackSounds(
+    onError?: (key: SoundUrlKey, err: unknown) => void
+): Promise<void> {
+    for (const key of Object.keys(SOUND_URLS) as SoundUrlKey[]) {
+        try {
+            await ensureFeedbackSoundMp3(key);
+        } catch (err) {
+            onError?.(key, err);
+        }
+    }
+}
+
 async function buildFeedbackSoundMp3(key: SoundUrlKey): Promise<FeedbackSoundFile> {
     const source = SOUND_URLS[key];
     const response = await fetch(source);

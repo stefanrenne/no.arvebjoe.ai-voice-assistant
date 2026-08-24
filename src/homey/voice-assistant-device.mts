@@ -15,7 +15,7 @@ import { AudioOutputPipeline } from './audio-output-pipeline.mjs';
 import { DeviceStore } from '../helpers/interfaces.mjs';
 import { createLogger } from '../helpers/logger.mjs';
 import { SOUND_URLS, SOUND_TEXTS, SoundUrlKey } from '../helpers/sound-urls.mjs';
-import { ensureFeedbackSoundMp3 } from '../helpers/feedback-sounds.mjs';
+import { ensureFeedbackSoundMp3, prewarmFeedbackSounds } from '../helpers/feedback-sounds.mjs';
 import { ensureListeningChime, ensureMicClosedChime, appendChimeToPcm } from '../helpers/listening-chime.mjs';
 import { scheduleAudioFileDeletion } from '../helpers/file-helper.mjs';
 import { recordingRegistry, retentionMsFromSetting, Recording } from '../helpers/recording-registry.mjs';
@@ -271,6 +271,9 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
 
     this.micGain = this.resolveMicGain(settings.mic_gain);
     this.replyToFlowUrl = settings.reply_audio_output === 'flow_url';
+    if (this.replyToFlowUrl) {
+      this.prewarmFlowFeedbackSounds();
+    }
 
     // Follow-up burst-skip: use the setting if present, else the small default. Unlike the
     // wake skip this defaults to a non-zero value so the mic-open burst is always swallowed.
@@ -1449,6 +1452,17 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
    * Fire-and-forget: every call site is a failure path that must not wait on a
    * fetch/encode, and a clip we cannot produce is logged, not thrown.
    */
+  /**
+   * Only the Flow-URL route needs the MP3 copies — a satellite that plays its own
+   * audio streams the FLAC original straight from GitHub. Building them at init
+   * (like the chimes above) keeps the WAN fetch and the encode out of the first
+   * wake, and off the error path, where the network is often the problem.
+   */
+  private prewarmFlowFeedbackSounds(): void {
+    prewarmFeedbackSounds((key, err) =>
+      this.logger.warn(`Feedback sound ${key} could not be prepared — it will be rebuilt on first use:`, err));
+  }
+
   private playFeedbackSound(key: SoundUrlKey): void {
     if (!this.replyToFlowUrl) {
       this.playUrl(SOUND_URLS[key]);
@@ -2009,6 +2023,9 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
     if (changedKeys.includes('reply_audio_output')) {
       this.replyToFlowUrl = newSettings.reply_audio_output === 'flow_url';
       this.logger.info(`Reply audio: ${this.replyToFlowUrl ? 'sent to Flows as a URL' : 'played on this device'}`);
+      if (this.replyToFlowUrl) {
+        this.prewarmFlowFeedbackSounds();
+      }
     }
 
     // Wake-word change: resolve the typed name/id against what the satellite

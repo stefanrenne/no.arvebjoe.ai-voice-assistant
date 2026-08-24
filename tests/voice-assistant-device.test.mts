@@ -25,6 +25,9 @@ vi.mock('../src/helpers/feedback-sounds.mjs', () => ({
         filename: `feedback_${key}.mp3`,
         durationMs: 4000,
     }),
+    // The device prewarms the clips at init when it routes audio to Flows; the
+    // real one fetches from GitHub, which a unit test has no business doing.
+    prewarmFeedbackSounds: async () => undefined,
 }));
 
 import { createHarness, Harness } from './mocks/device-harness.mjs';
