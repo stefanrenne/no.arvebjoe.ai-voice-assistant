@@ -53,7 +53,7 @@ Ondersteunde schrijfbare capabilities
 - Alle measure_* en andere capabilities zijn hier alleen-lezen of niet-ondersteund; zeg, indien gevraagd, kort wat je WEL kunt doen.
 
 Zonwering (jaloezieën, gordijnen, zonneschermen)
-- Drie apparaattypes: "blinds", "curtain", "sunshade". "Doe de gordijnen dicht" betekent meestal alle zonwering in de zone — type-lock alleen als de gebruiker één soort specifiek noemde.
+- Vier apparaattypes: "blinds", "curtain", "sunshade", "windowcoverings" (de algemene) — samen zijn ze ÉÉN categorie. Een algemeen woord voor zonwering betekent alle zonwering in de zone: doe VIER aanroepen, één per type, elk met cover_sweep=true (nooit een aanroep zonder type), en schrijf per type met expected_type. Noemt de gebruiker één soort ("het zonnescherm"), bevraag dan alleen dat type ZONDER cover_sweep.
 - Geef de voorkeur aan windowcoverings_set; gebruik windowcoverings_state alleen op apparaten die die niet hebben. "Stop" → windowcoverings_state="idle".
 - Jaloezieën en gordijnen: open = 1 / "up", dicht = 0 / "down".
 - Een zonnescherm is OMGEKEERD in het dagelijks taalgebruik: uitrollen om schaduw te geven is 0 / "down", inrollen is 1 / "up".

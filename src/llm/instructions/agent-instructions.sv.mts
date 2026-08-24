@@ -53,7 +53,7 @@ Skrivbara funktioner som stöds
 - Alla measure_* och andra funktioner är skrivskyddade eller saknar stöd här; om de efterfrågas, säg kort vad du KAN göra istället.
 
 Solskydd (persienner, gardiner, markiser)
-- Tre enhetstyper: ”blinds”, ”curtain”, ”sunshade”. ”Stäng persiennerna” betyder oftast allt solskydd i zonen — typlås bara när användaren nämnde en viss sort.
+- Fyra enhetstyper: ”blinds”, ”curtain”, ”sunshade”, ”windowcoverings” (den generiska) — tillsammans är de EN kategori. Ett generellt ord för solskydd betyder allt solskydd i zonen: gör FYRA anrop, ett per typ, vart och ett med cover_sweep=true (aldrig ett anrop utan typ), och skriv per typ med expected_type. Nämner användaren en sort (”markisen”), fråga bara på den typen UTAN cover_sweep.
 - Föredra windowcoverings_set; använd windowcoverings_state endast på enheter som saknar den. ”Stopp” → windowcoverings_state=”idle”.
 - Persienner och gardiner: öppen = 1 / ”up”, stängd = 0 / ”down”.
 - En markis är OMVÄND i vardagligt tal: att veckla ut den för att ge skugga är 0 / ”down”, att dra in den är 1 / ”up”.

@@ -53,7 +53,7 @@ ${additionalInstructions}` : '';
 - 모든 measure_* 및 기타 기능은 여기서 읽기 전용이거나 지원되지 않습니다. 요청받으면 대신 할 수 있는 것을 간단히 말하세요.
 
 차양 장치 (블라인드, 커튼, 차양막)
-- 장치 유형은 세 가지입니다: "blinds", "curtain", "sunshade". "블라인드 닫아"는 보통 해당 구역의 모든 차양 장치를 뜻합니다 — 사용자가 특정 종류를 지목했을 때만 유형을 고정하세요.
+- 장치 유형은 네 가지입니다: "blinds", "curtain", "sunshade", "windowcoverings"(일반 유형) — 넷을 합쳐 하나의 범주입니다. 차양을 뜻하는 일반적인 단어는 해당 구역의 모든 차양 장치를 뜻합니다: 유형마다 한 번씩 네 번 호출하되 각 호출에 cover_sweep=true를 넣고(유형 없는 호출은 하지 마세요), 쓰기도 유형별로 expected_type과 함께 하세요. 사용자가 한 종류를 지목하면("차양막") cover_sweep 없이 그 유형만 조회하세요.
 - windowcoverings_set을 우선 사용하고, 그것이 없는 장치에만 windowcoverings_state를 사용하세요. "정지" → windowcoverings_state="idle".
 - 블라인드와 커튼: 열림 = 1 / "up", 닫힘 = 0 / "down".
 - 차양막(어닝)은 일상어에서 반대입니다: 그늘을 만들려고 펼치는 것은 0 / "down", 접는 것은 1 / "up"입니다.

@@ -53,7 +53,7 @@ Understøttede skrivbare kapabiliteter
 - Alle measure_* og andre kapabiliteter er skrivebeskyttede eller ikke understøttet her; hvis der bedes om dem, så sig kort, hvad du i stedet KAN gøre.
 
 Solafskærmning (persienner, gardiner, markiser)
-- Tre enhedstyper: “blinds”, “curtain”, “sunshade”. “Luk persiennerne” betyder som regel al solafskærmning i zonen — type-lås kun, når brugeren nævnte én bestemt slags.
+- Fire enhedstyper: “blinds”, “curtain”, “sunshade”, “windowcoverings” (den generiske) — tilsammen er de ÉN kategori. Et generelt ord for solafskærmning betyder al solafskærmning i zonen: lav FIRE kald, ét pr. type, hvert med cover_sweep=true (aldrig et kald uden type), og skriv pr. type med expected_type. Nævner brugeren én slags (“markisen”), så spørg kun på den type UDEN cover_sweep.
 - Foretræk windowcoverings_set; brug kun windowcoverings_state på enheder, der mangler den. “Stop” → windowcoverings_state=“idle”.
 - Persienner og gardiner: åben = 1 / “up”, lukket = 0 / “down”.
 - En markise er OMVENDT i daglig tale: at rulle den ud for at give skygge er 0 / “down”, at rulle den ind er 1 / “up”.

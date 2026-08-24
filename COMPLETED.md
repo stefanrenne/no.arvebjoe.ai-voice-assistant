@@ -1822,3 +1822,40 @@ always-on `smart` feature, so it raises the context floor for everyone with no g
 Roughly +300 tokens for English and +500-600 for Russian/Korean (the same chars-per-token divisors
 the settings budget meter uses). Judged worth it: the inversion note is most of the block, and
 without it the feature is wrong half the time on awnings.
+
+**Follow-up (2026-08-24): covers are one category, queried as three typed calls.** The block above
+first said *"close the blinds" usually means every cover in the zone — only type-lock when the user
+named one kind specifically*, which contradicted the *Category nouns → REQUIRED type-locking* rule a
+few lines below ("blinds" is both a category noun and one of the three types), and the model was
+free to pick either. The intended reading could not work anyway: acting on it means an **untyped**
+`get_devices_in_standard_zone()`, and that listing is never empty — the satellite itself is an
+ordinary Homey device in its own zone (`registerDevice` resolves it there) — so the zone fallback,
+which only fires on an empty result, can never trigger from it.
+
+Resolved by making the three cover types **one category queried as three typed calls**, one per
+type, never an untyped listing, with `expected_type` per write. Type-locking still holds per call
+(nothing widens), each call can be individually empty and so can trigger its own fallback, and the
+accumulating grant from PR #51's review fixes makes the multi-listing write land in one go.
+
+That split needed one code-side guard: a zone with blinds but no curtains would send the *curtain*
+call reaching into another room, mixing two rooms into a single "close the covers". `tryZoneFallback`
+therefore declines when the asked-for type is a cover and the standard zone already holds a cover of
+another kind (`ToolManager.COVER_TYPES` / `coversPresentInStandardZone`). Non-cover types are
+unaffected. +3 cases in `tests/tool-manager-zone-fallback.test.mts`; the rewrite costs ~+35 tokens
+per language (~+55 for Russian/Korean).
+
+**Same day, found on hardware: `windowcoverings` is a fourth cover type, and the guard had to become
+sweep-only.** A real house turned up a curtain motor on Homey's *generic* `windowcoverings` class
+rather than `curtain`, which made it invisible to every cover rule we had written: "close the
+curtains" type-locked to `curtain`, found nothing locally, fell back house-wide to `curtain`, found
+nothing again, dead end — with the device hanging right there supporting `windowcoverings_set`. It is
+now the fourth member of the category, in `COVER_TYPES` and in all 12 instruction blocks (four typed
+calls, not three).
+
+Adding it exposed the flaw in the guard above: with the generic class counted, a living room whose
+only cover is a `windowcoverings` curtain would decline the fallback for *"open the awning 50%"* —
+the exact request the whole fallback was built for. Naming one kind is a request about THAT device
+wherever it hangs; only the multi-type sweep must stay in its own room. The model therefore marks the
+sweep calls with `cover_sweep: true` and the guard is consulted for those alone. Verified against the
+reporter's real catalog (awning in Tuin, blinds in Kantoor/Keuken, generic curtains in the satellite's
+own Woonkamer): named → reaches the Tuin, swept → stays home.

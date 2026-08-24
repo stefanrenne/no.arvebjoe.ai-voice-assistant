@@ -92,6 +92,72 @@ describe('ToolManager zone fallback', () => {
         expect(res.error.code).toBe('CROSS_ZONE_BLOCKED');
     });
 
+    // Covers are one category split over three device types (blinds / curtain /
+    // sunshade), so "close the covers" is three typed calls. A zone that owns
+    // covers of its own must serve them locally — the empty call for the kind it
+    // lacks must not reach into another room and mix two rooms in one command.
+    describe('window coverings as one category', () => {
+        beforeEach(() => {
+            deviceManager.addDevice({
+                id: 'device-98', name: 'Terrace Awning', zone: 'Terrace', zones: ['Terrace'],
+                type: 'sunshade', capabilities: ['windowcoverings_set=1'], dataId: 'mac-098',
+            } as any);
+        });
+
+        it('does not sweep into another zone when the zone has covers of its own', async () => {
+            // Office has blinds (device-16) and curtains (device-17), no sunshade.
+            await build('Office');
+            const res = await listStandardZone({ type: 'sunshade', cover_sweep: true });
+            expect(res.ok).toBe(true);
+            expect(res.data.devices).toEqual([]);
+            expect(res.meta).toBeUndefined();
+        });
+
+        it('still reaches the other zone when the user named that one kind', async () => {
+            // Same zone, same devices — but without cover_sweep this is "close the
+            // awning", a request about that device wherever it hangs.
+            await build('Office');
+            const res = await listStandardZone({ type: 'sunshade' });
+            expect(res.ok).toBe(true);
+            expect(res.data.devices.map((d: any) => d.id)).toEqual(['device-98']);
+            expect(res.meta.zone).toBe('Terrace');
+        });
+
+        it("counts Homey's generic windowcoverings class as a cover", async () => {
+            // A curtain motor often lands on 'windowcoverings' rather than
+            // 'curtain'; the sweep must treat that zone as already covered.
+            deviceManager.addDevice({
+                id: 'device-96', name: 'Living Room Curtains', zone: 'Living Room', zones: ['Living Room'],
+                type: 'windowcoverings', capabilities: ['windowcoverings_set=1'], dataId: 'mac-096',
+            } as any);
+            await build('Living Room');
+
+            const swept = await listStandardZone({ type: 'sunshade', cover_sweep: true });
+            expect(swept.data.devices).toEqual([]);
+
+            const named = await listStandardZone({ type: 'sunshade' });
+            expect(named.data.devices.map((d: any) => d.id)).toEqual(['device-98']);
+        });
+
+        it('still falls back for a zone with no covers at all', async () => {
+            // Kitchen has none of the three, so the sunshade call may reach out.
+            const res = await listStandardZone({ type: 'sunshade' });
+            expect(res.ok).toBe(true);
+            expect(res.data.devices.map((d: any) => d.id)).toEqual(['device-98']);
+            expect(res.meta.zone).toBe('Terrace');
+        });
+
+        it('leaves non-cover types unaffected by the cover rule', async () => {
+            // Owning covers only blocks the OTHER cover types. A speaker still
+            // falls back normally (the only one is in the Living Room).
+            await build('Office');
+            const res = await listStandardZone({ type: 'speaker', cover_sweep: true });
+            expect(res.ok).toBe(true);
+            expect(res.data.devices.map((d: any) => d.id)).toEqual(['device-4']);
+            expect(res.meta.zone).toBe('Living Room');
+        });
+    });
+
     it('drops the grant when the satellite moves to another zone', async () => {
         await listStandardZone({ type: 'blinds' });
         toolManager.setStandardZone('Bedroom');
