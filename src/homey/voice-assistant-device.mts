@@ -326,6 +326,13 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
     // Initialize tool manager - This will define all the function the agent can call.
     this.toolManager = new ToolManager(this.homey, this.currentZone, this.deviceManager, this.geoHelper, this.weatherHelper, this.timerManager);
 
+    // Every tool reads device/zone state, so none may run before the refetch this
+    // turn kicked off has landed — otherwise it answers from the PREVIOUS turn's
+    // catalog and a device added, moved or renamed since is invisible. It has to
+    // be enforced inside execute(): the providers emit 'tool.called' and run the
+    // tool on the next line without awaiting the listeners.
+    this.toolManager.setBeforeRun(() => this.devicePromise ?? Promise.resolve());
+
     // The ToolManager decides whether the Bring! shopping-list tools are active
     // (feature enabled + credentials present); mirror that into the prompt so
     // the shopping-list instruction block is only added when the tools exist.
@@ -999,12 +1006,14 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
       this.turn.addReplyDelta(delta);
     });
 
-    // The agent want's to use a tool. We need to make sure we have all the data from the API now.
-    this.provider.on('tool.called', async (d: { callId: string; name: string; args: any }) => {
+    // The agent wants to use a tool. Logging/telemetry only — the wait for fresh
+    // API data happens in ToolManager.execute, see setBeforeRun.
+    this.provider.on('tool.called', (d: { callId: string; name: string; args: any }) => {
       this.convo.info(`${d.name} ${this.compact(d.args)}`, 'TOOL');
       this.logger.info(`${d.name}`, 'TOOL_CALLED', d.args);
       this.fireDeviceTrigger('assistant-thinking', { text: `Using tool ${d.name}`, type: 'tool' });
-      await this.devicePromise;
+      // NOT awaited here — emit() ignores async listeners, so this would gate
+      // nothing. The wait lives in ToolManager.execute (setBeforeRun above).
     });
 
     // What the tool handler actually returned (fed back to the model).

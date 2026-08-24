@@ -51,6 +51,9 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
     // still reporting success.
     private zoneFallback: { zones: Set<string>; ids: Set<string>; grantedAt: number } | null = null;
 
+    // Awaited before every tool handler; see setBeforeRun.
+    private beforeRun?: () => Promise<void>;
+
     // Devices of the most recent fallback listing, so a `fb:` page token can
     // continue paging it (the fallback searches house-wide and would otherwise
     // have to dump every match in one tool result).
@@ -142,6 +145,14 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
         this.registerDefaultTools();
     }
 
+    /**
+     * Host hook awaited before every tool runs (see execute). The device points
+     * this at the turn's in-flight device/zone refetch.
+     */
+    setBeforeRun(hook: (() => Promise<void>) | undefined): void {
+        this.beforeRun = hook;
+    }
+
     /** The zone `get_devices_in_standard_zone` resolves against (the device's own zone). */
     getStandardZone(): string {
         return this.standardZone;
@@ -191,6 +202,20 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
         const tool = this.tools.get(name);
         if (!tool) {
             return { output: { error: `Unknown tool: ${name}` }, failed: false };
+        }
+        // Wait for whatever the host needs settled before a tool reads state —
+        // in practice the turn's device/zone refetch. This has to happen HERE:
+        // the providers emit a 'tool.called' event and run the tool on the very
+        // next line, and emit() does not await async listeners, so awaiting in a
+        // listener gates nothing and the tool reads the previous turn's catalog.
+        if (this.beforeRun) {
+            try {
+                await this.beforeRun();
+            } catch (err: any) {
+                // A failed refetch is not a reason to refuse the tool: the
+                // catalog is merely stale, which the handler can still work with.
+                this.logger.warn(`beforeRun hook failed for ${name}: ${String(err?.message ?? err)}`);
+            }
         }
         try {
             return { output: await tool.handler(args ?? {}), failed: false };
