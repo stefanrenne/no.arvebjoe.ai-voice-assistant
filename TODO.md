@@ -193,7 +193,9 @@ their own settings page that uploads a snapshot to their servers and shows the u
       window. This is the fix for the second portal report (above), which arrived with a user message
       and a log that could not answer it.
 
-- [ ] **Check whether `homey-log` is actually enabled in the published app.** It disables itself
+- [x] **Check whether `homey-log` is actually enabled in the published app.** *(resolved 2026-08-27: it was
+      not — `env.json` was missing on the publishing machine; `HOMEY_LOG_URL` is now set, so `reportError()`
+      is live from the next publish.)* It disables itself
       unless `Homey.env.HOMEY_LOG_URL` is a string (`node_modules/homey-log/lib/Log.js:41`); there is
       no `env.json` in the repo (gitignored, `.gitignore:1`); and
       [`docs/release-testing-since-1.4.0.md`](./docs/release-testing-since-1.4.0.md):265 records
