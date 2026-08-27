@@ -180,8 +180,16 @@ export class WebServer {
      * buildStream URLs, IP re-resolved per call (DHCP lease can change).
      */
     buildStaticUrl(filename: string): string {
+        return this.buildUserdataUrl('audio', filename);
+    }
+
+    /**
+     * URL for any file under the app's userdata volume, which Homey serves as
+     * `/app/<id>/userdata/<subdir>/<file>` — e.g. the log dumps in `log/`.
+     */
+    buildUserdataUrl(subdir: string, filename: string): string {
         this.ip = this.getLanIP();
-        return `http://${this.ip}/app/${this.homey.manifest.id}/userdata/audio/${filename}`;
+        return `http://${this.ip}/app/${this.homey.manifest.id}/userdata/${subdir}/${encodeURIComponent(filename)}`;
     }
 
     async buildStream(audioData: AudioData): Promise<FileInfo> {

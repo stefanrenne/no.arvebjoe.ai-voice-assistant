@@ -8,6 +8,7 @@ import { sendTestLogLine, RemoteLogTestRequest, RemoteLogTestResult } from './sr
 import { seenDevices, SeenDeviceView } from './src/helpers/seen-devices.mjs';
 import { probeEspDevice } from './src/voice_assistant/esp-probe.mjs';
 import { recordingRegistry, Recording } from './src/helpers/recording-registry.mjs';
+import { writeLogDump, LogDumpResult } from './src/helpers/log-dump.mjs';
 
 /**
  * App Web API — called from the settings page via `Homey.api(...)`.
@@ -148,6 +149,24 @@ export default {
      * GET /recordings — the retained microphone recordings ("what did I just
      * say?"), newest first, with what speech-to-text made of each one.
      */
+    /**
+     * POST /dump-log — write the redacted in-memory log buffer to
+     * /userdata/log/<datetime>.txt and return its LAN URL (plus the text, for
+     * the page's copy button). The file is deleted after DUMP_TTL_MS.
+     */
+    async dumpLog({ homey }: { homey: any }): Promise<{ ok: boolean; message: string; dump?: LogDumpResult }> {
+        try {
+            const webServer = homey.app?.webServer;
+            const buildUrl = webServer
+                ? (f: string) => webServer.buildUserdataUrl('log', f)
+                : (f: string) => `/app/${homey.manifest.id}/userdata/log/${encodeURIComponent(f)}`;
+            const dump = await writeLogDump(homey, buildUrl);
+            return { ok: true, message: `Wrote ${dump.lines} lines`, dump };
+        } catch (err: any) {
+            return { ok: false, message: `Could not write the log dump: ${err?.message ?? err}` };
+        }
+    },
+
     async getRecordings(): Promise<{ recordings: Recording[]; now: number }> {
         return { recordings: recordingRegistry.list(), now: Date.now() };
     },

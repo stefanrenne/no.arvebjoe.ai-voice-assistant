@@ -27,6 +27,49 @@
       rewritten alongside. Users now have a manual escape hatch (switching the tile's *Start
       conversation* off cancels the turn), so this is a robustness item, not an emergency.
 
+## "Heard nothing" on a real utterance — quiet speech never crosses `minSpeechRms` (ROOT CAUSE FOUND 2026-08-27, not fixed)
+
+Seen three times on the TR satellite (`3RSPK-…`, zone Ute, custom pipeline) in the first live "Dump
+log" sessions: Arve says *"Hvor mye er klokka"*, the app answers **"Heard nothing"** after exactly
+**8.0 s**; a retry a few seconds later works. Homey's diagnostics could never have shown this — it was
+found by dumping the log (`2026-08-27_23-02-37.txt`) and pulling the retained `rx_*.flac` recordings.
+
+**Proven by replaying the three recordings through the real `SimpleVad`** (the `rx_` clip is
+captured after skip and gain, i.e. exactly what the VAD saw):
+
+| clip | speech RMS (200 ms windows) | peak | VAD result |
+|---|---|---|---|
+| failed #1 | 116 · 420 · 275 · 146 · 251 · 352 | 1676 | speechStart @0.9 s → folded back as a "click" @2.5 s → **TIMEOUT @8.0 s** |
+| failed #2 | 296 · 215 · 539 · 296 · 242 · 224 · 316 | 2156 | speechStart @0.2 s → folded back @2.6 s → **TIMEOUT @8.0 s** |
+| worked    | 455 · 872 · 507 · 727 · 609 · 745 | 3296 | speechStart @0.8 s → UTTERANCE 2160 ms |
+
+The threshold was **500 the whole time** (`minSpeechRms` default; the adaptive part is irrelevant
+because the TR's noise floor is ~3 RMS — a very clean mic). The failed takes were simply spoken at
+about half the level (RMS 200–400 vs 500–900) — inaudible as a difference to the ear, and perfectly
+intelligible audio (peaks ~2000, STT would have had no trouble) — so fewer than `minSpeechMs`
+(200 ms) of frames ever exceeded 500, the burst was folded back as a click, and the **no-speech**
+timer ran out. This is with the TR's `micGain` 4× already applied. Two independent defects:
+
+- [ ] **`minSpeechRms` = 500 is too high for quiet-but-clear speech.** Lower the floor (≈200–250 —
+      the failing takes sit at 116–540, the floor on this mic is 3) and/or make the floor relative to
+      the observed noise (a clean room should not need 500). Check the PE's recordings too before
+      settling on a number; and consider whether the TR default gain (4×) is still too low — the
+      *good* take peaks at 3296, so 8× would not clip. Unit-test with synthetic PCM at RMS 250/500/800
+      against a floor of 3 and of 200.
+- [ ] **A no-speech timeout after a `speechStart` must not end as "Heard nothing".** Something
+      crossed the threshold — send the whole captured turn (`preRoll` + everything since) to STT and
+      let the transcriber decide, instead of declaring silence 8 s later. The device already treats an
+      empty transcript correctly, so the downside is one STT call. Also stop reporting `timeout` as
+      `silence` and log the numbers (`VAD timeout: threshold=…, peak RMS seen=…`) so the next dump
+      explains itself.
+- [ ] **Put the `rx_` file URL in the `Recorded N.Ns` log line** so a dump alone lets us fetch the clip
+      (this investigation needed the URLs pasted by hand from the recordings API).
+
+Replay harness (not committed): decode with `flacToPcmBuffer`, feed `SimpleVad` in 40 ms chunks,
+print 200 ms RMS windows and the speechStart/fold/utterance/timeout events with the live threshold.
+The double `Pipeline healthy` at init that looked suspicious earlier is just the two devices (PE at
+.50, TR at .56) each building their own provider — not a defect.
+
 ## Homey developer portal reports (seen 2026-08-15)
 
 - [x] ~~**`TypeError: Cannot read properties of null (reading 'abort')`**~~ — a deleted device kept
@@ -160,8 +203,11 @@ nothing anywhere adds context to the payload or triggers a report. What SharpToo
 first looked like a *customizable* Homey dialog — is a **parallel channel of their own**: a button in
 their own settings page that uploads a snapshot to their servers and shows the user a key to quote.
 
-- [ ] **Add a "Dump log" button to Settings → Debug that writes a file into userdata and shows its
-      LAN URL.** We already serve userdata over HTTP: `webserver.mts:192` builds
+- [x] **Add a "Dump log" button to Settings → Debug that writes a file into userdata and shows its
+      LAN URL.** *(done 2026-08-27 — `src/helpers/log-buffer.mts` + `log-dump.mts`, `POST /dump-log`,
+      file at `/userdata/log/<datetime>.txt`, 30 min TTL; see COMPLETED.md §27. Deviations from the
+      notes below: the buffer captures the quieted loggers **regardless of verbose_logging**, and
+      LAN IPs are kept unredacted on purpose — they are private and help the user self-diagnose.)* We already serve userdata over HTTP: `webserver.mts:192` builds
       `http://<ip>/app/<app-id>/userdata/audio/<file>`, which is Homey's own static serving of the
       app's userdata folder, and `file-helper.mts` already does scheduled deletion. So the button
       writes a redacted `diagnostic-<random>.txt` and the page shows its URL. The user opens it in a
@@ -199,7 +245,8 @@ their own settings page that uploads a snapshot to their servers and shows the u
       production, and every crash report we have read came from Athom's portal instead. Either wire a
       DSN or stop maintaining that machinery as if it runs.
 
-- [ ] **Point users at the right button.** [`README.md`](./README.md):547 tells them to *"copy the
+- [x] **Point users at the right button.** *(done 2026-08-27 — README now leads with Dump log and
+      names the app-page diagnostics report as the fallback.)* [`README.md`](./README.md):547 told them to *"copy the
       app log … ⋮ menu"*. Copy-paste from a phone is the fragile path, and it does not name the
       mechanism that actually reaches us. Say **Create Diagnostics Report, on the app's own page**,
       and say *right after it fails*.
@@ -437,6 +484,14 @@ hanging". Four things the log settles:
   thread/changelog for a fix, then verify with a few Norwegian turns on the real PE.
 
 ## Watch items (no action unless they recur)
+
+- **Zone fallback cannot tell two same-named zones under the SAME parent apart (PR #51,
+  decided 2026-08-27 — deferred):** `tryZoneFallback` groups matches on the zone *path*
+  (`"Office > Upstairs"`), which separates same-named zones under different parents but not
+  siblings with identical names. Fixing it needs a zone id on `Device`, which lands in every
+  device listing the model sees — a per-device token cost (`docs/cost-of-growth.md`). Left as
+  is because the layout is rare and the failure mode is a *declined* fallback (the safe
+  direction). Revisit only if a user reports a real house that hits it.
 
 - **Timer-tool phrasing miss (2026-07-28, live test, Norwegian):** "START nedtelling ett
   minutt" did not trigger `set_timer` — the LLM said it can't do countdowns and called

@@ -122,6 +122,16 @@ function resolveAudioDir(): void {
   }
 }
 
+// Same story for the "Dump log" files (/userdata/log, override HE_LOG_DIR).
+function resolveLogDir(): void {
+  if (process.env.HE_LOG_DIR?.trim()) return;
+  try {
+    mkdirSync('/userdata/log', { recursive: true });
+  } catch {
+    process.env.HE_LOG_DIR = join(tmpdir(), 'he-log');
+  }
+}
+
 // Push settings.json `env` values into process.env so the app code (which reads
 // process.env.HE_HOST_IP, process.env.ESP_LOG_LEVEL, ...) picks them up without
 // you having to export them by hand. An already-set real env var takes
@@ -136,3 +146,4 @@ if (config.env) {
 }
 
 resolveAudioDir();
+resolveLogDir();

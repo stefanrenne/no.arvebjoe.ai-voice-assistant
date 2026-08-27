@@ -1,6 +1,7 @@
 import Homey from 'homey/lib/Homey.js';
 import util from 'util';
 import { remoteLog, SYSLOG_ERROR, SYSLOG_WARNING, SYSLOG_INFO, SYSLOG_DEBUG } from './remote-log.mjs';
+import { logBuffer, redactForDump, redactDetails, LogBufferLevel } from './log-buffer.mjs';
 
 // ANSI color codes
 const colors = {
@@ -27,7 +28,8 @@ const colors = {
 
 
 // Field names whose string values are secrets and must never appear in logs.
-const SECRET_KEY_RE = /(api[_-]?key|access[_-]?key|secret|token|password|passwd|_key$|^key$)/i;
+// `key$` (not `_key$`) so camelCase fields like encryptionKey are covered too.
+const SECRET_KEY_RE = /(api[_-]?key|access[_-]?key|secret|token|password|passwd|key$)/i;
 
 // Mask a secret string as first-4 + "...." + last-4 (e.g. "sk-p....8AA").
 // Values too short to partially reveal are fully masked.
@@ -137,6 +139,9 @@ class Logger {
             // The severity stays DEBUG whatever `verbose` says: it describes
             // what this logger IS, and existing collector filters depend on it.
             this.emitRemote(SYSLOG_DEBUG, subFrom, message, details);
+            // ...and into the dump buffer regardless of `verbose`: the buffer is
+            // ours, and these are exactly the lines a submitted log lacks.
+            this.capture('debug', subFrom, message, details);
             if (!Logger.verbose) {
                 return;
             }
@@ -145,7 +150,32 @@ class Logger {
         }
         // Enabled loggers (e.g. CONVO) are the app's normal narrative → INFO.
         this.emitRemote(SYSLOG_INFO, subFrom, message, details);
+        this.capture('info', subFrom, message, details);
         this.write(message, subFrom, details);
+    }
+
+    // One line into the "Dump log" ring buffer (log-buffer.mts). Redacted here,
+    // at write time, so the buffer never holds transcripts or keys. Never throws.
+    private capture(level: LogBufferLevel, subFrom: string, message: string, details: any) {
+        try {
+            let text = redactForDump(String(message));
+            if (details instanceof Error) {
+                // name: message plus the first few frames — enough to place it.
+                const stack = (details.stack || `${details.name}: ${details.message}`).split(/\r?\n/).slice(0, 4).join(' <- ');
+                const code = (details as any).code ? ` [${(details as any).code}]` : '';
+                text += ` | ${redactForDump(stack)}${code}`;
+            } else if (typeof details === 'string' && /Text response received/.test(message)) {
+                // The reply text travels as the details string here.
+                text += ` | <${details.length} chars redacted>`;
+            } else if (details !== null && details !== undefined &&
+                (typeof details !== 'object' || Object.keys(details).length > 0)) {
+                const rendered = util.inspect(redactDetails(maskSecrets(details)), { colors: false, depth: 4, breakLength: Infinity, compact: true });
+                text += ` | ${redactForDump(rendered)}`;
+            }
+            logBuffer.push(level, this.from, subFrom, text);
+        } catch (_) {
+            // The dump buffer must never break the caller.
+        }
     }
 
     // Forward one entry to the remote syslog transport. All formatting cost is
@@ -214,6 +244,7 @@ class Logger {
 
         try {
             this.emitRemote(SYSLOG_ERROR, 'ERROR', message, details);
+            this.capture('error', 'ERROR', message, details);
             this.reportError(details instanceof Error ? details : new Error(String(details)), message);
 
             if (Logger.homey) {
@@ -238,6 +269,7 @@ class Logger {
 
     warn(message: string, details: any = null) {
         this.emitRemote(SYSLOG_WARNING, 'WARN', message, details);
+        this.capture('warn', 'WARN', message, details);
         this.write(message, 'WARN', details);
     }
 

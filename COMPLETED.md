@@ -1776,3 +1776,53 @@ throughout this testing.
 playback included — was run on 2026-08-19 and worked. Every device on hand (2× PE, TR, XiaoZhi) has
 now been paired from scratch and driven through a conversation on this code. (The TR's is covered — it ran a whole multi-turn
 quiz with playback.)
+
+## 27. "Dump log" — a full, redacted log as a file the user can share (2026-08-27)
+
+**Problem.** Homey's *Create Diagnostics Report* submits only a short tail of recent lines and must
+be created right after the failure; `verbose_logging` made that channel worse (ESP/PE/AGENT chatter
+pushed the connect/handshake lines out first), and the SDK has no diagnostics hook. Full design and
+the rejected alternatives (mailto, prefilled GitHub issue, Sentry transport, fake crash) are in
+TODO.md → "Getting a full log out of a user".
+
+**What shipped.**
+- `src/helpers/log-buffer.mts` — a 2000-line ring buffer every `Logger` writes into from `info()` /
+  `warn()` / `error()`. The quieted subsystem loggers (ESP, AGENT, PE, device) land in it **whether
+  or not verbose logging is on**, at level `DBG`, so a dump always contains the lines that say
+  whether the satellite and the engine connected — the very lines a submitted log used to lack.
+- **Redaction at write time** (`redactForDump`): ANSI stripped; transcripts and replies replaced by
+  `"<N chars redacted>"` (patterns: `Heard:`, `Reply:`, `STT NNNms:`, `Final transcript:`,
+  `LLM reply:`, `Flow question (…):`, the no-LLM hand-off); inline `sk-…` keys, bearer tokens and
+  44-char base64 blobs (Noise keys) masked; coordinate pairs coarsened to one decimal (the GEOHELPER
+  "Location updated" line is the home address); `details` objects go through `maskSecrets` (whose
+  key regex now also matches camelCase `…Key` fields such as `encryptionKey`) **and `redactDetails`**,
+  which masks string values under text-bearing keys (`text`, `transcript`, `delta`, `query`,
+  `question`, `item`, `content`, `prompt`, `reply`) and the ESP event shape
+  `{ name: 'text' | 'chat_log_delta', value }`. The second live dump showed why: the transcript
+  survived in `VoiceAssistantEvent: STT_END | { data: [{ name: 'text', value: '…' }] }` and the reply
+  streamed out through `INTENT_PROGRESS … chat_log_delta` even though the CONVO lines were redacted.
+  Message-level prefixes also cover `Converting text to speech:`, `Speaking text:`, `Asking agent to
+  output …:`, OpenAI `*transcript*.delta =`, `query=` in TOOL lines and `"query"/"text"/…` fields in
+  logged JSON. **Rule for new log lines:** if it carries spoken or typed user text, either use one of
+  those field names or add a prefix to `TRANSCRIPT_RES` — and check a real dump, not just the tests.
+  **LAN IPs are kept on purpose** — private addresses, and exactly what lets a user see which
+  device the app cannot reach. If a new log line starts carrying spoken text, add its prefix to
+  `TRANSCRIPT_RES`.
+- `src/helpers/log-dump.mts` — `writeLogDump()` writes `/userdata/log/<YYYY-MM-DD_HH-mm-ss>.txt`
+  (Homey's time zone via `homey.clock.getTimezone()`; same-second collision gets a `-ms` suffix),
+  with a header (app/Homey/Node versions, verbose state, selection-only settings, key *presence*),
+  and deletes it after `DUMP_TTL_MS` = 30 min via `homey.setTimeout`. `initLogDumpFolder()` wipes
+  the folder at app start (app.mts, next to `initAudioFolder`). `HE_LOG_DIR` overrides the folder
+  for the emulator, whose port-80 server now serves `/userdata/log/*` too.
+- `WebServer.buildUserdataUrl(subdir, file)` generalizes the audio URL builder;
+  `buildStaticUrl` delegates to it. `POST /dump-log` (`api.mts` → `dumpLog`) returns
+  `{ url, text, lines, expiresAt }`.
+- Settings → Debug → **Dump log** card: button, LAN link, `Copy log to clipboard`
+  (`navigator.clipboard` on HTTPS `my.homey.app`, hidden-textarea `execCommand` fallback for the
+  mobile webview), and a privacy note stating exactly what is removed and what is kept.
+
+**Gotchas.** The userdata URL is unauthenticated but LAN-only; the datetime filename is guessable
+by design (Arve's call — it is the user's own network), the TTL is the actual bound. The homey-log /
+`HOMEY_LOG_URL` question and the automatic compact snapshot remain open in TODO.md.
+Live-verified on Arve's Homey 2026-08-27 (183 lines, 178 of them from quieted loggers with verbose
+off; leak sweep clean). Tests: `tests/log-dump.test.mts` (19 cases).

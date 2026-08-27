@@ -110,6 +110,10 @@
     "playRecording": {
       "method": "POST",
       "path": "/play-recording"
+    },
+    "dumpLog": {
+      "method": "POST",
+      "path": "/dump-log"
     }
   },
   "esm": true,
