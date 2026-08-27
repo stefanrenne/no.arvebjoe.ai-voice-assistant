@@ -136,6 +136,9 @@ class EspVoiceAssistantClient extends (EventEmitter as new () => TypedEmitter<Es
   // when there is no mDNS record to read them from.
   private macAddress: string = '';
   private friendlyName: string = '';
+  // Firmware identity for the log dump's Devices block: HelloResponse.serverInfo
+  // ("2026.3.2") and DeviceInfoResponse esphomeVersion/model/manufacturer/project.
+  private firmwareInfo: string = '';
   // Noise encryption: the device's API encryption key (undefined = plaintext)
   // and the codec for the CURRENT connection. A codec is single-use (fresh
   // ephemeral keys per handshake), so start() builds a new one every connect.
@@ -292,6 +295,11 @@ class EspVoiceAssistantClient extends (EventEmitter as new () => TypedEmitter<Es
   // name). Empty until DeviceInfoResponse has been received.
   getFriendlyName(): string {
     return this.friendlyName;
+  }
+
+  /** e.g. "ESPHome 2026.3.2, Nabu Casa Home Assistant Voice PE" — '' until the device has said hello. */
+  getFirmwareInfo(): string {
+    return this.firmwareInfo;
   }
 
   scheduleReconnect(): void {
@@ -631,6 +639,9 @@ class EspVoiceAssistantClient extends (EventEmitter as new () => TypedEmitter<Es
   async dispatch({ name, message }: { name: string; message: any }): Promise<void> {
 
 
+    if (name === 'HelloResponse' && message?.serverInfo && !this.firmwareInfo) {
+      this.firmwareInfo = `ESPHome ${message.serverInfo}`;
+    }
     if (name === 'HelloResponse' && !this.connected) {
       // Validate server API version - VoiceAssistantAnnounceRequest requires API >= 1.5
       const serverMajor = message?.apiVersionMajor ?? 0;
@@ -804,6 +815,12 @@ class EspVoiceAssistantClient extends (EventEmitter as new () => TypedEmitter<Es
       }
       if (message?.friendlyName || message?.name) {
         this.friendlyName = message.friendlyName || message.name;
+      }
+      {
+        const version = message?.esphomeVersion ? `ESPHome ${message.esphomeVersion}` : this.firmwareInfo;
+        const make = [message?.manufacturer, message?.model].filter(Boolean).join(' ');
+        const project = message?.projectName ? `${message.projectName}${message.projectVersion ? ` ${message.projectVersion}` : ''}` : '';
+        this.firmwareInfo = [version, make, project].filter(Boolean).join(', ');
       }
 
       // Parse the voice-assistant feature flags so we know whether the device

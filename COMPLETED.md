@@ -1810,7 +1810,11 @@ TODO.md → "Getting a full log out of a user".
   `TRANSCRIPT_RES`.
 - `src/helpers/log-dump.mts` — `writeLogDump()` writes `/userdata/log/<YYYY-MM-DD_HH-mm-ss>.txt`
   (Homey's time zone via `homey.clock.getTimezone()`; same-second collision gets a `-ms` suffix),
-  with a header (app/Homey/Node versions, verbose state, selection-only settings, key *presence*),
+  with a header (app/Homey/Node versions, verbose state, selection-only settings, key *presence*,
+  and a **Devices** block — one `diagnosticSummary()` line per paired satellite: driver, name,
+  address, firmware from `EspVoiceAssistantClient.getFirmwareInfo()` (HelloResponse `serverInfo` +
+  DeviceInfoResponse version/model/project), plaintext/encrypted, satellite and engine link state,
+  mic gain, audio route — so a report never needs "which device / which engine?" asked back),
   and deletes it after `DUMP_TTL_MS` = 30 min via `homey.setTimeout`. `initLogDumpFolder()` wipes
   the folder at app start (app.mts, next to `initAudioFolder`). `HE_LOG_DIR` overrides the folder
   for the emulator, whose port-80 server now serves `/userdata/log/*` too.

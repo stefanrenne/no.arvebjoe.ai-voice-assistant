@@ -90,6 +90,10 @@ export function buildDumpText(homey: any, entries: LogBufferEntry[], now: number
         const v = safe(() => settingsManager.getGlobal<string>(key));
         head.push(`  ${key} = ${v ? 'set' : 'not set'}`);
     }
+    head.push('', 'Devices:');
+    const devices = listDeviceSummaries(homey);
+    if (devices.length === 0) head.push('  (no voice satellites paired)');
+    for (const line of devices) head.push(`  ${line}`);
     head.push('',
         'Redacted before writing: API keys and tokens, what was said (transcripts and replies are',
         'replaced by "<N chars redacted>"), and coordinates (rounded to ~10 km). Private LAN addresses',
@@ -126,6 +130,33 @@ export async function writeLogDump(homey: any, buildUrl: (filename: string) => s
     const url = buildUrl(filename);
     log.info(`Log dump written: ${filepath} (${entries.length} lines) → ${url}`);
     return { filename, url, text, lines: entries.length, expiresAt: now + DUMP_TTL_MS };
+}
+
+/**
+ * One line per paired satellite, via each device's `diagnosticSummary()`. Any
+ * failure degrades to a note — the dump must never fail because of this.
+ */
+export function listDeviceSummaries(homey: any): string[] {
+    const out: string[] = [];
+    try {
+        const drivers = homey?.drivers?.getDrivers?.() ?? {};
+        for (const driver of Object.values(drivers) as any[]) {
+            let devices: any[] = [];
+            try { devices = driver?.getDevices?.() ?? []; } catch { continue; }
+            for (const device of devices) {
+                try {
+                    out.push(typeof device?.diagnosticSummary === 'function'
+                        ? device.diagnosticSummary()
+                        : `${driver?.id ?? '?'} "${device?.getName?.() ?? '?'}"`);
+                } catch (err: any) {
+                    out.push(`${driver?.id ?? '?'}: summary failed (${err?.message ?? err})`);
+                }
+            }
+        }
+    } catch (err: any) {
+        out.push(`(device list unavailable: ${err?.message ?? err})`);
+    }
+    return out;
 }
 
 async function exists(p: string): Promise<boolean> {

@@ -4,7 +4,7 @@ import os from 'os';
 import path from 'path';
 import { createLogBuffer, logBuffer, redactForDump, redactDetails, formatEntry, formatTimestamp } from '../src/helpers/log-buffer.mjs';
 import { createLogger, setVerboseLogging } from '../src/helpers/logger.mjs';
-import { writeLogDump, dumpFilename, initLogDumpFolder, DUMP_TTL_MS } from '../src/helpers/log-dump.mjs';
+import { writeLogDump, dumpFilename, initLogDumpFolder, listDeviceSummaries, DUMP_TTL_MS } from '../src/helpers/log-dump.mjs';
 
 // "Dump log" (Settings → Debug): every Logger line lands in a redacted ring
 // buffer, and the button writes it to /userdata/log/<datetime>.txt. See TODO.md
@@ -209,6 +209,36 @@ describe('writeLogDump', () => {
         homey.timers[0].fn();
         await new Promise((r) => setTimeout(r, 20));
         await expect(fs.access(path.join(dir, res.filename))).rejects.toThrow();
+    });
+
+    it('lists every paired satellite in the header, via diagnosticSummary()', async () => {
+        const homey = fakeHomey();
+        homey.drivers = {
+            getDrivers: () => ({
+                'thirdreality-voice--music-assistant': {
+                    id: 'thirdreality-voice--music-assistant',
+                    getDevices: () => [{ diagnosticSummary: () => 'thirdreality-voice--music-assistant "Ute" @192.168.0.56 — ESPHome 2025.9.0 (plaintext) — satellite connected, Custom pipeline engine connected — mic gain 4x, audio→device' }],
+                },
+                'home-assistant-voice-preview-edition': {
+                    id: 'home-assistant-voice-preview-edition',
+                    getDevices: () => [{ getName: () => 'Kitchen' }, { diagnosticSummary: () => { throw new Error('nope'); } }],
+                },
+                'xiaozhi-ai': { id: 'xiaozhi-ai', getDevices: () => { throw new Error('driver broken'); } },
+            }),
+        };
+        const lines = listDeviceSummaries(homey);
+        expect(lines).toEqual([
+            'thirdreality-voice--music-assistant "Ute" @192.168.0.56 — ESPHome 2025.9.0 (plaintext) — satellite connected, Custom pipeline engine connected — mic gain 4x, audio→device',
+            'home-assistant-voice-preview-edition "Kitchen"',
+            'home-assistant-voice-preview-edition: summary failed (nope)',
+        ]);
+        const res = await writeLogDump(homey, (f) => f, Date.UTC(2026, 7, 27, 21, 3, 11));
+        expect(res.text).toContain('Devices:\n  thirdreality-voice--music-assistant "Ute" @192.168.0.56');
+    });
+
+    it('says so when no satellite is paired or the driver list is unavailable', () => {
+        expect(listDeviceSummaries({})).toEqual([]);
+        expect(listDeviceSummaries({ drivers: { getDrivers: () => { throw new Error('x'); } } })).toEqual(['(device list unavailable: x)']);
     });
 
     it('does not overwrite a dump written in the same second', async () => {

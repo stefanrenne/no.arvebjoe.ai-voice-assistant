@@ -1815,6 +1815,24 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
    * reason. Falls back to the raw id so an unknown provider still reads
    * sensibly rather than as "undefined".
    */
+  /**
+   * One line for the log dump's Devices block — which satellite, where, on what
+   * firmware, and whether each of its two links is up. Lets a reporter skip the
+   * "which device / which engine do you use?" round-trip. No secrets: the
+   * encryption key is reported as present/absent only.
+   */
+  diagnosticSummary(): string {
+    const store = (this.getStore?.() ?? {}) as { address?: string; port?: number; encryptionKey?: string };
+    const settings = (this.getSettings?.() ?? {}) as Record<string, any>;
+    const address = store.address ? `${store.address}${store.port && store.port !== 6053 ? `:${store.port}` : ''}` : 'address unknown';
+    const firmware = this.esp?.getFirmwareInfo?.() || 'firmware unknown';
+    const encrypted = settings.encryption_key || store.encryptionKey ? 'encrypted' : 'plaintext';
+    const esp = this.isEspClientHealthy ? 'connected' : 'NOT connected';
+    const agent = this.isAgentHealthy ? 'connected' : 'NOT connected';
+    const audio = this.replyToFlowUrl ? 'audio→Flow URL' : 'audio→device';
+    return `${this.driver?.id ?? 'unknown-driver'} "${this.getName()}" @${address} — ${firmware} (${encrypted}) — satellite ${esp}, ${this.engineLabel()} engine ${agent} — mic gain ${this.micGain}x, ${audio}`;
+  }
+
   private engineLabel(): string {
     const id = this.currentProviderId || settingsManager.getGlobal('voice_provider', DEFAULT_VOICE_PROVIDER);
     return VoiceAssistantDevice.ENGINE_LABELS[id as string] ?? String(id);

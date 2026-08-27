@@ -533,7 +533,10 @@ language-model and speech stages can also be set to **None** to switch them off 
   thousand log lines — including the detailed satellite-connection and AI-engine lines, whether or
   not verbose logging is on — to a text file on your Homey and shows a link to it. Open the link
   from a phone or computer on the same network and attach the file to your forum post, e-mail or
-  GitHub issue (a **Copy log to clipboard** button is there too). API keys and everything that was
+  GitHub issue (a **Copy log to clipboard** button is there too). The file starts with a summary —
+  app and Homey versions, the engine and pipeline stages you selected, and one line per paired
+  satellite (model, address, firmware, whether it and the engine are connected) — so you don't have
+  to describe your setup separately. API keys and everything that was
   said (your questions, the assistant's answers) are removed before the file is written, and your
   home coordinates are rounded to about 10 km; local network addresses are kept because they help
   you see which device the app can't reach. The file
