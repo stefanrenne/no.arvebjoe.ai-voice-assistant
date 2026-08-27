@@ -27,49 +27,6 @@
       rewritten alongside. Users now have a manual escape hatch (switching the tile's *Start
       conversation* off cancels the turn), so this is a robustness item, not an emergency.
 
-## "Heard nothing" on a real utterance — quiet speech never crosses `minSpeechRms` (ROOT CAUSE FOUND 2026-08-27, not fixed)
-
-Seen three times on the TR satellite (`3RSPK-…`, zone Ute, custom pipeline) in the first live "Dump
-log" sessions: Arve says *"Hvor mye er klokka"*, the app answers **"Heard nothing"** after exactly
-**8.0 s**; a retry a few seconds later works. Homey's diagnostics could never have shown this — it was
-found by dumping the log (`2026-08-27_23-02-37.txt`) and pulling the retained `rx_*.flac` recordings.
-
-**Proven by replaying the three recordings through the real `SimpleVad`** (the `rx_` clip is
-captured after skip and gain, i.e. exactly what the VAD saw):
-
-| clip | speech RMS (200 ms windows) | peak | VAD result |
-|---|---|---|---|
-| failed #1 | 116 · 420 · 275 · 146 · 251 · 352 | 1676 | speechStart @0.9 s → folded back as a "click" @2.5 s → **TIMEOUT @8.0 s** |
-| failed #2 | 296 · 215 · 539 · 296 · 242 · 224 · 316 | 2156 | speechStart @0.2 s → folded back @2.6 s → **TIMEOUT @8.0 s** |
-| worked    | 455 · 872 · 507 · 727 · 609 · 745 | 3296 | speechStart @0.8 s → UTTERANCE 2160 ms |
-
-The threshold was **500 the whole time** (`minSpeechRms` default; the adaptive part is irrelevant
-because the TR's noise floor is ~3 RMS — a very clean mic). The failed takes were simply spoken at
-about half the level (RMS 200–400 vs 500–900) — inaudible as a difference to the ear, and perfectly
-intelligible audio (peaks ~2000, STT would have had no trouble) — so fewer than `minSpeechMs`
-(200 ms) of frames ever exceeded 500, the burst was folded back as a click, and the **no-speech**
-timer ran out. This is with the TR's `micGain` 4× already applied. Two independent defects:
-
-- [ ] **`minSpeechRms` = 500 is too high for quiet-but-clear speech.** Lower the floor (≈200–250 —
-      the failing takes sit at 116–540, the floor on this mic is 3) and/or make the floor relative to
-      the observed noise (a clean room should not need 500). Check the PE's recordings too before
-      settling on a number; and consider whether the TR default gain (4×) is still too low — the
-      *good* take peaks at 3296, so 8× would not clip. Unit-test with synthetic PCM at RMS 250/500/800
-      against a floor of 3 and of 200.
-- [ ] **A no-speech timeout after a `speechStart` must not end as "Heard nothing".** Something
-      crossed the threshold — send the whole captured turn (`preRoll` + everything since) to STT and
-      let the transcriber decide, instead of declaring silence 8 s later. The device already treats an
-      empty transcript correctly, so the downside is one STT call. Also stop reporting `timeout` as
-      `silence` and log the numbers (`VAD timeout: threshold=…, peak RMS seen=…`) so the next dump
-      explains itself.
-- [ ] **Put the `rx_` file URL in the `Recorded N.Ns` log line** so a dump alone lets us fetch the clip
-      (this investigation needed the URLs pasted by hand from the recordings API).
-
-Replay harness (not committed): decode with `flacToPcmBuffer`, feed `SimpleVad` in 40 ms chunks,
-print 200 ms RMS windows and the speechStart/fold/utterance/timeout events with the live threshold.
-The double `Pipeline healthy` at init that looked suspicious earlier is just the two devices (PE at
-.50, TR at .56) each building their own provider — not a defect.
-
 ## Homey developer portal reports (seen 2026-08-15)
 
 - [x] ~~**`TypeError: Cannot read properties of null (reading 'abort')`**~~ — a deleted device kept

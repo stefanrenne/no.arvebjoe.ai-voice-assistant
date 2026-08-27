@@ -1754,7 +1754,9 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
         retentionMs: this.recordingRetentionMs,
       });
       this.currentRecordingId = recording.id;
-      this.convo.info(`Recorded ${(durationMs / 1000).toFixed(1)}s of microphone audio (debug playback is on)`, 'MIC');
+      // The URL is in the line on purpose: a log dump alone then points at the
+      // clip, which is what proved the quiet-speech VAD defect (TODO.md).
+      this.convo.info(`Recorded ${(durationMs / 1000).toFixed(1)}s of microphone audio (debug playback is on) → ${fileInfo.url}`, 'MIC');
     }
   }
 

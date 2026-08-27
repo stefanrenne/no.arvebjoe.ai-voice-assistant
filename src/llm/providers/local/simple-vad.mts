@@ -20,8 +20,14 @@
 export interface SimpleVadOptions {
     sampleRate?: number;        // default 16000
     frameMs?: number;           // analysis window, default 20 ms
-    /** Floor for the speech threshold (int16 RMS). */
-    minSpeechRms?: number;      // default 500
+    /**
+     * Floor for the speech threshold (int16 RMS). Default 250: live recordings
+     * from a ThirdReality satellite (mic gain 4x) put clearly intelligible speech
+     * at RMS 120-540 — the old 500 folded those turns away as clicks and ended
+     * them as "heard nothing" (TODO.md, 2026-08-27). The room floor on those
+     * mics is ~3, so the adaptive part never lifts the bar; this floor is it.
+     */
+    minSpeechRms?: number;      // default 250
     /** Speech threshold = clamp(noiseFloor * noiseFactor, minSpeechRms, maxSpeechRms). */
     noiseFactor?: number;       // default 2.5
     maxSpeechRms?: number;      // default 6000
@@ -41,8 +47,20 @@ export interface VadResult {
     speechStart: boolean;
     /** Set when the utterance closed (end-of-speech or max length). PCM16 mono at the input rate. */
     utterance: Buffer | null;
-    /** Set when no speech arrived within the timeout. */
+    /** Why `utterance` closed. `timeout` = the no-speech timer ran out AFTER something had crossed the threshold. */
+    reason?: 'silence' | 'max_length' | 'timeout';
+    /** Set when no speech arrived within the timeout (nothing ever crossed the threshold). */
     timeout: boolean;
+}
+
+/** Numbers behind the last decision, for the log. */
+export interface VadStats {
+    threshold: number;
+    noiseFloor: number;
+    /** Loudest frame RMS seen this turn. */
+    peakRms: number;
+    /** Frames above threshold this turn. */
+    speechFrames: number;
 }
 
 export class SimpleVad {
@@ -62,6 +80,13 @@ export class SimpleVad {
     private preRollLen = 0;
     private captured: Buffer[] = [];     // frames since speech start
     private noiseFloor = 200;            // adaptive quiet-level estimate (int16 RMS)
+    // Everything since the first threshold crossing of the turn (pre-roll
+    // included), so a no-speech timeout after a false start can still hand STT
+    // what was said instead of declaring silence. Capped at maxUtteranceFrames.
+    private sinceFirstSpeech: Buffer[] = [];
+    private sinceFirstSpeechFrames = 0;
+    private peakRms = 0;
+    private turnSpeechFrames = 0;
     private speechActive = false;
     private speechFrames = 0;
     private quietFrames = 0;
@@ -73,7 +98,7 @@ export class SimpleVad {
         this.sampleRate = opts.sampleRate ?? 16000;
         const frameMs = opts.frameMs ?? 20;
         this.frameBytes = Math.round(this.sampleRate * frameMs / 1000) * 2;
-        this.minSpeechRms = opts.minSpeechRms ?? 500;
+        this.minSpeechRms = opts.minSpeechRms ?? 250;
         this.noiseFactor = opts.noiseFactor ?? 2.5;
         this.maxSpeechRms = opts.maxSpeechRms ?? 6000;
         this.silenceFrames = Math.ceil((opts.silenceMs ?? 800) / frameMs);
@@ -95,7 +120,25 @@ export class SimpleVad {
         this.totalFrames = 0;
         this.utteranceFrames = 0;
         this.finished = false;
+        this.sinceFirstSpeech = [];
+        this.sinceFirstSpeechFrames = 0;
+        this.peakRms = 0;
+        this.turnSpeechFrames = 0;
         // Keep the learned noiseFloor across turns — the room doesn't change.
+    }
+
+    /** The current threshold and what this turn has seen so far. */
+    stats(): VadStats {
+        return {
+            threshold: this.threshold(),
+            noiseFloor: this.noiseFloor,
+            peakRms: this.peakRms,
+            speechFrames: this.turnSpeechFrames,
+        };
+    }
+
+    private threshold(): number {
+        return Math.min(this.maxSpeechRms, Math.max(this.minSpeechRms, this.noiseFloor * this.noiseFactor));
     }
 
     /** Feed mic PCM (any chunk size). */
@@ -116,8 +159,15 @@ export class SimpleVad {
     private processFrame(frame: Buffer, result: VadResult): void {
         this.totalFrames++;
         const rms = this.frameRms(frame);
-        const threshold = Math.min(this.maxSpeechRms, Math.max(this.minSpeechRms, this.noiseFloor * this.noiseFactor));
+        const threshold = this.threshold();
         const isSpeech = rms >= threshold;
+        if (rms > this.peakRms) this.peakRms = rms;
+        if (isSpeech) this.turnSpeechFrames++;
+
+        if (this.sinceFirstSpeechFrames > 0 && this.sinceFirstSpeechFrames < this.maxUtteranceFrames) {
+            this.sinceFirstSpeech.push(Buffer.from(frame));
+            this.sinceFirstSpeechFrames++;
+        }
 
         if (!isSpeech) {
             // Track the quiet level so a noisy room raises the bar. Slow EMA,
@@ -133,6 +183,12 @@ export class SimpleVad {
                 this.utteranceFrames = 0;
                 this.captured = [Buffer.from(frame)];
                 result.speechStart = true;
+                if (this.sinceFirstSpeechFrames === 0) {
+                    // First crossing of the turn: start the safety-net capture
+                    // with the pre-roll so a later timeout can still transcribe.
+                    this.sinceFirstSpeech = [...this.preRoll.map((b) => Buffer.from(b)), Buffer.from(frame)];
+                    this.sinceFirstSpeechFrames = 1;
+                }
             } else {
                 // Rolling pre-roll so the first syllable isn't clipped.
                 this.preRoll.push(Buffer.from(frame));
@@ -143,7 +199,16 @@ export class SimpleVad {
                 }
                 if (this.totalFrames >= this.timeoutFrames) {
                     this.finished = true;
-                    result.timeout = true;
+                    if (this.sinceFirstSpeechFrames > 0) {
+                        // Something crossed the threshold earlier but never
+                        // lasted minSpeechMs — quiet speech, most likely. Hand
+                        // STT everything since then and let it decide, rather
+                        // than reporting "heard nothing" 8 s later.
+                        result.utterance = Buffer.concat(this.sinceFirstSpeech);
+                        result.reason = 'timeout';
+                    } else {
+                        result.timeout = true;
+                    }
                 }
             }
             return;
@@ -181,6 +246,7 @@ export class SimpleVad {
         if ((hadRealSpeech && this.quietFrames >= this.silenceFrames) || this.utteranceFrames >= this.maxUtteranceFrames) {
             this.finished = true;
             result.utterance = Buffer.concat([...this.preRoll, ...this.captured]);
+            result.reason = this.utteranceFrames >= this.maxUtteranceFrames ? 'max_length' : 'silence';
         }
     }
 

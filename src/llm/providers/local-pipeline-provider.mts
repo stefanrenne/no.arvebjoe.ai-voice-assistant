@@ -649,9 +649,25 @@ export class LocalPipelineProvider extends (EventEmitter as new () => TypedEmitt
             }
             if (result.utterance) {
                 this.phase = 'processing';
+                const st = this.vad.stats();
+                const ms = Math.round(result.utterance.length / 2 / 16);
+                if (result.reason === 'timeout') {
+                    // Quiet speech: it crossed the threshold but never for
+                    // minSpeechMs, so the no-speech timer ran out. Transcribe
+                    // anyway — STT is the judge, not the energy gate.
+                    this.logger.warn(`VAD: no end-of-speech before the ${ms}ms timeout — transcribing what was heard anyway ` +
+                        `(threshold=${st.threshold.toFixed(0)}, peak RMS=${st.peakRms.toFixed(0)}, frames above=${st.speechFrames})`);
+                } else {
+                    this.logger.info(`VAD: utterance closed (${result.reason}, ${ms}ms, threshold=${st.threshold.toFixed(0)}, peak RMS=${st.peakRms.toFixed(0)})`);
+                }
                 this.emit("silence", "local");
                 void this.runAudioTurn(result.utterance, this.takeSttStream());
             } else if (result.timeout) {
+                const st = this.vad.stats();
+                // Nothing ever crossed the threshold. Say so with the numbers,
+                // so a log dump can tell "quiet room" from "mic too quiet".
+                this.logger.warn(`VAD: no speech detected before the timeout ` +
+                    `(threshold=${st.threshold.toFixed(0)}, noise floor=${st.noiseFloor.toFixed(0)}, peak RMS=${st.peakRms.toFixed(0)})`);
                 this.abortSttStream();
                 this.phase = 'idle';
                 this.emit("silence", "local");

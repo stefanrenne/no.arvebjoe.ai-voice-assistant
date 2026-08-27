@@ -1826,3 +1826,47 @@ by design (Arve's call — it is the user's own network), the TTL is the actual 
 `HOMEY_LOG_URL` question and the automatic compact snapshot remain open in TODO.md.
 Live-verified on Arve's Homey 2026-08-27 (183 lines, 178 of them from quieted loggers with verbose
 off; leak sweep clean). Tests: `tests/log-dump.test.mts` (19 cases).
+
+## 28. "Heard nothing" on quiet speech — the local VAD's floor was too high (2026-08-27)
+
+**Symptom.** On the ThirdReality satellite with the custom pipeline, a normal *"Hvor mye er klokka"*
+ended after exactly **8.0 s** with "Heard nothing"; a retry seconds later worked. Seen three times
+in one evening. Homey's diagnostics report could never have shown it — it was found with the new
+**Dump log** (§27) plus the retained `rx_*.flac` recordings from *What did I just say?*.
+
+**Root cause, proven by replaying the recordings through the real `SimpleVad`.** The `rx_` clip is
+captured after skip and gain, i.e. exactly what the VAD saw:
+
+| clip | speech RMS (200 ms windows) | peak | old VAD |
+|---|---|---|---|
+| failed #1 | 116 · 420 · 275 · 146 · 251 · 352 | 1676 | speechStart → folded back as a click → TIMEOUT @8.0 s |
+| failed #2 | 296 · 215 · 539 · 296 · 242 · 224 · 316 | 2156 | same |
+| worked | 455 · 872 · 507 · 727 · 609 · 745 | 3296 | utterance 2160 ms |
+
+The threshold was `minSpeechRms` = **500** throughout: the TR's noise floor is ~3 RMS, so the
+adaptive `noiseFloor × 2.5` never mattered and the hard floor was the bar. The failed takes were
+spoken ~6 dB softer (inaudible as a difference, perfectly intelligible for STT), so fewer than
+`minSpeechMs` (200 ms) of frames exceeded 500, the burst was folded back as a click, and the
+**no-speech** timer expired — which the provider then reported as `silence` with an empty transcript
+and no STT call, and the device as "Heard nothing".
+
+**Fixes (`simple-vad.mts`, `local-pipeline-provider.mts`, `voice-assistant-device.mts`).**
+1. `minSpeechRms` default **500 → 250**. Replaying the same three clips: all close via normal
+   end-of-speech at 2.0–2.6 s.
+2. **A no-speech timeout after a threshold crossing hands STT what it heard** (`reason: 'timeout'`,
+   audio = pre-roll + everything since the first crossing, capped at `maxUtteranceMs`) instead of
+   declaring silence. STT is the judge, not the energy gate; the cost is one STT call on a true
+   click-then-nothing. `VadResult.reason` (`silence` | `max_length` | `timeout`) and `stats()`
+   (threshold, noise floor, peak RMS, frames above) feed two new log lines, so a dump now says
+   *why* a turn ended: `VAD: utterance closed (silence, 2160ms, threshold=250, peak RMS=3296)` or
+   `VAD: no speech detected before the timeout (threshold=…, noise floor=…, peak RMS=…)`.
+3. The `Recorded N.Ns of microphone audio` line now carries the clip's URL, so a dump alone is
+   enough to fetch and replay the audio next time.
+
+**Not changed, worth knowing.** The TR default `micGain` (4×) stays; the good take peaked at 3296
+so 8× would not clip, but the floor fix is the general one and the PE was not measured. If a PE
+user reports the same, replay their clip first (harness: decode with `flacToPcmBuffer`, feed
+`SimpleVad` in 40 ms chunks, print 200 ms RMS windows + events with the live threshold).
+Tests: `tests/simple-vad.test.mts` (+3), `tests/local-pipeline-provider.test.mts` (timeout case
+rewritten + no-speech case).
+
