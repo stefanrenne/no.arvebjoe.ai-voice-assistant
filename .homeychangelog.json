@@ -58,5 +58,8 @@
   },
   "1.5.0": {
     "en": "New: the Custom pipeline can now run on Anthropic's Claude, with the model picked from a live list, and the cloud services for its speech and text stages — OpenAI, Groq, OpenRouter, DeepSeek — are now a dropdown that fills in the address and a working model for you. The pipeline settings are reorganised into one card per stage, and speech-to-text can be given hints (a context sentence and expected words) so short commands and names come back right. Important fix: adding a device could reboot your voice satellite on some ESPHome firmware versions, which showed up as pairing timing out or a device stuck Unavailable. An unavailable device now says which side is down — the device or the voice engine — and the Debug page shows the two separately, alongside a new Verbose logging switch for when you need to send in a log. Setting up Wi-Fi over Bluetooth now notices straight away if the device drops the link. Fixes a crash when a device was deleted, and the Home Assistant Voice PE now trims the wake word from the start of a command by default."
+  },
+  "1.5.1": {
+    "en": "New Dump log button under Settings, Debug: writes the app's recent log, including the detailed satellite and voice-engine lines, to a file on your Homey and shows a link you can open on your phone or computer and attach to a forum post or e-mail. API keys, your spoken commands and the assistant's replies are removed before the file is written, and it is deleted again after 30 minutes. Fix: quiet but clear speech on the ThirdReality satellite could end the turn with \"Heard nothing\" after 8 seconds; the voice detector now picks up softer speech and, when in doubt, sends what it heard to speech recognition instead of giving up."
   }
 }
