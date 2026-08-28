@@ -141,6 +141,93 @@ check and a whole HA Core instance on what is probably a settings problem):
       existing `available` AND (which still drives the star), and the page renders both rows with
       the engine named. See [`COMPLETED.md`](./COMPLETED.md) §24.
 
+## Getting a full log out of a user — "Dump log" to a userdata file (design settled 2026-08-21)
+
+**The problem is the channel, not the logging.** Homey's app-level diagnostics report — Settings
+(cog) → **Apps** → *AI Voice Assistant* → **Create Diagnostics Report**, which is the only one that
+reaches us; the *More → Settings → General* one goes to Athom support and users routinely send that
+one instead — submits only *"a limited amount of recent logs"* and has to be created **immediately
+after reproducing the issue**
+([Homey support](https://support.homey.app/hc/en-us/articles/360013177034-Create-a-diagnostics-report),
+[SharpTools](https://help.sharptools.io/article/120-how-to-submit-homey-diagnostics)). The window is
+short by design, and `verbose_logging` (§21) makes it *worse*: ESP/PE/AGENT chatter on a live audio
+pipeline pushes the connect and handshake lines out of the buffer before the user presses the button.
+"Turn on verbose, use it a while, then send a log" cannot work.
+
+The app cannot help from inside that flow: there is **no diagnostics hook in the SDK** — `App` in
+`@types/homey/lib/App.d.ts` exposes only `homey`, `manifest`, `id`, `sdk`, `onInit`, `onUninit`, and
+nothing anywhere adds context to the payload or triggers a report. What SharpTools does — and what
+first looked like a *customizable* Homey dialog — is a **parallel channel of their own**: a button in
+their own settings page that uploads a snapshot to their servers and shows the user a key to quote.
+
+- [x] **Add a "Dump log" button to Settings → Debug that writes a file into userdata and shows its
+      LAN URL.** *(done 2026-08-27 — `src/helpers/log-buffer.mts` + `log-dump.mts`, `POST /dump-log`,
+      file at `/userdata/log/<datetime>.txt`, 30 min TTL; see COMPLETED.md §27. Deviations from the
+      notes below: the buffer captures the quieted loggers **regardless of verbose_logging**, and
+      LAN IPs are kept unredacted on purpose — they are private and help the user self-diagnose.)* We already serve userdata over HTTP: `webserver.mts:192` builds
+      `http://<ip>/app/<app-id>/userdata/audio/<file>`, which is Homey's own static serving of the
+      app's userdata folder, and `file-helper.mts` already does scheduled deletion. So the button
+      writes a redacted `diagnostic-<random>.txt` and the page shows its URL. The user opens it in a
+      phone browser and has a **real file** to attach wherever they already are — forum, e-mail,
+      GitHub issue. No clipboard API, no account, no size cap, and none of the webview download
+      restrictions. It also sidesteps Homey's report window entirely, because the buffer is ours.
+
+      Notes for when this is built:
+      - **The buffer belongs in `Logger.write()` (`logger.mts:177`)** — the single choke point every
+        line already passes through, verbose ones included, so this stays contained.
+      - **Redact at write time, not at dump time.** Verbose output carries STT transcripts — what
+        people said in their own homes — plus hosts and keys. A dump is worth far less than a privacy
+        incident, and the page should show what is about to be handed over.
+      - The userdata path is **unauthenticated**: unguessable filename, and a short TTL through the
+        existing scheduled deletion. It stays on the LAN unless the user chooses to send it.
+      - Pair it with a clipboard/textarea copy in the same card for desktop users (`my.homey.app` is
+        HTTPS so `navigator.clipboard` works there; the mobile webview needs the hidden-textarea
+        fallback).
+      - The new API route goes in `.homeycompose/app.json` under `api`, never `app.json`.
+
+- [ ] **Dump a compact snapshot into the app log automatically, so unprompted reports are not a dead
+      loss.** Whatever we build, some users will just press *Create Diagnostics Report* without
+      reading anything. A short dense block — ESP connect/handshake outcome, provider selected and
+      whether it ever opened, last error per subsystem, sanitized config — written on every session
+      end and every connect failure keeps the tail of the app log useful inside Homey's narrow
+      window. This is the fix for the second portal report (above), which arrived with a user message
+      and a log that could not answer it.
+
+- [x] **Check whether `homey-log` is actually enabled in the published app.** *(resolved 2026-08-27: it was
+      not — `env.json` was missing on the publishing machine; `HOMEY_LOG_URL` is now set, so `reportError()`
+      is live from the next publish.)* It disables itself
+      unless `Homey.env.HOMEY_LOG_URL` is a string (`node_modules/homey-log/lib/Log.js:41`); there is
+      no `env.json` in the repo (gitignored, `.gitignore:1`); and
+      [`docs/release-testing-since-1.4.0.md`](./docs/release-testing-since-1.4.0.md):265 records
+      captures as *"local-only — no `HOMEY_LOG_URL`"*. If it is unset on the machine we publish from,
+      then `reportError()`'s fingerprinting and hour-long cooldown (`logger.mts:264`) are a no-op in
+      production, and every crash report we have read came from Athom's portal instead. Either wire a
+      DSN or stop maintaining that machinery as if it runs.
+
+- [x] **Point users at the right button.** *(done 2026-08-27 — README now leads with Dump log and
+      names the app-page diagnostics report as the fallback.)* [`README.md`](./README.md):547 told them to *"copy the
+      app log … ⋮ menu"*. Copy-paste from a phone is the fragile path, and it does not name the
+      mechanism that actually reaches us. Say **Create Diagnostics Report, on the app's own page**,
+      and say *right after it fails*.
+
+**Rejected, with reasons** (2026-08-21 brainstorm — do not re-litigate without new information):
+
+- **`mailto:` with the log in the body** — practical URL caps are ~2 KB, so it carries a snapshot at
+  best, and settings pages run in a webview where `mailto:` frequently does nothing.
+- **Prefilled GitHub issue** (`?body=`) — the same URL-length wall in the single-digit KB range, plus
+  it needs an account most Homey users do not have. Fine as a secondary "file a proper issue" button.
+- **Sentry as the transport** — `homey-log` 2.1.2 wraps **raven**, the legacy SDK, which has **no
+  attachment support**, so the log would have to ride inside the event body where Sentry truncates
+  it; and `captureMessage(message)` takes no per-call options
+  (`node_modules/homey-log/lib/Log.js:126`), so there is no fingerprint control — every submission
+  becomes its own issue — while its in-process de-dupe silently drops a repeat submission. Only ever
+  viable for a compact snapshot, and only once a DSN exists.
+- **Faking a crash to smuggle the log into an exception** — right instinct (reuse the pipe), wrong
+  mechanism: `captureMessage` at info level is the honest version, and it is already in `logger.mts`.
+  Faking exceptions corrupts crash metrics and alerting, and message-based grouping spawns a new
+  issue per report. Faking it into *Athom's* crash feed is worse still — that means deliberately
+  crashing the app on a user's Homey, killing their voice pipeline, to file a bug report.
+
 ## ReSpeaker XVF3800 driver — needs hardware verification
 
 Driver written 2026-07-28 from the community ESPHome config alone (**no hardware was
@@ -356,6 +443,14 @@ hanging". Four things the log settles:
   thread/changelog for a fix, then verify with a few Norwegian turns on the real PE.
 
 ## Watch items (no action unless they recur)
+
+- **Zone fallback cannot tell two same-named zones under the SAME parent apart (PR #51,
+  decided 2026-08-27 — deferred):** `tryZoneFallback` groups matches on the zone *path*
+  (`"Office > Upstairs"`), which separates same-named zones under different parents but not
+  siblings with identical names. Fixing it needs a zone id on `Device`, which lands in every
+  device listing the model sees — a per-device token cost (`docs/cost-of-growth.md`). Left as
+  is because the layout is rare and the failure mode is a *declined* fallback (the safe
+  direction). Revisit only if a user reports a real house that hits it.
 
 - **Timer-tool phrasing miss (2026-07-28, live test, Norwegian):** "START nedtelling ett
   minutt" did not trigger `set_timer` — the LLM said it can't do countdowns and called

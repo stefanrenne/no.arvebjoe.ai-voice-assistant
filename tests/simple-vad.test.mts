@@ -18,12 +18,12 @@ function speech(ms: number, amplitude = 8000): Buffer {
 
 /** Feed a buffer in device-sized chunks (~32 ms), merging the results. */
 function feedAll(vad: SimpleVad, pcm: Buffer) {
-    const out = { speechStart: false, utterance: null as Buffer | null, timeout: false };
+    const out = { speechStart: false, utterance: null as Buffer | null, timeout: false, reason: undefined as string | undefined };
     const chunk = 1024;
     for (let off = 0; off < pcm.length; off += chunk) {
         const r = vad.feed(pcm.subarray(off, Math.min(off + chunk, pcm.length)));
         out.speechStart = out.speechStart || r.speechStart;
-        out.utterance = out.utterance ?? r.utterance;
+        if (r.utterance && !out.utterance) { out.utterance = r.utterance; out.reason = r.reason; }
         out.timeout = out.timeout || r.timeout;
     }
     return out;
@@ -88,6 +88,53 @@ describe('SimpleVad', () => {
         const tail = feedAll(vad, silence(600));
         expect(talk.speechStart || tail.speechStart).toBe(true);
         expect(tail.utterance).not.toBeNull();
+    });
+
+    it('detects quiet but clear speech (RMS ~350) with the default floor', () => {
+        // Live ThirdReality recordings put intelligible speech at RMS 120-540;
+        // the old floor of 500 folded those turns away as clicks. Amplitude 500
+        // on a sine is RMS ~354.
+        const vad = new SimpleVad({ silenceMs: 400 });
+        vad.reset();
+        feedAll(vad, silence(200));
+        const talk = feedAll(vad, speech(1000, 500));
+        const tail = feedAll(vad, silence(600));
+        expect(talk.speechStart).toBe(true);
+        expect(tail.utterance).not.toBeNull();
+        expect(tail.reason).toBe('silence');
+        expect(vad.stats().peakRms).toBeGreaterThan(300);
+    });
+
+    it('hands over what it heard when the no-speech timer runs out after a false start', () => {
+        // Speech that only occasionally pokes above the threshold never lasts
+        // minSpeechMs, so it is folded back — but it DID cross, so the timeout
+        // must return the audio (pre-roll + everything since) instead of
+        // reporting silence. Force the situation with a high floor.
+        const vad = new SimpleVad({ minSpeechRms: 3000, minSpeechMs: 200, silenceMs: 400, noSpeechTimeoutMs: 3000 });
+        vad.reset();
+        feedAll(vad, silence(200));
+        const click = feedAll(vad, speech(100, 8000));    // above 3000 for 100 ms only
+        expect(click.speechStart).toBe(true);
+        const quiet = feedAll(vad, speech(2000, 1500));   // "speech" below the bar
+        expect(quiet.utterance).toBeNull();
+        const out = feedAll(vad, silence(1500));          // …until the 3 s timer runs out
+        expect(out.timeout).toBe(false);
+        expect(out.utterance).not.toBeNull();
+        expect(out.reason).toBe('timeout');
+        // Pre-roll (300 ms) + click + quiet speech + tail up to the timeout ≈ 3 s.
+        const ms = out.utterance!.length / 2 / 16;
+        expect(ms).toBeGreaterThan(2500);
+        expect(ms).toBeLessThanOrEqual(3300);
+        expect(vad.stats().speechFrames).toBeGreaterThan(0);
+    });
+
+    it('reports a plain timeout when nothing ever crossed the threshold', () => {
+        const vad = new SimpleVad({ noSpeechTimeoutMs: 1000 });
+        vad.reset();
+        const out = feedAll(vad, silence(1200));
+        expect(out.timeout).toBe(true);
+        expect(out.utterance).toBeNull();
+        expect(vad.stats().peakRms).toBe(0);
     });
 
     it('caps a never-ending utterance at maxUtteranceMs', () => {

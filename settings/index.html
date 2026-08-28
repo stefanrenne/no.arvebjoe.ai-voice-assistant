@@ -519,6 +519,33 @@
       font-style: italic;
     }
 
+    /* "Dump log" result: the LAN URL plus a copy button */
+    .dump-result {
+      margin-top: 10px;
+      border: 1px solid #e1e7e3;
+      border-radius: 8px;
+      background: #fbfcfb;
+      padding: 10px;
+      font-size: 13px;
+    }
+
+    .dump-result a {
+      word-break: break-all;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .dump-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .dump-meta {
+      color: #6c757d;
+      margin-top: 6px;
+    }
+
     .debug-row {
       border: 1px solid #e1e7e3;
       border-radius: 8px;
@@ -1537,6 +1564,35 @@
             <div class="debug-list" id="recordings_list">
               <div class="debug-empty">Loading…</div>
             </div>
+          </div>
+        </div>
+
+        <!-- ---- Dump log: the app's recent log as a downloadable file ---- -->
+        <div class="card">
+          <div class="feature-head">
+            <div>
+              <div class="feature-title">Dump log</div>
+              <div class="feature-sub">Get the app's recent log as a file you can share</div>
+            </div>
+            <button type="button" class="stage-test-btn" id="dump_log_btn">Dump log</button>
+          </div>
+          <div class="note">Writes the last few thousand log lines — including the detailed satellite,
+            connection and AI-engine logs, whether or not verbose logging is on — to a text file on your
+            Homey and shows a link to it. Open the link on this network, then attach the file to a forum
+            post, an e-mail or a GitHub issue. This is the log to send when reporting a problem: Homey's own
+            diagnostics report only carries the last few lines.
+            <br><br>
+            <strong>Privacy:</strong> API keys and everything that was said (your questions and the assistant's
+            answers) are removed before the file is written, and your home coordinates are rounded to about
+            10 km. Local network addresses are kept, because they help you see which device the app
+            cannot reach. The file is deleted after 30 minutes.</div>
+          <div class="dump-result" id="dump_log_result" hidden>
+            <div>File: <a id="dump_log_link" href="#" target="_blank" rel="noopener"></a></div>
+            <div class="dump-actions">
+              <button type="button" class="stage-test-btn" id="dump_log_copy_btn">Copy log to clipboard</button>
+            </div>
+            <div class="dump-meta" id="dump_log_meta"></div>
+            <textarea id="dump_log_text" hidden readonly aria-hidden="true"></textarea>
           </div>
         </div>
 
@@ -2719,6 +2775,62 @@
       });
       loadSeenDevices();
       loadRecordings();
+
+      // Dump log: POST /dump-log writes the redacted buffer to /userdata/log and
+      // returns the LAN URL plus the text (for the clipboard fallback).
+      var dumpLogBtn = document.getElementById("dump_log_btn");
+      var dumpLogResult = document.getElementById("dump_log_result");
+      var dumpLogLink = document.getElementById("dump_log_link");
+      var dumpLogMeta = document.getElementById("dump_log_meta");
+      var dumpLogText = document.getElementById("dump_log_text");
+      var dumpLogCopyBtn = document.getElementById("dump_log_copy_btn");
+
+      dumpLogBtn.addEventListener("click", function () {
+        dumpLogBtn.disabled = true;
+        dumpLogBtn.textContent = "Writing…";
+        Homey.api("POST", "/dump-log", {}, function (err, res) {
+          dumpLogBtn.disabled = false;
+          dumpLogBtn.textContent = "Dump log";
+          if (err || !res || !res.ok || !res.dump) {
+            return Homey.alert((res && res.message) || err || "Could not write the log dump");
+          }
+          var d = res.dump;
+          dumpLogLink.href = d.url;
+          dumpLogLink.textContent = d.url;
+          dumpLogText.value = d.text || "";
+          dumpLogMeta.textContent = d.lines + " lines · " + Math.round((d.text || "").length / 1024) +
+            " KB · the file is deleted at " + new Date(d.expiresAt).toLocaleTimeString();
+          dumpLogResult.hidden = false;
+        });
+      });
+
+      // navigator.clipboard needs a secure context (my.homey.app is HTTPS); the
+      // mobile webview falls back to the hidden-textarea + execCommand path.
+      dumpLogCopyBtn.addEventListener("click", function () {
+        var text = dumpLogText.value;
+        var done = function (ok) {
+          dumpLogCopyBtn.textContent = ok ? "Copied" : "Copy failed";
+          setTimeout(function () { dumpLogCopyBtn.textContent = "Copy log to clipboard"; }, 2000);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () { done(true); }, function () { legacyCopy(); });
+        } else {
+          legacyCopy();
+        }
+        function legacyCopy() {
+          try {
+            dumpLogText.hidden = false;
+            dumpLogText.select();
+            dumpLogText.setSelectionRange(0, text.length);
+            var ok = document.execCommand("copy");
+            dumpLogText.hidden = true;
+            done(ok);
+          } catch (e) {
+            dumpLogText.hidden = true;
+            done(false);
+          }
+        }
+      });
 
       // Remote syslog logging (no token cost — not part of the budget meter).
       var remoteLogEnabledElement = document.getElementById("remote_log_enabled");

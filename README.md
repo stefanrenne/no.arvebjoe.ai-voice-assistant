@@ -535,6 +535,21 @@ language-model and speech stages can also be set to **None** to switch them off 
   from a speech-recognition problem (the audio is clear but the transcript is wrong). While it is
   on, recent microphone audio is reachable on your local network like every other clip the device
   plays, so leave it off when you're not debugging.
+* **Dump log** — the button to use when **reporting a problem**. It writes the app's last few
+  thousand log lines — including the detailed satellite-connection and AI-engine lines, whether or
+  not verbose logging is on — to a text file on your Homey and shows a link to it. Open the link
+  from a phone or computer on the same network and attach the file to your forum post, e-mail or
+  GitHub issue (a **Copy log to clipboard** button is there too). The file starts with a summary —
+  app and Homey versions, the engine and pipeline stages you selected, and one line per paired
+  satellite (model, address, firmware, whether it and the engine are connected) — so you don't have
+  to describe your setup separately. API keys and everything that was
+  said (your questions, the assistant's answers) are removed before the file is written, and your
+  home coordinates are rounded to about 10 km; local network addresses are kept because they help
+  you see which device the app can't reach. The file
+  is deleted after 30 minutes. This beats Homey's own *Create Diagnostics Report*, which only
+  carries the last few lines and must be created right after the failure — if you do use that
+  one, use the report button on the **app's own page** (Homey app → **More** → **Apps** → *AI
+  Voice Assistant*), not the one under General settings, which goes to Athom.
 * **Remote logging** — stream the app's logs to any **syslog** server (RFC 5424 over UDP or TCP):
   rsyslog/syslog-ng, a Synology or QNAP log center, Grafana Alloy/Loki, Papertrail, and so on.
   Enter the server's address and port (default 514), pick UDP or TCP, and choose a level:
@@ -549,11 +564,10 @@ language-model and speech stages can also be set to **None** to switch them off 
 * **Verbose logging** *(opt-in, off by default)* — the same detailed per-subsystem logs, written
   straight to the app's own log instead of to a syslog server. Without it the app log shows only
   conversation events, so a log you send in can't say whether the satellite and the AI engine
-  actually connected — the lines that would answer that are the ones being held back. Turn it on,
-  reproduce the problem, then copy the app log (Homey app → **More** → **Apps** → *AI Voice
-  Assistant* → the **⋮** menu). Leave it off the rest of the time: it's a lot of text, and it makes
-  the log harder to read rather than easier. Use this when you don't run a syslog server; use
-  **Remote logging** above when you do.
+  actually connected — the lines that would answer that are the ones being held back. Useful when
+  you want to follow along live in the app log; for sending a log in, use **Dump log** above
+  instead (it always contains these lines). Leave it off the rest of the time: it's a lot of text,
+  and it makes the log harder to read rather than easier.
 
 Settings changes apply on the fly — no app restart needed.
 

@@ -10,6 +10,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { createLogger } from '../../src/helpers/logger.mjs';
 import { audioDir } from '../../src/helpers/file-helper.mjs';
+import { logDumpDir } from '../../src/helpers/log-dump.mjs';
 
 const log = createLogger('EMU-Audio', false);
 
@@ -19,6 +20,7 @@ const log = createLogger('EMU-Audio', false);
  * header made a browser refuse to play them.
  */
 function contentTypeFor(filename: string): string {
+  if (filename.endsWith('.txt')) return 'text/plain; charset=utf-8';
   if (filename.endsWith('.mp3')) return 'audio/mpeg';
   if (filename.endsWith('.wav')) return 'audio/wav';
   return 'audio/flac';
@@ -40,20 +42,20 @@ export function startAudioServer(required: boolean = true): Promise<void> {
     const server = http.createServer((req, res) => {
       try {
         const url = new URL(req.url ?? '/', 'http://localhost');
-        const m = url.pathname.match(/\/userdata\/audio\/([^/]+)$/);
+        const m = url.pathname.match(/\/userdata\/(audio|log)\/([^/]+)$/);
         if (!m) { res.statusCode = 404; res.end('Not found'); return; }
 
-        const root = audioRoot();
-        const file = join(root, decodeURIComponent(m[1]));
+        const root = m[1] === 'log' ? resolve(logDumpDir()) : audioRoot();
+        const file = join(root, decodeURIComponent(m[2]));
         if (!file.startsWith(root) || !existsSync(file)) {
           res.statusCode = 404; res.end('Not found'); return;
         }
 
         const size = statSync(file).size;
-        res.setHeader('Content-Type', contentTypeFor(m[1]));
+        res.setHeader('Content-Type', contentTypeFor(m[2]));
         res.setHeader('Content-Length', String(size));
         createReadStream(file).pipe(res);
-        log.info(`${m[1]} (${size} bytes)`, 'SERVE');
+        log.info(`${m[1]}/${m[2]} (${size} bytes)`, 'SERVE');
       } catch {
         res.statusCode = 500; res.end('error');
       }

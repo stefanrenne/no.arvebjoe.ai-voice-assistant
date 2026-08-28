@@ -1,6 +1,7 @@
 import Homey from 'homey';
 import { WebServer } from './src/helpers/webserver.mjs';
 import { initAudioFolder } from './src/helpers/file-helper.mjs';
+import { initLogDumpFolder } from './src/helpers/log-dump.mjs';
 import { DeviceManager } from './src/helpers/device-manager.mjs';
 import { ApiHelper } from './src/helpers/api-helper.mjs';
 import { GeoHelper } from './src/helpers/geo-helper.mjs';
@@ -68,6 +69,8 @@ export default class AiVoiceAssistantApp extends Homey.App implements AppService
     // unawaited cleanup could delete a just-written file, leaving the satellite
     // a valid URL that 404s (code_review_2 M4).
     await initAudioFolder();
+    // Log dumps (Settings → Debug → Dump log) are ephemeral too.
+    await initLogDumpFolder();
 
     // Debug tools (settings page → Debug). Both are passive until used: the
     // recording registry only holds entries while `debug_audio_enabled` is on,

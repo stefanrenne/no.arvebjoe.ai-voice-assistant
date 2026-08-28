@@ -382,20 +382,33 @@ describe('LocalPipelineProvider', () => {
         expect(sttTranscribe).toHaveBeenCalledTimes(1);
     });
 
-    it('aborts a dangling STT session on VAD timeout (false start, then nothing)', async () => {
+    it('finishes (not aborts) the STT session when the timeout follows a false start', async () => {
         const abort = vi.fn();
         const finish = vi.fn(async () => '');
         (provider as any).stt.createStream = vi.fn(() => ({ append: vi.fn(), finish, abort }));
 
         const transcriptDone = once(provider, 'transcript.done', 5000);
-        // A click shorter than minSpeechMs opens the session (speechStart) but
-        // folds back into silence; the turn then times out with it dangling.
+        // A burst shorter than minSpeechMs opens the session (speechStart) but
+        // folds back into silence. Something DID cross the threshold, so when
+        // the no-speech timer runs out the turn is transcribed anyway (quiet
+        // speech looks exactly like this — TODO.md 2026-08-27) and STT decides.
         feedAll(provider, speech(100));
         feedAll(provider, silence(9000));
         const [transcript] = await transcriptDone;
         expect(transcript).toBe('');
-        expect(abort).toHaveBeenCalledTimes(1);
-        expect(finish).not.toHaveBeenCalled();
+        expect(finish).toHaveBeenCalledTimes(1);
+        expect(abort).not.toHaveBeenCalled();
+    });
+
+    it('still ends the turn with an empty transcript and no STT call when nothing ever crossed the threshold', async () => {
+        const createStream = vi.fn();
+        (provider as any).stt.createStream = createStream;
+        const transcriptDone = once(provider, 'transcript.done', 5000);
+        feedAll(provider, silence(9000));
+        const [transcript] = await transcriptDone;
+        expect(transcript).toBe('');
+        expect(createStream).not.toHaveBeenCalled();
+        expect(sttTranscribe).not.toHaveBeenCalled();
     });
 
     it('emits error (and no response.done) when a pipeline stage fails', async () => {
