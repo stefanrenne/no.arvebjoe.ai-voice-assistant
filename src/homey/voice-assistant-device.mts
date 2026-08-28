@@ -1440,6 +1440,17 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
 
 
   /**
+   * Only the Flow-URL route needs the MP3 copies — a satellite that plays its own
+   * audio streams the FLAC original straight from GitHub. Building them at init
+   * (like the chimes above) keeps the WAN fetch and the encode out of the first
+   * wake, and off the error path, where the network is often the problem.
+   */
+  private prewarmFlowFeedbackSounds(): void {
+    prewarmFeedbackSounds((key, err) =>
+      this.logger.warn(`Feedback sound ${key} could not be prepared — it will be rebuilt on first use:`, err));
+  }
+
+  /**
    * Play one of the pre-recorded feedback clips (`sound-urls.mts`).
    *
    * Normally that means the satellite's own speaker, straight from the GitHub
@@ -1452,17 +1463,6 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
    * Fire-and-forget: every call site is a failure path that must not wait on a
    * fetch/encode, and a clip we cannot produce is logged, not thrown.
    */
-  /**
-   * Only the Flow-URL route needs the MP3 copies — a satellite that plays its own
-   * audio streams the FLAC original straight from GitHub. Building them at init
-   * (like the chimes above) keeps the WAN fetch and the encode out of the first
-   * wake, and off the error path, where the network is often the problem.
-   */
-  private prewarmFlowFeedbackSounds(): void {
-    prewarmFeedbackSounds((key, err) =>
-      this.logger.warn(`Feedback sound ${key} could not be prepared — it will be rebuilt on first use:`, err));
-  }
-
   private playFeedbackSound(key: SoundUrlKey): void {
     if (!this.replyToFlowUrl) {
       this.playUrl(SOUND_URLS[key]);

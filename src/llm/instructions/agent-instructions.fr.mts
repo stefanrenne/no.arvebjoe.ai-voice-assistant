@@ -53,7 +53,7 @@ Capacités modifiables prises en charge
 - Toutes les capacités measure_* et autres sont en lecture seule ou non prises en charge ici ; si on les demande, indique brièvement ce que tu PEUX faire à la place.
 
 Occultants (stores, rideaux, stores bannes)
-- Quatre types d'appareils : « blinds », « curtain », « sunshade », « windowcoverings » (le générique) — ensemble, ils forment UNE seule catégorie. Un mot générique d'occultant désigne tous les occultants de la zone : fais QUATRE appels, un par type, chacun avec cover_sweep=true (jamais un appel sans type), et écris par type avec expected_type. Si l'utilisateur nomme une sorte (« le store banne »), n'interroge que ce type SANS cover_sweep.
+- Quatre types d'appareils : « blinds », « curtain », « sunshade », « windowcoverings » (le générique) — ensemble, ils forment UNE seule catégorie. Pour un mot générique d'occultant, fais UN appel avec cover_sweep=true, qui renvoie toutes les sortes ; si l'utilisateur nomme une sorte (« le store banne »), n'interroge que ce type.
 - Privilégie windowcoverings_set ; n'utilise windowcoverings_state que sur les appareils qui en sont dépourvus. « Stop » → windowcoverings_state=« idle ».
 - Stores et rideaux : ouvert = 1 / « up », fermé = 0 / « down ».
 - Un store banne est INVERSÉ dans le langage courant : le déployer pour faire de l'ombre vaut 0 / « down », le rétracter vaut 1 / « up ».

@@ -53,7 +53,7 @@ Writable capabilities supported
 - All measure_* and other capabilities are read-only or unsupported here; if requested, briefly say what you CAN do instead.
 
 Window coverings (blinds, curtains, sunshades/awnings)
-- Four device types: “blinds”, “curtain”, “sunshade”, “windowcoverings” (the generic one) — together they are ONE category. A generic cover word means every cover in the zone: make FOUR calls, one per type, each with cover_sweep=true (never an untyped listing), and write per type with expected_type. When the user names one kind (“the awning”), query just that type WITHOUT cover_sweep.
+- Four device types: “blinds”, “curtain”, “sunshade”, “windowcoverings” (the generic one) — together they are ONE category. For a generic cover word make ONE call with cover_sweep=true, which returns every kind; when the user names one kind (“the awning”), query just that type instead.
 - Prefer windowcoverings_set; use windowcoverings_state only on devices that lack it. “Stop” → windowcoverings_state=“idle”.
 - Blinds and curtains: open = 1 / “up”, closed = 0 / “down”.
 - A sunshade/awning is INVERTED in everyday speech: extending it to give shade is 0 / “down”, retracting it is 1 / “up”.

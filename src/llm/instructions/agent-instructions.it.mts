@@ -53,7 +53,7 @@ Capability scrivibili supportate
 - Tutte le capability measure_* e le altre sono in sola lettura o non supportate qui; se richieste, indica brevemente cosa PUOI fare invece.
 
 Schermature (tapparelle, tende, tende da sole)
-- Quattro tipi di dispositivo: “blinds”, “curtain”, “sunshade”, “windowcoverings” (quello generico) — insieme sono UNA sola categoria. Una parola generica per le schermature vale per tutte quelle della zona: fai QUATTRO chiamate, una per tipo, ciascuna con cover_sweep=true (mai una chiamata senza tipo), e scrivi per tipo con expected_type. Se l'utente nomina un genere (“la tenda da sole”), interroga solo quel tipo SENZA cover_sweep.
+- Quattro tipi di dispositivo: “blinds”, “curtain”, “sunshade”, “windowcoverings” (quello generico) — insieme sono UNA sola categoria. Per una parola generica sulle schermature fai UNA chiamata con cover_sweep=true, che restituisce ogni genere; se l'utente nomina un genere (“la tenda da sole”), interroga solo quel tipo.
 - Preferisci windowcoverings_set; usa windowcoverings_state solo sui dispositivi che ne sono privi. “Stop” → windowcoverings_state=“idle”.
 - Tapparelle e tende: aperto = 1 / “up”, chiuso = 0 / “down”.
 - Una tenda da sole è INVERTITA nel linguaggio comune: estenderla per fare ombra vale 0 / “down”, ritrarla vale 1 / “up”.

@@ -1860,6 +1860,20 @@ sweep calls with `cover_sweep: true` and the guard is consulted for those alone.
 reporter's real catalog (awning in Tuin, blinds in Kantoor/Keuken, generic curtains in the satellite's
 own Woonkamer): named → reaches the Tuin, swept → stays home.
 
+**Review follow-up: the category is expanded in code, not by the model.** Asking per type left the
+mixing bug in place one level up — with four independent calls, each type gets its own fallback
+decision, so from a cover-less room the awning in the garden and the curtains in the living room
+were both granted while the blinds (spread over two rooms) were skipped. Exactly what the guard was
+meant to prevent, and no per-call check can see it: the mixing only exists across the calls.
+
+So `cover_sweep: true` is now ONE call that expands the category inside the handler
+(`listCovers` → `listCoverSweep`). The zone's own coverings are served when it has any; otherwise a
+single fallback decision runs over the house-wide union, so "unambiguous" means *every cover of
+every kind sits in one other zone*. The per-type sibling guard is gone — with one call there are no
+siblings to check — and the instruction block shrank back to one sentence (~25 tokens cheaper per
+language than the four-call wording, ~45 for Russian/Korean). The satellite-in-zone problem that
+sank the untyped listing does not apply: the union is still built from typed queries.
+
 ## 27. "Dump log" — a full, redacted log as a file the user can share (2026-08-27)
 
 **Problem.** Homey's *Create Diagnostics Report* submits only a short tail of recent lines and must

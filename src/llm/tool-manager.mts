@@ -53,11 +53,12 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
 
     // Awaited before every tool handler; see setBeforeRun.
     private beforeRun?: () => Promise<void>;
+    private static readonly BEFORE_RUN_TIMEOUT_MS = 5_000;
 
     // Devices of the most recent fallback listing, so a `fb:` page token can
     // continue paging it (the fallback searches house-wide and would otherwise
     // have to dump every match in one tool result).
-    private zoneFallbackPage: { type: string; devices: any[] } | null = null;
+    private zoneFallbackPage: { key: string; devices: any[]; fromFallback: boolean; zone?: string } | null = null;
 
     // How long a fallback grant stays usable. The grant exists to serve the
     // utterance that triggered it, so it must not outlive it: without a bound it
@@ -209,12 +210,27 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
         // next line, and emit() does not await async listeners, so awaiting in a
         // listener gates nothing and the tool reads the previous turn's catalog.
         if (this.beforeRun) {
+            let timer: ReturnType<typeof setTimeout> | undefined;
             try {
-                await this.beforeRun();
+                // Bounded for the same reason the catch exists: a stale catalog
+                // is workable, a turn that never answers is not. A Homey API call
+                // this slow has already lost the turn's timing anyway.
+                await Promise.race([
+                    this.beforeRun(),
+                    new Promise<void>((_, reject) => {
+                        timer = setTimeout(
+                            () => reject(new Error(`refetch still running after ${ToolManager.BEFORE_RUN_TIMEOUT_MS} ms`)),
+                            ToolManager.BEFORE_RUN_TIMEOUT_MS);
+                        timer.unref?.();
+                    }),
+                ]);
             } catch (err: any) {
-                // A failed refetch is not a reason to refuse the tool: the
-                // catalog is merely stale, which the handler can still work with.
+                // A failed or slow refetch is not a reason to refuse the tool:
+                // the catalog is merely stale, which the handler can still work
+                // with.
                 this.logger.warn(`beforeRun hook failed for ${name}: ${String(err?.message ?? err)}`);
+            } finally {
+                clearTimeout(timer);
             }
         }
         try {
@@ -285,15 +301,34 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
      * guard below lets exactly these through — the model neither has to nor
      * should set allow_cross_zone for them.
      */
-    private async tryZoneFallback(type?: string, coverSweep = false): Promise<{ devices: any[]; zone: string } | null> {
+    private async tryZoneFallback(type?: string): Promise<{ devices: any[]; zone: string } | null> {
         if (!this.standardZone) return null;
         if (!ToolManager.boolSetting('zone_fallback_enabled', true)) return null;
 
-        // Only while sweeping: naming one kind ("close the awning") is a request
-        // about THAT device wherever it is, and must still reach another zone.
-        if (coverSweep && await this.coversPresentInStandardZone(type)) return null;
-
         const devices = await this.listDevicesBy(null, type ?? null);
+        return this.grantFallback(devices, type ?? 'device');
+    }
+
+    /**
+     * The cover-category counterpart: ONE decision over every window covering in
+     * the house, so "unambiguous" means every cover of every kind sits in one
+     * other zone. Deciding per type would grant each type its own room, and
+     * "close the covers" would move the awning in the garden and the curtains in
+     * the living room together — the mixing the whole check exists to prevent.
+     */
+    private async tryCoverFallback(): Promise<{ devices: any[]; zone: string } | null> {
+        if (!this.standardZone) return null;
+        if (!ToolManager.boolSetting('zone_fallback_enabled', true)) return null;
+
+        return this.grantFallback(await this.listCovers(null), 'cover');
+    }
+
+    /**
+     * Hand back a house-wide match ONLY when it is unambiguous — every device
+     * sits in one single other zone — and remember the ids so the cross-zone
+     * write guard admits exactly these.
+     */
+    private grantFallback(devices: any[], label: string): { devices: any[]; zone: string } | null {
         if (devices.length === 0) return null;
 
         // Group on the full zone PATH, not the leaf name: two distinct Homey
@@ -310,7 +345,7 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
         };
         const paths = new Set(devices.map(pathOf).filter(Boolean));
         if (paths.size !== 1) {
-            this.logger.info(`Zone fallback skipped: ${devices.length} ${type ?? 'device'}(s) across ${paths.size} zones`);
+            this.logger.info(`Zone fallback skipped: ${devices.length} ${label}(s) across ${paths.size} zones`);
             return null;
         }
 
@@ -328,33 +363,28 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
         zones.add(path);
         this.zoneFallback = { zones, ids, grantedAt: previous ? previous.grantedAt : Date.now() };
 
-        this.logger.info(`Zone fallback: no ${type ?? 'device'} in ${this.standardZone}, using ${devices.length} in ${zone}`);
+        this.logger.info(`Zone fallback: no ${label} in ${this.standardZone}, using ${devices.length} in ${zone}`);
         return { devices, zone };
     }
 
     /**
-     * True when the asked-for type is a window covering and the standard zone
-     * already holds a covering of ANOTHER kind. "Close the covers" is one
-     * request the model splits into one typed call per cover type; if the zone
-     * has covers of its own, the request is already served locally and the empty
-     * call for a kind this room simply does not own must not drag in another
-     * room's. Consulted ONLY for those sweep calls (cover_sweep) — a user who
-     * names one kind is asking about that device wherever it hangs.
+     * Every window covering in one zone, or in the whole house when `zone` is
+     * null. A generic cover word ("close the covers") is ONE request, so it is
+     * one call that expands the category here — the model asking per type would
+     * have to make four round trips and each could land in a different room.
      */
-    private async coversPresentInStandardZone(type?: string): Promise<boolean> {
-        if (!this.standardZone) return false;
-        const asked = (type ?? '').toLowerCase();
-        if (!ToolManager.COVER_TYPES.includes(asked)) return false;
-
-        for (const sibling of ToolManager.COVER_TYPES) {
-            if (sibling === asked) continue;
-            const local = await this.listDevicesBy(this.standardZone, sibling);
-            if (local.length > 0) {
-                this.logger.info(`Zone fallback skipped: ${this.standardZone} already has covers (${sibling})`);
-                return true;
+    private async listCovers(zone: string | null): Promise<any[]> {
+        const found: any[] = [];
+        const seen = new Set<string>();
+        for (const type of ToolManager.COVER_TYPES) {
+            for (const device of await this.listDevicesBy(zone, type)) {
+                if (device?.id && !seen.has(device.id)) {
+                    seen.add(device.id);
+                    found.push(device);
+                }
             }
         }
-        return false;
+        return found;
     }
 
     /** The live fallback grant, or null when there is none or it has expired. */
@@ -381,13 +411,13 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
      * so nothing is silently dropped either.
      */
     private pageZoneFallback(
-        type: string | undefined,
+        key: string,
         pageSize: number | undefined,
-        pageToken: string | null,
-        zoneHint?: string
+        pageToken: string | null
     ): { ok: boolean; data?: any; meta?: any; error?: any } {
         const cache = this.zoneFallbackPage;
-        if (!cache || cache.type !== (type ?? '')) {
+        const expired = (msg: string) => {
+            this.logger.info(`Page token rejected: ${msg}`);
             return {
                 ok: false,
                 error: {
@@ -395,7 +425,13 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
                     message: "That page token is no longer valid. Call get_devices_in_standard_zone again without a page_token."
                 }
             };
-        }
+        };
+
+        if (!cache || cache.key !== key) return expired(`no cached listing for '${key}'`);
+        // A fallback listing is only usable while its write grant lives: handing
+        // out page 2 of devices that can no longer be written is a confusing
+        // failure two steps later.
+        if (cache.fromFallback && !this.activeZoneFallback()) return expired('the fallback grant has expired');
 
         const size = Math.max(1, Math.min(100, typeof pageSize === 'number' && pageSize > 0 ? pageSize : 25));
         const offset = pageToken
@@ -406,17 +442,57 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
             ? `${ToolManager.FALLBACK_TOKEN_PREFIX}${offset + size}`
             : null;
 
-        const zone = zoneHint || cache.devices.map((d: any) => d?.zone).find(Boolean) || '';
+        const paged = { ok: true, data: { devices: slice, next_page_token: nextToken } };
+        if (!cache.fromFallback) {
+            return paged;
+        }
+
+        const zone = cache.zone || cache.devices.map((d: any) => d?.zone).find(Boolean) || '';
+        const what = key === ToolManager.COVER_LISTING_KEY ? 'window coverings' : key || 'devices';
         return {
-            ok: true,
-            data: { devices: slice, next_page_token: nextToken },
+            ...paged,
             meta: {
                 scope: "other_zone",
                 standard_zone: this.standardZone,
                 zone,
-                note: `No ${type ?? "devices"} in ${this.standardZone}; ${zone} is the only zone that has any. You may act on these without allow_cross_zone, but say which zone you acted on.`
+                note: `No ${what} in ${this.standardZone}; ${zone} is the only zone that has any. You may act on these without allow_cross_zone, but say which zone you acted on.`
             }
         };
+    }
+
+    /** Cache key for the expanded cover category (see listCovers). */
+    private static readonly COVER_LISTING_KEY = 'covers';
+
+    /**
+     * "Close the covers" as ONE call: serve the zone's own coverings when it has
+     * any, and only otherwise make a single fallback decision over the whole
+     * category.
+     */
+    private async listCoverSweep(
+        pageSize: number | undefined,
+        pageToken: string | null
+    ): Promise<{ ok: boolean; data?: any; meta?: any; error?: any }> {
+        if (pageToken) {
+            return this.pageZoneFallback(ToolManager.COVER_LISTING_KEY, pageSize, pageToken);
+        }
+
+        const local = this.standardZone ? await this.listCovers(this.standardZone) : [];
+        if (local.length > 0) {
+            this.zoneFallbackPage = { key: ToolManager.COVER_LISTING_KEY, devices: local, fromFallback: false };
+            return this.pageZoneFallback(ToolManager.COVER_LISTING_KEY, pageSize, null);
+        }
+
+        const fallback = await this.tryCoverFallback();
+        if (!fallback) {
+            return { ok: true, data: { devices: [], next_page_token: null } };
+        }
+        this.zoneFallbackPage = {
+            key: ToolManager.COVER_LISTING_KEY,
+            devices: fallback.devices,
+            fromFallback: true,
+            zone: fallback.zone,
+        };
+        return this.pageZoneFallback(ToolManager.COVER_LISTING_KEY, pageSize, null);
     }
 
     /**
@@ -1466,7 +1542,7 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
                 type: "object",
                 properties: {                    
                     type: { type: "string", description: "Device type to filter devices (optional)." },
-                    cover_sweep: { type: "boolean", description: "True only when this call is one of the per-type calls for a generic window-covering word (see the window coverings rules). Leave it out when the user named one kind." },
+                    cover_sweep: { type: "boolean", description: "True for a generic window-covering request (\"close the covers\"): returns every blind, curtain, awning and generic covering in one call. `type` is ignored. Leave it out when the user named one kind." },
                     page_size: { type: "integer", description: "Number of devices to return per page (default 50, max 100).", minimum: 1, maximum: 100 },
                     page_token: { type: "string", description: "Token for pagination (optional)." }
                 },
@@ -1479,18 +1555,29 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
                 const pageSizeSafe = page_size || undefined;
                 const pageTokenSafe = page_token || null;
                 try {
+                    // The whole cover category in one call — the model must not
+                    // ask per type, or each type gets its own fallback decision
+                    // and one request moves covers in two different rooms.
+                    if (cover_sweep === true) {
+                        return await this.listCoverSweep(pageSizeSafe, pageTokenSafe);
+                    }
                     // A `fb:` token continues a fallback listing, not a standard-zone
                     // one — the standard zone has none of this type by definition.
                     if (pageTokenSafe && pageTokenSafe.startsWith(ToolManager.FALLBACK_TOKEN_PREFIX)) {
-                        return this.pageZoneFallback(typeSafe, pageSizeSafe, pageTokenSafe);
+                        return this.pageZoneFallback(typeSafe ?? '', pageSizeSafe, pageTokenSafe);
                     }
                     const data = await this.deviceManager.getSmartHomeDevices(this.standardZone, typeSafe, pageSizeSafe, pageTokenSafe);
                     const found = Array.isArray((data as any)?.devices) ? (data as any).devices : [];
                     if (found.length === 0 && !pageTokenSafe) {
-                        const fallback = await this.tryZoneFallback(typeSafe, cover_sweep === true);
+                        const fallback = await this.tryZoneFallback(typeSafe);
                         if (fallback) {
-                            this.zoneFallbackPage = { type: typeSafe ?? '', devices: fallback.devices };
-                            return this.pageZoneFallback(typeSafe, pageSizeSafe, null, fallback.zone);
+                            this.zoneFallbackPage = {
+                                key: typeSafe ?? '',
+                                devices: fallback.devices,
+                                fromFallback: true,
+                                zone: fallback.zone,
+                            };
+                            return this.pageZoneFallback(typeSafe ?? '', pageSizeSafe, null);
                         }
                     }
                     return { ok: true, data };
