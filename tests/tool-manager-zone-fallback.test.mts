@@ -174,6 +174,28 @@ describe('ToolManager zone fallback', () => {
             expect(res.meta.zone).toBe('Terrace');
         });
 
+        it('answers for the named kind even when the sweep flag is also set', async () => {
+            // The reported failure: "open the awning" from a living room whose
+            // only cover is a generic curtain. A model that sets both would be
+            // answered with that curtain, and the user is told there is no awning
+            // in the house at all. The named type wins.
+            addTerraceAwning();
+            deviceManager.addDevice({
+                id: 'device-96', name: 'Living Room Curtains', zone: 'Living Room', zones: ['Living Room'],
+                type: 'windowcoverings', capabilities: ['windowcoverings_set=1'], dataId: 'mac-096',
+            } as any);
+            await build('Living Room');
+
+            const res = await listStandardZone({ type: 'sunshade', cover_sweep: true });
+            expect(res.ok).toBe(true);
+            expect(res.data.devices.map((d: any) => d.id)).toEqual(['device-98']);
+            expect(res.meta.zone).toBe('Terrace');
+
+            // And it is writable, without allow_cross_zone.
+            const write = await setCapability({ deviceIds: ['device-98'], capabilityId: 'windowcoverings_set', newValue: 1 });
+            expect(write.ok).toBe(true);
+        });
+
         it('pages the swept listing and keeps the grant for every page', async () => {
             // From the Kitchen the fallback is the Office's two covers.
             const first = await listStandardZone({ cover_sweep: true, page_size: 1 });

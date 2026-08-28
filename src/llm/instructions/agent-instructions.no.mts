@@ -53,7 +53,7 @@ Skrivbare funksjoner som støttes
 - Alle measure_* og andre funksjoner er kun lesbare eller ikke støttet her; hvis forespurt, si kort hva du KAN gjøre i stedet.
 
 Solskjerming (persienner, gardiner, markiser)
-- Fire enhetstyper: "blinds", "curtain", "sunshade", "windowcoverings" (den generiske) — til sammen er de ÉN kategori. Ved et generelt ord for solskjerming gjør du ETT kall med cover_sweep=true, som returnerer alle slag; nevner brukeren én type ("markisen"), spør kun på den typen.
+- Fire enhetstyper: "blinds", "curtain", "sunshade", "windowcoverings" (den generiske) — til sammen er de ÉN kategori. Kun ved et generelt ord for solskjerming gjør du ETT kall med cover_sweep=true og uten type, som returnerer alle slag i denne sonen; nevner brukeren én type ("markisen"), send den typen UTEN cover_sweep — det er det som lar svaret nå rommet der den faktisk henger.
 - Foretrekk windowcoverings_set; bruk windowcoverings_state kun på enheter som mangler den. "Stopp" → windowcoverings_state="idle".
 - Persienner og gardiner: åpen = 1 / "up", lukket = 0 / "down".
 - En markise er OMVENDT i dagligtale: å kjøre den ut for å gi skygge er 0 / "down", å trekke den inn er 1 / "up".

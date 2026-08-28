@@ -1542,7 +1542,7 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
                 type: "object",
                 properties: {                    
                     type: { type: "string", description: "Device type to filter devices (optional)." },
-                    cover_sweep: { type: "boolean", description: "True for a generic window-covering request (\"close the covers\"): returns every blind, curtain, awning and generic covering in one call. `type` is ignored. Leave it out when the user named one kind." },
+                    cover_sweep: { type: "boolean", description: "True for a GENERIC window-covering request (\"close the covers\"): returns every blind, curtain, awning and generic covering in one call. Use it INSTEAD of type, never together with it — when the user names one kind (\"the awning\"), pass that type and leave this out, or the answer is limited to the coverings this room happens to own." },
                     page_size: { type: "integer", description: "Number of devices to return per page (default 50, max 100).", minimum: 1, maximum: 100 },
                     page_token: { type: "string", description: "Token for pagination (optional)." }
                 },
@@ -1550,15 +1550,24 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
                 additionalProperties: false
             },
             handler: async ({ type, cover_sweep, page_size, page_token }) => {
-                this.logger.info('get_devices_in_standard_zone', 'TOOL', `zone=${this.standardZone}, type=${type}, page_size=${page_size}, page_token=${page_token}`);                
+                this.logger.info('get_devices_in_standard_zone', 'TOOL', `zone=${this.standardZone}, type=${type}, cover_sweep=${cover_sweep === true}, page_size=${page_size}, page_token=${page_token}`);
                 const typeSafe = type || undefined;
                 const pageSizeSafe = page_size || undefined;
                 const pageTokenSafe = page_token || null;
+                // A named type WINS over the sweep flag. "Open the awning" is about
+                // that kind wherever it hangs; sweeping instead answers with the
+                // coverings this room happens to own — a living room with curtains
+                // then hides an awning one room away, and the user is told there is
+                // no awning at all. Only an unnamed request is a category sweep.
+                const sweep = cover_sweep === true && !typeSafe;
+                if (cover_sweep === true && typeSafe) {
+                    this.logger.info(`cover_sweep ignored: '${typeSafe}' was named, answering for that kind`);
+                }
                 try {
-                    // The whole cover category in one call — the model must not
-                    // ask per type, or each type gets its own fallback decision
-                    // and one request moves covers in two different rooms.
-                    if (cover_sweep === true) {
+                    // The whole cover category in one call — asking per type gives
+                    // each type its own fallback decision, and one request would
+                    // move covers in two different rooms.
+                    if (sweep) {
                         return await this.listCoverSweep(pageSizeSafe, pageTokenSafe);
                     }
                     // A `fb:` token continues a fallback listing, not a standard-zone
