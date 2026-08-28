@@ -58,6 +58,45 @@ describe('GeminiLiveProvider (fake GenAI harness)', () => {
         expect(geminiSessions.length).toBe(0);
     });
 
+    // Live's input transcription detects the language per utterance, so without a
+    // hint a short Dutch command comes back as German while the spoken reply is
+    // still correct — the transcript is a sidecar, and it feeds the CONVO log and
+    // the assistant-heard Flow trigger.
+    describe('language pinning', () => {
+        it('hints the configured language to the input transcriber', async () => {
+            const homey = new MockHomey();
+            provider = new GeminiLiveProvider(homey as any, toolManager as any, { ...baseOpts, languageCode: 'nl', languageName: 'Nederlands' });
+            await provider.start();
+
+            const { config } = geminiSessions[0];
+            expect(config.inputAudioTranscription).toEqual({ languageHints: { languageCodes: ['nl'] } });
+            expect(config.speechConfig.languageCode).toBe('nl');
+        });
+
+        it('sends the device vocabulary as adaptation phrases, capped', async () => {
+            const many = Array.from({ length: 150 }, (_, i) => `Device number ${i}`);
+            const homey = new MockHomey();
+            const withVocabulary = { ...toolManager, getSttVocabulary: () => many };
+            provider = new GeminiLiveProvider(homey as any, withVocabulary as any, { ...baseOpts, languageCode: 'nl' });
+            await provider.start();
+
+            const phrases = geminiSessions[0].config.inputAudioTranscription.adaptationPhrases;
+            expect(phrases.length).toBeLessThanOrEqual(100);
+            expect(phrases.join('').length).toBeLessThanOrEqual(800);
+            expect(phrases[0]).toBe('Device number 0');
+        });
+
+        it('omits both fields rather than sending empty ones', async () => {
+            const homey = new MockHomey();
+            provider = new GeminiLiveProvider(homey as any, toolManager as any, { ...baseOpts, languageCode: '' });
+            await provider.start();
+
+            const { config } = geminiSessions[0];
+            expect(config.inputAudioTranscription).toEqual({});
+            expect(config.speechConfig.languageCode).toBeUndefined();
+        });
+    });
+
     it('emits open and Healthy when the live session opens', async () => {
         makeProvider();
         const openSpy = vi.fn();

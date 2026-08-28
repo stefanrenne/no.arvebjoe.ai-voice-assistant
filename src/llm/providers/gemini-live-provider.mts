@@ -180,6 +180,47 @@ export class GeminiLiveProvider extends (EventEmitter as new () => TypedEmitter<
         }];
     }
 
+    /**
+     * Input-transcription config. Sent empty until now, which left the sidecar
+     * transcriber detecting the language per utterance with nothing to go on: a
+     * one-second Dutch command lands in German often enough to notice ("Open het
+     * keukenraam" → "Ohne das Küchenfenster"), because the languages are
+     * phonetically close and there is little signal in a short utterance. The
+     * reply stays correct — Live is audio-to-audio and the model hears the real
+     * language — so only the transcript is wrong, which is what the CONVO log,
+     * the `assistant-heard` Flow trigger and the empty-transcript gate read.
+     *
+     * `adaptationPhrases` is the same device/zone vocabulary the OpenAI provider
+     * sends as a prompt (`ToolManager.getSttVocabulary`), and takes a real list
+     * here instead of a sentence. Capped like the OpenAI prompt: an unusually
+     * large home must not push an unbounded list into every session.
+     */
+    private transcriptionConfig(): Record<string, unknown> {
+        const config: Record<string, unknown> = {};
+
+        const code = (this.options.languageCode || '').trim();
+        if (code) {
+            config.languageHints = { languageCodes: [code] };
+        }
+
+        const phrases: string[] = [];
+        let length = 0;
+        for (const name of this.toolManager.getSttVocabulary()) {
+            if (phrases.length >= GeminiLiveProvider.MAX_ADAPTATION_PHRASES) break;
+            if (length + name.length > GeminiLiveProvider.MAX_ADAPTATION_CHARS) break;
+            phrases.push(name);
+            length += name.length;
+        }
+        if (phrases.length > 0) {
+            config.adaptationPhrases = phrases;
+        }
+
+        return config;
+    }
+
+    private static readonly MAX_ADAPTATION_PHRASES = 100;
+    private static readonly MAX_ADAPTATION_CHARS = 800;
+
     // --- lifecycle -----------------------------------------------------------
 
     async start(): Promise<void> {
@@ -227,8 +268,14 @@ export class GeminiLiveProvider extends (EventEmitter as new () => TypedEmitter<
                 },
                 config: {
                     responseModalities: [Modality.AUDIO],
-                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
-                    inputAudioTranscription: {},
+                    speechConfig: {
+                        voiceConfig: { prebuiltVoiceConfig: { voiceName } },
+                        // The spoken reply's language. The model picks it from the
+                        // conversation on its own, but saying it removes the same
+                        // guess the transcriber was getting wrong.
+                        ...(this.options.languageCode ? { languageCode: this.options.languageCode } : {}),
+                    },
+                    inputAudioTranscription: this.transcriptionConfig(),
                     outputAudioTranscription: {},
                     systemInstruction: this.instructionState.text,
                     tools: this.toolsForGemini(),
