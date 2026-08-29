@@ -444,6 +444,17 @@ hanging". Four things the log settles:
 
 ## Watch items (no action unless they recur)
 
+- **Mistral Voxtral Realtime STT has no language pin (found via PR #52, 2026-08-28):** the
+  Gemini Live sidecar transcriber flipped Dutch to German until PR #52 sent `languageHints`;
+  every other STT backend already passes `language` through. The Voxtral Realtime websocket
+  (`mistral-realtime-stt-client.mts`) has NO language parameter — the model detects the language
+  and reports it afterwards in `transcription.language`. Worse than the Gemini case because the
+  Mistral provider is a chain (STT → LLM → TTS): a mis-transcribed utterance is the LLM's only
+  input, so the whole answer goes wrong, not just the log line. Options if it bites: check the
+  reported `transcription.language` against `selected_language_code` and re-run the utterance
+  through the batch Voxtral STT (which does take `language`), or note the limitation in
+  README.md. Left alone until a user reports it.
+
 - **Zone fallback cannot tell two same-named zones under the SAME parent apart (PR #51,
   decided 2026-08-27 — deferred):** `grantFallback()` (shared by the typed fallback and the `cover_sweep` fallback) groups matches on the zone *path*
   (`"Office > Upstairs"`), which separates same-named zones under different parents but not
