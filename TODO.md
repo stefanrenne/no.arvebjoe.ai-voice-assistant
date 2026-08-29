@@ -445,7 +445,7 @@ hanging". Four things the log settles:
 ## Watch items (no action unless they recur)
 
 - **Zone fallback cannot tell two same-named zones under the SAME parent apart (PR #51,
-  decided 2026-08-27 — deferred):** `tryZoneFallback` groups matches on the zone *path*
+  decided 2026-08-27 — deferred):** `grantFallback()` (shared by the typed fallback and the `cover_sweep` fallback) groups matches on the zone *path*
   (`"Office > Upstairs"`), which separates same-named zones under different parents but not
   siblings with identical names. Fixing it needs a zone id on `Device`, which lands in every
   device listing the model sees — a per-device token cost (`docs/cost-of-growth.md`). Left as
