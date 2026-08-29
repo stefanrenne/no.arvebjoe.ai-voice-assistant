@@ -2009,6 +2009,31 @@ Tests: `tests/voice-assistant-device.test.mts` § *announce watchdog* — fires 
 (turn idle, one `run_end`, one `pipeline_error`, `onoff` false, no chime, a late ack is ignored,
 the next wake is not swallowed); stays quiet when the ack arrives; re-arms per clip.
 
+**Same evening, first real firing — on the ThirdReality, not the AtomS3R (2026-08-29 22:01).**
+Arve's Dump log: a five-clip reply, clips 1-4 acked normally (`MediaPlayerState 2` → `1` →
+`AnnounceFinished` within ~3.5 s each), clip 5 (1.8 s) went to `MediaPlayerState 2` and then
+**nothing** — no idle, no ack — and the watchdog fired at 11.8 s. VictoriaLogs over the previous
+7 days: 54 announce turns started, 53 completed, so a dropped ack is rare (this was the one) but
+real, and it is the *last* clip of a reply the user heard in full. The first-cut watchdog answered
+it with a pipeline ERROR to the device, a *"Turn aborted"* warning, no mic reopen, and a message
+blaming the AtomS3R's I2S bus — all wrong for a speaker that had just played the clip.
+
+**Two-strike rule.** The first miss in a turn is now *forgiven*: the clip is treated as finished
+and the turn continues exactly as if the ack had arrived — `onAnnounceFinished('watchdog')`, the
+same method the real `announce_finished` listener calls — so the next queued clip plays, or the
+normal end-of-reply closure runs (`tts_end`/`run_end`, ring off, **mic reopen if the reply was a
+question**). Only a **second consecutive** miss (a real ack resets the count; so does a new turn)
+means nothing is playing on this device, and that one aborts as before (`pipeline_error` +
+`run_end`, queued clips dropped). A wedged AtomS3R therefore costs one extra clip budget before it
+is given up on; a TR that drops one ack costs the user 10 s of silence at the end of the reply and
+nothing else. The CONVO messages are generic now (*"the satellite never reported the clip
+finished"*) — the I2S-bus explanation lives in the code comment, not in every log line.
+
+Tests (six, `tests/voice-assistant-device.test.mts` § *announce watchdog*): first miss forgiven
+(normal close, no `pipeline_error`, late ack ignored, next wake fine); forgiven miss still reopens
+the mic after a question; quiet when the ack is on time; re-arms per clip; second consecutive miss
+aborts; a real ack between two misses resets the count.
+
 ## 30. Small closures swept out of TODO.md (2026-08-29)
 
 Items that were finished in place and left ticked in `TODO.md`; archived here so the TODO list

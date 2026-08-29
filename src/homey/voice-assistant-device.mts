@@ -189,7 +189,8 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
 
   /**
    * Announce watchdog: how long past a clip's own playback length we wait for
-   * the satellite's announce_finished ack before giving the turn up.
+   * the satellite's announce_finished ack before acting without it (see
+   * onAnnounceWatchdogFired for what acting means).
    *
    * On the announce path the run ends ONLY when the device acks playback. A
    * satellite whose speaker cannot start never acks — the M5Stack AtomS3R does
@@ -203,6 +204,9 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
    */
   private readonly ANNOUNCE_WATCHDOG_GRACE_MS: number = 10_000;
   private announceWatchdog: NodeJS.Timeout | null = null;
+  // Clips in this turn the device never acked, consecutively. The first miss is
+  // forgiven (see onAnnounceWatchdogFired); the second aborts the turn.
+  private announceMisses = 0;
 
   /**
    * onInit is called when the device is initialized.
@@ -562,64 +566,14 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
         this.convo.info('Speaking reply (announce)', 'TTS');
         this.logger.info(`Playing FIRST announcement from URL: ${fileInfo.url}`);
         this.playUrlByFileInfo(fileInfo, false);
+        this.announceMisses = 0;
         this.armAnnounceWatchdog(fileInfo);
       }
       // 'queued' segments play when announce_finished dequeues them.
     });
 
 
-    this.esp.on('announce_finished', () => {
-      // This handler only drives the multi-segment announce QUEUE (say/wake replies).
-      // The reopen and continue-reply announces also ack with AnnounceFinished, often
-      // late (during a later turn). Those arrive with no announce queue active; the
-      // pipeline reports them as 'ignore' so they can't spuriously end a run or
-      // trigger a second reopen.
-      const next = this.audioOutput.announceFinished();
-      if (next.kind === 'ignore') {
-        this.logger.info('Ignoring stray announce_finished (no announce queue active)');
-        return;
-      }
-
-      this.logger.info('Announcement finished');
-      // The ack arrived — this clip's watchdog is done. The next clip arms its own.
-      this.clearAnnounceWatchdog();
-
-      if (next.kind === 'play') {
-        this.logger.info(`Playing NEXT announcement from URL: ${next.fileInfo.url}`);
-        if (this.needDelayedPlayback) {
-          this.homey.setTimeout(() => {
-            this.esp.tts_start();
-            this.playUrlByFileInfo(next.fileInfo, false);
-            this.armAnnounceWatchdog(next.fileInfo);
-          }, 500);
-        } else {
-          this.playUrlByFileInfo(next.fileInfo, false);
-          this.armAnnounceWatchdog(next.fileInfo);
-        }
-        return;
-      }
-
-      // Queue drained — the announce turn's playback is over.
-      this.esp.tts_end()
-      this.esp.run_end();
-      this.setCapabilityValue('onoff', false);
-      this.logger.info(`Done playing announcements`);
-
-      const { reopenMic } = this.turn.finishAnnouncePlayback();
-      if (reopenMic) {
-        this.convo.info('Reply ended with a question — reopening mic for a follow-up', 'END');
-        // The reply ended in a question: open the conversation. Reopen the mic once
-        // ourselves (startConversation:true puts the PE into conversation mode); the
-        // machine marked the session active so this turn AND every turn the PE
-        // auto-reopens afterwards delivers its reply in-band on TTS_END. We send
-        // only THIS reopen; the PE drives the rest of the chain.
-        this.homey.setTimeout(() => {
-          this.reopenMic();
-        }, 1);
-      } else {
-        this.convo.info('Turn complete — conversation closed', 'END');
-      }
-    });
+    this.esp.on('announce_finished', () => this.onAnnounceFinished('device'));
 
 
     // The reply stream ended (segmenter flushed). In-band turns deliver here on
@@ -1172,26 +1126,115 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
   }
 
   /**
-   * The satellite never acked the announcement. Nothing more will happen on its
-   * own — the run only ends on that ack — so end the turn ourselves, the same
-   * way the tile's "Start conversation → off" does: abort the machine and the
-   * pipeline (dropping any segments still queued behind the stuck one), tell the
-   * device to leave its speaking state, drop the ring. No error chime: the
-   * speaker that could play it is the thing that is stuck.
+   * The satellite never acked the clip. Two very different satellites produce
+   * this, and they need opposite answers:
+   *
+   * - A speaker that genuinely cannot start (the AtomS3R's shared I2S bus) will
+   *   never ack anything this turn. Playing on just re-arms the watchdog per
+   *   clip and a five-clip reply takes a minute to die.
+   * - A speaker that played the clip and merely dropped the ack (seen on the
+   *   ThirdReality, 2026-08-29: MediaPlayerState went to playing and then no
+   *   idle, no AnnounceFinished, for the LAST clip of a reply whose four earlier
+   *   clips acked normally; 1 miss in 54 announce turns over 7 days). Aborting
+   *   there sends the device a pipeline ERROR and a 'turn aborted' warning for a
+   *   reply the user heard in full, and steals the follow-up reopen.
+   *
+   * So the FIRST miss in a turn is forgiven: the clip is treated as finished and
+   * the turn continues exactly as if the ack had arrived (next clip, or the
+   * normal end-of-reply closure including the mic reopen). A SECOND consecutive
+   * miss means nothing is playing, and the turn is ended the way the tile's
+   * "Start conversation -> off" ends one: machine and pipeline reset (queued
+   * segments dropped), pipeline_error + run_end, ring off. No error chime on
+   * either path: a speaker that is stuck cannot play it, and one that is not
+   * did nothing wrong the user should hear about.
    */
   private onAnnounceWatchdogFired(fileInfo: FileInfo, budgetMs: number): void {
     this.announceWatchdog = null;
     if (this.destroyed) {
       return;
     }
+    this.announceMisses++;
+    const clipS = ((fileInfo.playbackMs ?? 0) / 1000).toFixed(1);
+    const budgetS = (budgetMs / 1000).toFixed(1);
+    this.logger.warn(`Announce watchdog fired for ${fileInfo.url} after ${budgetMs} ms (miss ${this.announceMisses} this turn)`);
+
+    if (this.announceMisses === 1) {
+      this.convo.warn(
+        `The satellite never reported the ${clipS}s clip finished (no announce_finished within ${budgetS}s) - assuming it played and moving on`,
+        'END',
+      );
+      this.onAnnounceFinished('watchdog');
+      return;
+    }
+
     this.convo.warn(
-      `Announcement never finished — no announce_finished within ${(budgetMs / 1000).toFixed(1)}s `
-      + `of a ${((fileInfo.playbackMs ?? 0) / 1000).toFixed(1)}s clip; the satellite's speaker may be `
-      + `blocked (on the AtomS3R the mic and speaker share one I2S bus). Ending the turn.`,
+      `Second clip in a row the satellite never reported finished (${clipS}s clip, ${budgetS}s waited) - its speaker is not playing. Ending the turn.`,
       'END',
     );
-    this.logger.warn(`Announce watchdog fired for ${fileInfo.url} after ${budgetMs} ms`);
     this.abortCurrentTurn('announcement never finished');
+  }
+
+  /**
+   * An announcement finished - reported by the device (`announce_finished`), or
+   * assumed by the watchdog when the device never reported it. Drives the
+   * multi-segment announce QUEUE (say/wake replies): plays the next clip, or,
+   * when the queue has drained, closes the run and reopens the mic if the reply
+   * ended in a question.
+   *
+   * The reopen and continue-reply announces also ack with AnnounceFinished, often
+   * late (during a later turn). Those arrive with no announce queue active; the
+   * pipeline reports them as 'ignore' so they can't spuriously end a run or
+   * trigger a second reopen.
+   */
+  private onAnnounceFinished(source: 'device' | 'watchdog'): void {
+    const next = this.audioOutput.announceFinished();
+    if (next.kind === 'ignore') {
+      this.logger.info(`Ignoring stray announce_finished (no announce queue active, source=${source})`);
+      return;
+    }
+
+    this.logger.info(source === 'device' ? 'Announcement finished' : 'Announcement assumed finished (watchdog)');
+    // This clip's watchdog is done. The next clip arms its own.
+    this.clearAnnounceWatchdog();
+    if (source === 'device') {
+      this.announceMisses = 0;
+    }
+
+    if (next.kind === 'play') {
+      this.logger.info(`Playing NEXT announcement from URL: ${next.fileInfo.url}`);
+      if (this.needDelayedPlayback) {
+        this.homey.setTimeout(() => {
+          this.esp.tts_start();
+          this.playUrlByFileInfo(next.fileInfo, false);
+          this.armAnnounceWatchdog(next.fileInfo);
+        }, 500);
+      } else {
+        this.playUrlByFileInfo(next.fileInfo, false);
+        this.armAnnounceWatchdog(next.fileInfo);
+      }
+      return;
+    }
+
+    // Queue drained - the announce turn's playback is over.
+    this.esp.tts_end();
+    this.esp.run_end();
+    this.setCapabilityValue('onoff', false);
+    this.logger.info('Done playing announcements');
+
+    const { reopenMic } = this.turn.finishAnnouncePlayback();
+    if (reopenMic) {
+      this.convo.info('Reply ended with a question - reopening mic for a follow-up', 'END');
+      // The reply ended in a question: open the conversation. Reopen the mic once
+      // ourselves (startConversation:true puts the PE into conversation mode); the
+      // machine marked the session active so this turn AND every turn the PE
+      // auto-reopens afterwards delivers its reply in-band on TTS_END. We send
+      // only THIS reopen; the PE drives the rest of the chain.
+      this.homey.setTimeout(() => {
+        this.reopenMic();
+      }, 1);
+    } else {
+      this.convo.info('Turn complete - conversation closed', 'END');
+    }
   }
 
   /**
@@ -1241,6 +1284,7 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
     }
     this.clearNoSpeechTimeout();
     this.clearAnnounceWatchdog();
+    this.announceMisses = 0;
     // ONE reset each: the machine clears every turn/session flag, the pipeline
     // invalidates queued and in-flight segment work (generation bump) and drops
     // its buffers. Both report whether anything was actually in flight.

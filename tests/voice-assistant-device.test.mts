@@ -1009,10 +1009,12 @@ describe('VoiceAssistantDevice (harness)', () => {
     describe('announce watchdog — a satellite that never acks playback', () => {
         /**
          * The run on the announce path ends ONLY on the device's announce_finished.
-         * A speaker that cannot start (the AtomS3R's mic and speaker share one I2S
-         * bus — `Parent bus is busy` for 10-25 s in the 2026-08-14 field log) never
-         * sends it, and the turn used to sit in 'speaking' until the TCP link
-         * dropped. The watchdog is per clip: playbackMs + 10 s grace.
+         * Two satellites fail to send it for opposite reasons: a speaker that cannot
+         * start at all (the AtomS3R's mic and speaker share one I2S bus), and one
+         * that played the clip and merely dropped the ack (ThirdReality, 2026-08-29,
+         * last clip of a five-clip reply). So the FIRST miss in a turn is treated as
+         * "finished" and the turn goes on; the SECOND consecutive miss aborts it.
+         * The watchdog is per clip: playbackMs + 10 s grace.
          *
          * Fake timers go on BEFORE any audio is fed, so the watchdog's setTimeout
          * is the fake one; settle via advanceTimersByTimeAsync instead of h.settle.
@@ -1021,39 +1023,43 @@ describe('VoiceAssistantDevice (harness)', () => {
         const CLIP = Buffer.alloc(4800);
         const BUDGET_MS = 10_100;
 
-        async function playOneAnnouncement(h: Harness) {
+        async function startAnnounceTurn(h: Harness, clips: number) {
             h.esp.emit('starting');
             h.provider.emit('silence', 'server');
             h.provider.emit('transcript.done', 'slå på lyset');
-            (h.device as any).audioOutput.segmenter.emit('chunk', CLIP);
+            const seg = (h.device as any).audioOutput.segmenter;
+            for (let i = 0; i < clips; i++) seg.emit('chunk', CLIP);
             await vi.advanceTimersByTimeAsync(10);
             expect(h.esp.countOf('playAudioFromUrl')).toBe(1);
             expect((h.device as any).turn.state).toBe('speaking');
         }
 
-        it('ends the turn when the ack never comes', async () => {
+        it('forgives the first miss: treats the clip as finished and closes the turn normally', async () => {
             const h = await createHarness();
             vi.useFakeTimers();
             try {
-                await playOneAnnouncement(h);
+                await startAnnounceTurn(h, 1);
+                h.provider.emit('response.done');
+                await vi.advanceTimersByTimeAsync(10);
 
                 // Just inside the budget: still waiting.
-                await vi.advanceTimersByTimeAsync(BUDGET_MS - 20);
+                await vi.advanceTimersByTimeAsync(BUDGET_MS - 40);
                 expect((h.device as any).turn.state).toBe('speaking');
                 expect(h.esp.countOf('run_end')).toBe(0);
 
-                await vi.advanceTimersByTimeAsync(40);
+                await vi.advanceTimersByTimeAsync(60);
 
-                // Closed like a cancelled turn: device told to leave its state, ring off.
+                // Closed like a normal end of playback, NOT like an abort.
                 expect((h.device as any).turn.state).toBe('idle');
                 expect((h.device as any).audioOutput.isPlaying).toBe(false);
+                expect(h.esp.countOf('tts_end')).toBe(1);
                 expect(h.esp.countOf('run_end')).toBe(1);
-                expect(h.esp.countOf('pipeline_error')).toBe(1);
+                expect(h.esp.countOf('pipeline_error')).toBe(0);
                 expect(h.device.getCapabilityValue('onoff')).toBe(false);
-                // No error chime — the speaker is the thing that is stuck.
+                // No error chime either.
                 expect(h.esp.countOf('playAudioFromUrl')).toBe(1);
 
-                // A late ack from the stuck clip must not close the run a second time.
+                // A late ack from the forgiven clip is a stray and must not close the run again.
                 h.esp.emit('announce_finished');
                 await vi.advanceTimersByTimeAsync(10);
                 expect(h.esp.countOf('run_end')).toBe(1);
@@ -1066,11 +1072,36 @@ describe('VoiceAssistantDevice (harness)', () => {
             }
         });
 
+        it('a forgiven miss still reopens the mic when the reply ended in a question', async () => {
+            const h = await createHarness();
+            vi.useFakeTimers();
+            try {
+                h.esp.emit('starting');
+                h.provider.emit('silence', 'server');
+                h.provider.emit('transcript.done', 'hvordan er været?');
+                h.provider.emit('transcript.delta', 'Det er fint. Vil du høre mer?');
+                (h.device as any).audioOutput.segmenter.emit('chunk', CLIP);
+                await vi.advanceTimersByTimeAsync(10);
+                h.provider.emit('response.done'); // "?" -> continue the conversation
+                await vi.advanceTimersByTimeAsync(10);
+                expect(h.esp.countOf('send_voice_assistant_request')).toBe(0);
+
+                await vi.advanceTimersByTimeAsync(BUDGET_MS + 20);
+
+                expect(h.esp.countOf('run_end')).toBe(1);
+                expect(h.esp.countOf('pipeline_error')).toBe(0);
+                // The reopen the real ack would have triggered.
+                expect(h.esp.countOf('send_voice_assistant_request')).toBe(1);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
         it('stays quiet when the ack arrives in time', async () => {
             const h = await createHarness();
             vi.useFakeTimers();
             try {
-                await playOneAnnouncement(h);
+                await startAnnounceTurn(h, 1);
                 h.provider.emit('response.done');
                 await vi.advanceTimersByTimeAsync(10);
 
@@ -1091,10 +1122,7 @@ describe('VoiceAssistantDevice (harness)', () => {
             const h = await createHarness();
             vi.useFakeTimers();
             try {
-                await playOneAnnouncement(h);
-                // A second segment queues behind the first.
-                (h.device as any).audioOutput.segmenter.emit('chunk', CLIP);
-                await vi.advanceTimersByTimeAsync(10);
+                await startAnnounceTurn(h, 2);
                 expect((h.device as any).audioOutput.queueLength).toBe(1);
 
                 // First clip acks late but inside its budget -> second clip plays,
@@ -1108,12 +1136,60 @@ describe('VoiceAssistantDevice (harness)', () => {
                 // The old budget would have expired here; the new one has not.
                 await vi.advanceTimersByTimeAsync(600);
                 expect((h.device as any).turn.state).toBe('speaking');
+                expect(h.esp.countOf('run_end')).toBe(0);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it('a second consecutive miss aborts the turn — the speaker is not playing', async () => {
+            const h = await createHarness();
+            vi.useFakeTimers();
+            try {
+                await startAnnounceTurn(h, 2);
+                h.provider.emit('response.done');
+                await vi.advanceTimersByTimeAsync(10);
+
+                // Miss 1: forgiven -> the queued second clip is played and armed.
+                await vi.advanceTimersByTimeAsync(BUDGET_MS + 20);
+                expect(h.esp.countOf('playAudioFromUrl')).toBe(2);
+                expect((h.device as any).turn.state).toBe('speaking');
                 expect(h.esp.countOf('pipeline_error')).toBe(0);
 
-                // The second clip is the one that hangs.
-                await vi.advanceTimersByTimeAsync(BUDGET_MS);
+                // Miss 2: nothing is playing on this device. Abort.
+                await vi.advanceTimersByTimeAsync(BUDGET_MS + 20);
                 expect((h.device as any).turn.state).toBe('idle');
+                expect((h.device as any).audioOutput.isPlaying).toBe(false);
                 expect(h.esp.countOf('pipeline_error')).toBe(1);
+                expect(h.esp.countOf('run_end')).toBe(1);
+                expect(h.device.getCapabilityValue('onoff')).toBe(false);
+                // No error chime: the speaker could not play it anyway.
+                expect(h.esp.countOf('playAudioFromUrl')).toBe(2);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it('a real ack between two misses resets the count — they must be consecutive', async () => {
+            const h = await createHarness();
+            vi.useFakeTimers();
+            try {
+                await startAnnounceTurn(h, 3);
+                h.provider.emit('response.done');
+                await vi.advanceTimersByTimeAsync(10);
+
+                // Clip 1 misses (forgiven) -> clip 2 plays.
+                await vi.advanceTimersByTimeAsync(BUDGET_MS + 20);
+                expect(h.esp.countOf('playAudioFromUrl')).toBe(2);
+                // Clip 2 acks for real -> clip 3 plays, miss count back to 0.
+                h.esp.emit('announce_finished');
+                await vi.advanceTimersByTimeAsync(10);
+                expect(h.esp.countOf('playAudioFromUrl')).toBe(3);
+                // Clip 3 misses -> forgiven again, normal close, no abort.
+                await vi.advanceTimersByTimeAsync(BUDGET_MS + 20);
+                expect((h.device as any).turn.state).toBe('idle');
+                expect(h.esp.countOf('pipeline_error')).toBe(0);
+                expect(h.esp.countOf('tts_end')).toBe(1);
                 expect(h.esp.countOf('run_end')).toBe(1);
             } finally {
                 vi.useRealTimers();

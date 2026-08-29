@@ -325,7 +325,9 @@ hanging". Four things the log settles:
       their `i2s_audio` can be configured duplex / the wake-word restart delayed until
       `media_player` is idle, since a satellite that cannot speak while its wake-word engine
       listens is a hardware-config bug. Verify on the reporter's next Dump log that the watchdog
-      line (`Announcement never finished`) fires where the freezes used to be.
+      lines (`never reported the ... clip finished`, then `Second clip in a row`) fire where the
+      freezes used to be — on his hardware it should be the two-strike abort, not the forgiven
+      single miss the ThirdReality produced on 2026-08-29.
 - [ ] **Device rebooted at ~`14:53:35`** (`safe_mode:142 Boot seems successful; resetting boot loop
       counter` at `14:54:48`, plus the CLI's `Processing unexpected disconnect`) — this is the
       "crashed after the timer" report. Immediately before it: twelve announce cycles between
