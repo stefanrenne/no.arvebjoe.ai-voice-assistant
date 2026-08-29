@@ -29,13 +29,9 @@
 
 ## Homey developer portal reports (seen 2026-08-15)
 
-- [x] ~~**`TypeError: Cannot read properties of null (reading 'abort')`**~~ — a deleted device kept
-      receiving events from its provider, because `onDeleted()` detached the ESP client's listeners
-      but not the provider's. Fixed; full write-up in [`COMPLETED.md`](./COMPLETED.md) §19.
-
 **Second portal report (log ID `6abc4a3e-7738-4bf3-91a3-84c72ca24c27`, 2026-08-12) — not a crash.**
 A user-submitted diagnostic log; user message: *"Pas de connexion"*. The only captured exception is
-the Improv provisioning failure below. Voice PE at 192.168.1.81, Wi-Fi *SFRAD*.
+an Improv BLE connect failure (the dropped-link blind spot, since fixed — [`COMPLETED.md`](./COMPLETED.md) §20). Voice PE at 192.168.1.81, Wi-Fi *SFRAD*.
 
 **The log cannot answer the user's own complaint, and that is the finding.** He paired the same
 device (`20f83b0a7655`) **six times** in 20 minutes — manual entry at 12:59, 13:04, 13:18, mDNS list
@@ -53,11 +49,6 @@ are the four that never print. Only `CONVO`, `APP`, `PAIR`, `IMPROV_*`, `DEVICEM
 The one ESP-link error in the whole capture is a single `TCP connection error Error: read ETIMEDOUT`
 at 12:41:46, 18 minutes before the stdout window even starts — not enough to build anything on, but
 worth remembering if he sends a second log.
-
-- [x] ~~**A dropped BLE link stays invisible until a read or write fails**~~ — fixed; write-up in
-      [`COMPLETED.md`](./COMPLETED.md) §20.
-- [x] ~~**A user must be able to turn the quiet loggers on without a syslog collector**~~ — added
-      Settings → Debug → **Verbose logging**; write-up in [`COMPLETED.md`](./COMPLETED.md) §21.
 
 ## Forum: pairing probe rebooted the satellite — one open question
 
@@ -122,24 +113,12 @@ the question. The second portal report (see *Crash reports* above) is this failu
 practice: a user wrote *"Pas de connexion"* and paired the same device six times, and the log he
 submitted proves the ESP handshake and playback worked while saying nothing about the agent.
 
-**Both fixes below are now done (2026-08-18, [`COMPLETED.md`](./COMPLETED.md) §23-24), as is the
-logging gap in the correction above ([`COMPLETED.md`](./COMPLETED.md) §21).** What remains open is
-only the original report itself: its root cause was never established, and the reporter was never
-asked the questions above. If he resurfaces, the tile and the Debug tab now answer them for him.
-
-Two fixes worth making regardless of what his log says — both small, self-contained, and they
-turn this whole class of report into self-diagnosis (this tester spent an SSH session, a port
-check and a whole HA Core instance on what is probably a settings problem):
-
-- [x] ~~**Give `setUnavailable()` a reason.**~~ Done 2026-08-18 — `unavailableReason()` names the
-      failing side, and the engine by its settings-page label when it is the engine. The
-      true → false edge guard was replaced by a `lastUnavailableReason` comparison, so a reason
-      that changes while the device stays unavailable now reaches the tile. See
-      [`COMPLETED.md`](./COMPLETED.md) §23.
-- [x] ~~**Split the Debug row into "Device connected" and "Engine connected".**~~ Done 2026-08-18 —
-      `SeenDevice` carries `deviceConnected` / `engineConnected` / `engineName` alongside the
-      existing `available` AND (which still drives the star), and the page renders both rows with
-      the engine named. See [`COMPLETED.md`](./COMPLETED.md) §24.
+**The two fixes this motivated are done (2026-08-18 — `setUnavailable()` names the failing link,
+and the Debug list shows *Device connected* / *Engine connected* separately;
+[`COMPLETED.md`](./COMPLETED.md) §23-24), as is the logging gap in the correction above
+([`COMPLETED.md`](./COMPLETED.md) §21).** What remains open is only the original report itself: its
+root cause was never established, and the reporter was never asked the questions above. If he
+resurfaces, the tile and the Debug tab now answer them for him.
 
 ## Getting a full log out of a user — "Dump log" to a userdata file (design settled 2026-08-21)
 
@@ -159,18 +138,6 @@ The app cannot help from inside that flow: there is **no diagnostics hook in the
 nothing anywhere adds context to the payload or triggers a report. What SharpTools does — and what
 first looked like a *customizable* Homey dialog — is a **parallel channel of their own**: a button in
 their own settings page that uploads a snapshot to their servers and shows the user a key to quote.
-
-- [x] **Add a "Dump log" button to Settings → Debug that writes a file into userdata and shows its
-      LAN URL.** *(done 2026-08-27 — `src/helpers/log-buffer.mts` + `log-dump.mts`, `POST /dump-log`,
-      file at `/userdata/log/<datetime>.txt`, 30 min TTL; see COMPLETED.md §27. Deviations from the
-      notes below: the buffer captures the quieted loggers **regardless of verbose_logging**, and
-      LAN IPs are kept unredacted on purpose — they are private and help the user self-diagnose.)* We already serve userdata over HTTP: `webserver.mts:192` builds
-      `http://<ip>/app/<app-id>/userdata/audio/<file>`, which is Homey's own static serving of the
-      app's userdata folder, and `file-helper.mts` already does scheduled deletion. So the button
-      writes a redacted `diagnostic-<random>.txt` and the page shows its URL. The user opens it in a
-      phone browser and has a **real file** to attach wherever they already are — forum, e-mail,
-      GitHub issue. No clipboard API, no account, no size cap, and none of the webview download
-      restrictions. It also sidesteps Homey's report window entirely, because the buffer is ours.
 
       Notes for when this is built:
       - **The buffer belongs in `Logger.write()` (`logger.mts:177`)** — the single choke point every
@@ -192,23 +159,6 @@ their own settings page that uploads a snapshot to their servers and shows the u
       end and every connect failure keeps the tail of the app log useful inside Homey's narrow
       window. This is the fix for the second portal report (above), which arrived with a user message
       and a log that could not answer it.
-
-- [x] **Check whether `homey-log` is actually enabled in the published app.** *(resolved 2026-08-27: it was
-      not — `env.json` was missing on the publishing machine; `HOMEY_LOG_URL` is now set, so `reportError()`
-      is live from the next publish.)* It disables itself
-      unless `Homey.env.HOMEY_LOG_URL` is a string (`node_modules/homey-log/lib/Log.js:41`); there is
-      no `env.json` in the repo (gitignored, `.gitignore:1`); and
-      [`docs/release-testing-since-1.4.0.md`](./docs/release-testing-since-1.4.0.md):265 records
-      captures as *"local-only — no `HOMEY_LOG_URL`"*. If it is unset on the machine we publish from,
-      then `reportError()`'s fingerprinting and hour-long cooldown (`logger.mts:264`) are a no-op in
-      production, and every crash report we have read came from Athom's portal instead. Either wire a
-      DSN or stop maintaining that machinery as if it runs.
-
-- [x] **Point users at the right button.** *(done 2026-08-27 — README now leads with Dump log and
-      names the app-page diagnostics report as the fallback.)* [`README.md`](./README.md):547 told them to *"copy the
-      app log … ⋮ menu"*. Copy-paste from a phone is the fragile path, and it does not name the
-      mechanism that actually reaches us. Say **Create Diagnostics Report, on the app's own page**,
-      and say *right after it fails*.
 
 **Rejected, with reasons** (2026-08-21 brainstorm — do not re-litigate without new information):
 
@@ -360,9 +310,6 @@ hanging". Four things the log settles:
    failure (`:520`) and Noise decrypt failure — and this is the **only** tester running Noise
    encryption.
 
-- [x] ~~**Mute switch does not work**~~ — explained by (1) above: no entity key, so no
-      `SwitchCommandRequest` was ever sent. Fixed by `29338cf`; **re-test**, don't investigate.
-- [x] ~~**Volume does not work**~~ — same cause, same fix, same re-test.
 - [ ] **Find out who closes the TCP connection mid-reply** (log finding 4). The device log cannot
       name the path — **ask for the Homey-side log for the same window** (`homey app run --remote`,
       or point `remote_log_*` at a collector), where every one of the three candidate paths logs a
@@ -394,11 +341,6 @@ hanging". Four things the log settles:
       cancels the running turn, which removes the "is this a power switch?" confusion but not
       the underlying report. **Not exercised in the 2026-08-14 log** — every turn in it starts from
       the wake word — so this one is still untouched by evidence and needs its own test.
-- [x] ~~**No timer finish chime**~~ — does not reproduce; the 2026-08-14 log shows the full
-      120 s countdown and the chime repeat-playing (log finding 2). **The missing countdown *display*
-      is expected and won't be fixed** — the firmware has no timer UI at all
-      (`voice_assist_timer_finished_phase_id: "20"` is defined but never appears as a `case` in
-      `draw_display`, so it falls through to the idle page).
 - [ ] **The timer chime rings until the button is pressed, and nothing else stops it.** Firmware
       repeat-plays `timer_finished_sound` while the `timer_ringing` switch is on; the log shows ~10
       repeats and no path that clears it from our side. Decide whether the assistant should be able
@@ -563,94 +505,6 @@ un-dropped 2026-07-31** (see "Start a Homey flow by voice" below).
 
 ### High value, more work
 
-- [x] **Reply audio as a URL for speakerless devices (Sonos hand-off)** — **SHIPPED 2026-08-10**
-      as the per-device `reply_audio_output` dropdown (*Reply audio*: "Play on this device" /
-      "Send to a Flow as a URL") plus the **Reply audio is ready** trigger card with `url` +
-      `text` + `duration` tokens. Built exactly as designed below, on all five drivers, with two
-      decisions worth carrying forward: **follow-ups need the wake word again** in URL mode
-      (`keepOpen` is forced false — we hand off and return immediately, so "end of playback" is
-      send time, and reopening then would let the device hear the reply being spoken elsewhere),
-      and `askAgentOutputToSpeaker()` needed re-routing since its `cancelInband()` selects the
-      announce path that waits for an ack no speakerless device can send. Encoded at 48 kHz with
-      a 2-minute deletion grace. **Switched from FLAC to MP3 2026-08-11** (128 kbit/s mono,
-      `pcmToMp3Buffer()` on `@breezystack/lamejs` — pure JS, same no-native-deps constraint that
-      picked libflacjs): the FLAC blocker below was never worth waiting to hit, since MP3 is the
-      one format every networked speaker plays. `format` is a per-call option on
-      `buildReplyFile()`, so our own satellites keep getting FLAC. Still **unverified on real
-      hardware** — the tester has yet to confirm Sonos actually plays the file.
-      Original design notes kept below for that follow-up.
-      ORIGINAL ITEM — ReSpeaker tester
-      request 2026-08-07. His board has **no speaker**: he wants our TTS delivered as a URL so
-      a flow can hand it to the Sonos app's *"Play URL `<url>` at volume `<volume>`"* action.
-      Distinct from (and much easier than) the voice-input-only entry below: he still wants
-      **our** TTS — our voice, our language — so none of the `LocalPipelineProvider`
-      TTS-optional work applies and this can ship independently.
-      **Re-asked 2026-08-10 (post #60), now with a workaround in hand:** he has a flow piping the
-      reply *text* to his Sonos and finds the Sonos TTS voice poor — "but I can also play a url on
-      sonos, would it be possible to have the output available as a url?". Confirms the design
-      below is what he wants and that the `assistant-thinking`-to-Sonos-*Say* path works today, so
-      shipping the new card is additive and breaks nothing for him.
-      Findings from a full code read 2026-08-07 (all line refs verified, not guesses):
-      - **The unchunked path already exists — do not build a third one.** He asked whether
-        chunking could be made optional; `AudioOutputPipeline` has had two reply modes since
-        the Org-1 refactor: `announce` (one FLAC per speech segment, played back-to-back —
-        what he is seeing) and `inband`, which accumulates the whole reply's PCM and
-        `buildReplyFile()` (`audio-output-pipeline.mts:125`) emits **one** FLAC URL for it.
-        The mode is a single per-turn switch at `voice-assistant-device.mts:336`
-        (`beginTurn(started.followUp ? 'inband' : 'announce')`). URL mode = force `inband`.
-      - **Chunking only buys time-to-first-word on the device's own speaker** (segment 1 plays
-        while the model still generates the rest). A flow fires once with one URL, so that
-        benefit is zero here — forcing `inband` costs nothing but latency already being paid on
-        the Sonos round trip.
-      - **Expose it as one setting, not a raw "chunk / don't chunk" toggle** — chunking is an
-        implementation detail. Per-device dropdown, e.g. *"Reply audio: play on this device /
-        send as URL to a Flow"*, default **play on this device**; URL mode forces `inband`
-        internally. Open question for the owner: all five drivers, or only the speakerless ones
-        (ReSpeaker, AtomS3R without Echo Base)?
-      - **Use a NEW trigger card, not a `url` token on `assistant-thinking`.** Sequencing rules
-        the existing card out: it fires from the `response.done` handler
-        (`voice-assistant-device.mts:805`) and `audioOutput.flush()` only runs at `:809`, so at
-        trigger time nothing is encoded and there is no URL. Moving the fire point would change
-        timing for every existing user. Add e.g. **"Reply audio ready"** with `url` + `text` +
-        `duration` tokens, fired from the `reply-done` handler (`:488`) after `buildReplyFile()`.
-        Extra reasons: `assistant-thinking` also fires per tool call (`type: 'tool'`) where a
-        `url` token is always empty, and empty for every locally-playing device too — a footgun
-        in the flow editor; its own hint calls it a debug card; and existing flows piping `text`
-        to a Sonos *Say* card keep working untouched.
-      - **BLOCKER he has not hit yet — Sonos will not play our 24 kHz FLAC.** Reply files are
-        24 kHz mono 16-bit FLAC (`audio-output-pipeline.mts:128-132`). Sonos supports mono and
-        "up to 48 kHz", but the documented/tested FLAC rates are 44.1 and 48 kHz; 24000 Hz is
-        non-standard and Sonos is historically fussy — expect refusal or silent failure. Fix is
-        cheap, both pieces already exist in `src/helpers/wav.mts`:
-        `resamplePcm16Mono(pcm, 24000, 48000)` (exact 2× upsample, no quality question) then
-        encode with `sampleRate: 48_000`. `pcmToWav()` is the fallback if his player still balks
-        (Sonos definitely handles 16-bit WAV; the file lives 30 s so size is irrelevant).
-        Needs a target-sample-rate parameter on `buildReplyFile()`.
-        Refs: [Sonos supported audio formats](https://support.sonos.com/en-us/article/supported-audio-formats-for-sonos-music-library),
-        [community thread on FLAC 24/48](https://en.community.sonos.com/controllers-and-music-services-228995/playing-flac-over-24-48-6842145).
-      - **File TTL is too tight for a flow round trip.** Files are deleted 30 s after creation
-        (`file-helper.mts:47`), extended by playback length only when *we* play them
-        (`playUrlByFileInfo`, `:1152-1157`). `buildReplyFile()` does schedule with the
-        extension, so the basics hold — but 30 s of grace is thin if the flow groups speakers,
-        saves/restores the queue or ramps volume first. Raise the base grace (≈2 min) in URL mode.
-      - **Build URL mode on `inband`, never on `announce`.** The announce path ends a turn on
-        the device's `announce_finished` ack (`:432`), which is what calls
-        `finishAnnouncePlayback()`; with nothing playing locally that ack never arrives and the
-        turn hangs in `speaking`. The in-band path waits for no ack — it sends `tts_end` +
-        `run_end` immediately — and its null-file branch (`:525-528`) already does the right ESP
-        sequencing (`tts_end()` with no URL) so the LED ring still runs replying → idle. URL
-        mode is essentially "in-band with the URL diverted to a flow token".
-      - **Skip the baked-in listening chime in URL mode.** `appendChimeToPcm` at `:513` is only
-        appended to keep-open replies; in URL mode `keepOpen` must be forced false, otherwise
-        Sonos plays a "speak now" beep for a mic that is not reopening.
-      - **Trade-off to tell the tester:** with chunking off he hears nothing until the *entire*
-        reply is generated, then the Sonos hand-off on top — several seconds of silence on a
-        long answer. The LED ring still shows thinking/replying, but it will feel slower than
-        the PE does.
-      - **Change set** (small, mostly one file): new dropdown in `driver.settings.compose.json`;
-        mode force + URL branch in `voice-assistant-device.mts`; sample-rate param on
-        `buildReplyFile()`; new `.homeycompose/flow/triggers/` card; `README.md` update — and
-        **not** `README.txt` (App Store rule in CLAUDE.md).
 - [ ] **Voice-input-only mode (reply spoken by some other speaker)** — forum request
       2026-07-29, owner-approved in principle. User wants the satellite as a *microphone only*
       and the answer spoken by the Sonos app's *Say* card, with no TTS container at all.
