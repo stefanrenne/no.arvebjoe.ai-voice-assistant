@@ -67,12 +67,12 @@ export class ToolManager extends (EventEmitter as new () => TypedEmitter<ToolMan
     // turn seam shared by all three providers, so this is time-boxed instead.
     private static readonly ZONE_FALLBACK_TTL_MS = 2 * 60_000;
 
-    // Window coverings are three device types that speak as ONE category, so the
-    // instructions have the model list them with three typed calls. That makes
-    // each call individually empty-able, which is what lets the fallback work at
-    // all here — but it also means a zone WITH blinds and no curtains would send
-    // the curtain call reaching into another room, mixing two rooms into one
-    // "close the covers". See coversPresentInStandardZone.
+    // Window coverings are four device types that speak as ONE category. A
+    // generic request ("close the covers") arrives as a single call with
+    // cover_sweep=true and is expanded over these types in code (listCovers /
+    // listCoverSweep), so the fallback makes ONE decision over the whole
+    // category — deciding per type would let one request move covers in two
+    // different rooms. A named kind ("the awning") is a plain typed listing.
     // 'windowcoverings' is Homey's generic cover class and is common in the wild
     // (a curtain motor often lands there rather than on 'curtain'), so leaving it
     // out makes those devices invisible to everything cover-shaped.
