@@ -61,5 +61,8 @@
   },
   "1.5.2": {
     "en": "New Dump log button under Settings, Debug: writes the app's recent log, including the detailed satellite and voice-engine lines, to a file on your Homey and shows a link you can open on your phone or computer and attach to a forum post or e-mail. API keys, your spoken commands and the assistant's replies are removed before the file is written, and it is deleted again after 30 minutes. Fix: quiet but clear speech on the ThirdReality satellite could end the turn with \"Heard nothing\" after 8 seconds; the voice detector now picks up softer speech and, when in doubt, sends what it heard to speech recognition instead of giving up."
+  },
+  "1.5.3": {
+    "en": "New: blinds, curtains and awnings can now be controlled by voice — open, close, stop or set a position (\"open the sunshade halfway\"). New: when the room you are in has none of the device you asked for, and exactly one other room does, the assistant acts there and tells you which room (switch under Settings, Smart home control). Faster wake cue when replies are sent to a Flow as a URL: the sound clips are prepared at startup instead of on the first wake. Fix: with the Gemini engine, a short command could be written down in the wrong language (Dutch heard as German) even though the spoken reply was right. Fix: tools could answer from a slightly outdated list of devices. Fix: a satellite whose speaker never starts playing (seen on the M5Stack AtomS3R) no longer leaves the assistant stuck with the ring lit; the turn now ends by itself after a few seconds."
   }
 }
