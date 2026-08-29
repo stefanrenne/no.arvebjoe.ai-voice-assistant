@@ -188,6 +188,23 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
   private noSpeechTimeout: NodeJS.Timeout | null = null;
 
   /**
+   * Announce watchdog: how long past a clip's own playback length we wait for
+   * the satellite's announce_finished ack before giving the turn up.
+   *
+   * On the announce path the run ends ONLY when the device acks playback. A
+   * satellite whose speaker cannot start never acks — the M5Stack AtomS3R does
+   * exactly this when its microphone and speaker fight over the one I2S bus
+   * they share (`Parent bus is busy` / `Driver failed to start; retrying`, up
+   * to 25 s at a stretch in the 2026-08-14 field log) — and without a net the
+   * turn sits in 'speaking' with the ring lit until the TCP link happens to
+   * drop. 10 s is well past the firmware's normal start latency (hundreds of
+   * ms) and its 2 s empty-media timeout, and well short of "the device has
+   * hung". Per clip, so a long multi-segment reply is never cut short.
+   */
+  private readonly ANNOUNCE_WATCHDOG_GRACE_MS: number = 10_000;
+  private announceWatchdog: NodeJS.Timeout | null = null;
+
+  /**
    * onInit is called when the device is initialized.
    */
   async onInit(): Promise<void> {
@@ -545,6 +562,7 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
         this.convo.info('Speaking reply (announce)', 'TTS');
         this.logger.info(`Playing FIRST announcement from URL: ${fileInfo.url}`);
         this.playUrlByFileInfo(fileInfo, false);
+        this.armAnnounceWatchdog(fileInfo);
       }
       // 'queued' segments play when announce_finished dequeues them.
     });
@@ -563,6 +581,8 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
       }
 
       this.logger.info('Announcement finished');
+      // The ack arrived — this clip's watchdog is done. The next clip arms its own.
+      this.clearAnnounceWatchdog();
 
       if (next.kind === 'play') {
         this.logger.info(`Playing NEXT announcement from URL: ${next.fileInfo.url}`);
@@ -570,9 +590,11 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
           this.homey.setTimeout(() => {
             this.esp.tts_start();
             this.playUrlByFileInfo(next.fileInfo, false);
+            this.armAnnounceWatchdog(next.fileInfo);
           }, 500);
         } else {
           this.playUrlByFileInfo(next.fileInfo, false);
+          this.armAnnounceWatchdog(next.fileInfo);
         }
         return;
       }
@@ -1129,6 +1151,50 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
   }
 
   /**
+   * Arm the announce watchdog for the clip that was just handed to the device:
+   * its own playback length plus ANNOUNCE_WATCHDOG_GRACE_MS. One clip at a
+   * time — announce_finished clears it and the next clip re-arms it.
+   */
+  private armAnnounceWatchdog(fileInfo: FileInfo): void {
+    this.clearAnnounceWatchdog();
+    const budgetMs = (fileInfo.playbackMs ?? 0) + this.ANNOUNCE_WATCHDOG_GRACE_MS;
+    this.announceWatchdog = this.homey.setTimeout(
+      () => this.onAnnounceWatchdogFired(fileInfo, budgetMs),
+      budgetMs,
+    );
+  }
+
+  private clearAnnounceWatchdog(): void {
+    if (this.announceWatchdog) {
+      this.homey.clearTimeout(this.announceWatchdog);
+      this.announceWatchdog = null;
+    }
+  }
+
+  /**
+   * The satellite never acked the announcement. Nothing more will happen on its
+   * own — the run only ends on that ack — so end the turn ourselves, the same
+   * way the tile's "Start conversation → off" does: abort the machine and the
+   * pipeline (dropping any segments still queued behind the stuck one), tell the
+   * device to leave its speaking state, drop the ring. No error chime: the
+   * speaker that could play it is the thing that is stuck.
+   */
+  private onAnnounceWatchdogFired(fileInfo: FileInfo, budgetMs: number): void {
+    this.announceWatchdog = null;
+    if (this.destroyed) {
+      return;
+    }
+    this.convo.warn(
+      `Announcement never finished — no announce_finished within ${(budgetMs / 1000).toFixed(1)}s `
+      + `of a ${((fileInfo.playbackMs ?? 0) / 1000).toFixed(1)}s clip; the satellite's speaker may be `
+      + `blocked (on the AtomS3R the mic and speaker share one I2S bus). Ending the turn.`,
+      'END',
+    );
+    this.logger.warn(`Announce watchdog fired for ${fileInfo.url} after ${budgetMs} ms`);
+    this.abortCurrentTurn('announcement never finished');
+  }
+
+  /**
    * Nothing was ever spoken into this turn. Close it the way an empty
    * transcript closes one — a plain STT_END/RUN_END plus the mic-closed cue,
    * NOT an abort: the user simply said nothing, so the device should go quietly
@@ -1174,6 +1240,7 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
       return;
     }
     this.clearNoSpeechTimeout();
+    this.clearAnnounceWatchdog();
     // ONE reset each: the machine clears every turn/session flag, the pipeline
     // invalidates queued and in-flight segment work (generation bump) and drops
     // its buffers. Both report whether anything was actually in flight.
@@ -2165,6 +2232,7 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
     // Stop any running countdown so its setTimeout can't fire after teardown.
     try {
       this.clearNoSpeechTimeout();
+      this.clearAnnounceWatchdog();
       this.stopTimerCapabilityTick();
       this.timerManager?.dispose();
     } catch (err) {

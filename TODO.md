@@ -370,13 +370,15 @@ hanging". Four things the log settles:
       `noise-frame-codec.mts` under sustained traffic and it affects every encrypted device, not
       just this one. This is the top item on the list: it is ours, it is reproducible, and it is
       what the reporter experiences as "not stable enough for regular use".
-- [ ] **Decide what we do about the wedged I2S bus** (log finding 3). Firmware-side in origin, but
-      it strands *our* announce: nothing plays, no `announce_finished` ever comes, and the turn only
-      ends when the connection drops. Two angles — (a) an announce watchdog on our side that gives
-      up and ends the turn cleanly instead of leaving it hanging, and (b) report it to M5Stack /
-      check whether their `i2s_audio` can be configured duplex, since a satellite that cannot speak
-      while its wake-word engine listens is a hardware-config bug. (a) is ours and worth doing
-      regardless.
+- [ ] **Report the shared I2S bus to M5Stack** (log finding 3, angle (b); angle (a), the announce
+      watchdog on our side, is done — [`COMPLETED.md`](./COMPLETED.md) §29). The watchdog stops the
+      hang from stranding the turn, but the reply still does not play: `Parent bus is busy` is the
+      firmware's mic and speaker fighting over one I2S peripheral, and `micro_wake_word` re-arming
+      the mic the moment the VA leaves `STREAMING_MICROPHONE` is what wins the race. Check whether
+      their `i2s_audio` can be configured duplex / the wake-word restart delayed until
+      `media_player` is idle, since a satellite that cannot speak while its wake-word engine
+      listens is a hardware-config bug. Verify on the reporter's next Dump log that the watchdog
+      line (`Announcement never finished`) fires where the freezes used to be.
 - [ ] **Device rebooted at ~`14:53:35`** (`safe_mode:142 Boot seems successful; resetting boot loop
       counter` at `14:54:48`, plus the CLI's `Processing unexpected disconnect`) — this is the
       "crashed after the timer" report. Immediately before it: twelve announce cycles between

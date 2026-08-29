@@ -1971,3 +1971,41 @@ user reports the same, replay their clip first (harness: decode with `flacToPcmB
 Tests: `tests/simple-vad.test.mts` (+3), `tests/local-pipeline-provider.test.mts` (timeout case
 rewritten + no-speech case).
 
+## 29. Announce watchdog — a satellite that never acks playback no longer strands the turn (2026-08-29)
+
+**Why.** On the announce path the run ends ONLY when the device sends `announce_finished`. The
+M5Stack AtomS3R field log of 2026-08-14 ([issue #44](https://github.com/arvebjoe/no.arvebjoe.ai-voice-assistant/issues/44),
+`docs/m5stack-atoms3r/logs/2026-08-14-mirko-ug.txt`) showed what happens when that ack never comes:
+`[E][i2s_audio.speaker.std:401] Parent bus is busy` + `Driver failed to start; retrying in 1 second`
+139 times, in clusters starting the same second our reply FLAC began decoding and running 10-25 s
+with **no audio playing**, until the TCP link happened to drop and the firmware released the bus.
+The AtomS3R mic (GPIO7) and Echo Base speaker (GPIO5) share one I2S peripheral and
+`micro_wake_word` re-arms the mic the moment the VA leaves `STREAMING_MICROPHONE`, so the speaker
+cannot start. Meanwhile our turn sat in `speaking` with the ring lit and `onoff` true — the "keeps
+hanging" of the report. TODO.md § *M5Stack*, log finding 3, angle (a).
+
+**Shape.** `voice-assistant-device.mts`: `armAnnounceWatchdog(fileInfo)` at the three places a
+clip is handed to the device (`segment` → `play`, and both branches of the `announce_finished` →
+`play` dequeue, including the `needDelayedPlayback` 500 ms path), budget = `fileInfo.playbackMs` +
+`ANNOUNCE_WATCHDOG_GRACE_MS` (10 s). `announce_finished` clears it before dequeuing, so a long
+multi-segment reply is never cut short — each clip earns its own budget. Cleared in
+`abortCurrentTurn()` and at teardown. When it fires, `onAnnounceWatchdogFired()` logs a CONVO
+warning naming the clip and the shared-bus suspicion and calls `abortCurrentTurn('announcement
+never finished')` — the same closure as the tile's *Start conversation → off*: turn machine and
+pipeline reset (queued segments dropped), `pipeline_error` + `run_end` to the device, ring off.
+Deliberately **no error chime**: the speaker that would play it is the thing that is stuck.
+
+**Why 10 s.** Normal announce start latency is hundreds of ms and the firmware's empty-media
+timeout is 2 s, so 10 s past the clip's own length cannot fire on a healthy satellite; the wedge
+in the log ran 10-25 s, so it catches the real thing within a few seconds of where the user
+already gave up. Per clip rather than per turn so a long reply is not penalised.
+
+**Not covered, on purpose.** The in-band (follow-up) path: the PE plays that reply itself on
+`TTS_END` and reopens its own mic — there is no ack we wait for, so nothing to watch. And the
+reply still does not *play* on a wedged AtomS3R — that is firmware-side (angle (b), still open in
+TODO.md); this only stops the hang from stranding the turn.
+
+Tests: `tests/voice-assistant-device.test.mts` § *announce watchdog* — fires just past the budget
+(turn idle, one `run_end`, one `pipeline_error`, `onoff` false, no chime, a late ack is ignored,
+the next wake is not swallowed); stays quiet when the ack arrives; re-arms per clip.
+
