@@ -64,5 +64,8 @@
   },
   "1.5.3": {
     "en": "New: blinds, curtains and awnings can now be controlled by voice — open, close, stop or set a position (\"open the sunshade halfway\"). New: when the room you are in has none of the device you asked for, and exactly one other room does, the assistant acts there and tells you which room (switch under Settings, Smart home control). Faster wake cue when replies are sent to a Flow as a URL: the sound clips are prepared at startup instead of on the first wake. Fix: with the Gemini engine, a short command could be written down in the wrong language (Dutch heard as German) even though the spoken reply was right. Fix: tools could answer from a slightly outdated list of devices. Fix: a satellite whose speaker never starts playing (seen on the M5Stack AtomS3R) no longer leaves the assistant stuck with the ring lit; the turn now ends by itself after a few seconds."
+  },
+  "1.5.4": {
+    "en": "Fix: if your OpenAI project is not allowed to use one of the models the app needs (a setting on OpenAI's dashboard), the app now falls back to another model and sends you a notification telling you which model to allow, instead of silently never answering. Speech recognition falls back from gpt-4o-transcribe to gpt-4o-mini-transcribe or whisper-1, and the Say card falls back from gpt-4o-mini-tts to tts-1; the turn that hit the problem is still answered from the audio itself."
   }
 }
