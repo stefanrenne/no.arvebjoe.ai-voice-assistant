@@ -2262,7 +2262,7 @@ plays on the fallback. Testing notes worth keeping:
   and the device's `convo.error(...)` fallback line, now `convo.warn(...)`. A handled, recoverable
   condition never reports to Sentry (same principle as §15).
 
-Committed 2026-09-01 as `d10e968`; released as **1.5.4** (bump `eda732a`).
+Committed 2026-09-01 as `d10e968`; published as **1.5.4** (bump `eda732a`) the same day.
 
 ## 33. Diagnosability triage — the 2026-08-15 "Unavailable / Connected: no" report and the "Pas de connexion" portal log (archived from TODO.md 2026-09-01)
 

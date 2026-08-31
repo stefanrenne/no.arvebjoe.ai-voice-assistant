@@ -1,14 +1,5 @@
 # TODO — single source of truth
 
-## Release 1.5.4 — committed, not yet published
-
-The OpenAI model-fallback fix (portal report `87154194`) is done, live-verified on the real PE
-2026-08-31 and committed (`d10e968` + bump `eda732a`); full write-up and testing gotchas in
-[`COMPLETED.md`](./COMPLETED.md) §32.
-
-- [ ] **Publish + certify 1.5.4** (`homey app publish` — the tree already validates at publish
-      level; the `homey:manager:api` permission warning is expected).
-
 ## Model refusals — optional follow-ups (from the 1.5.4 work, not started)
 
 - [ ] Let the Gemini and Mistral providers emit `model_unavailable` on their equivalent
