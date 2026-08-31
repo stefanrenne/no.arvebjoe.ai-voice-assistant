@@ -2170,3 +2170,95 @@ Findings from a full code read 2026-08-07 (all line refs verified, not guesses):
   mode force + URL branch in `voice-assistant-device.mts`; sample-rate param on
   `buildReplyFile()`; new `.homeycompose/flow/triggers/` card; `README.md` update — and
   **not** `README.txt` (App Store rule in CLAUDE.md).
+
+## 32. A project without access to `gpt-4o-transcribe` made the app look dead (2026-08-29)
+
+**Report.** Portal diagnostic `87154194-92b4-4345-9a59-b714913be5c8` (2026-08-22, app 1.5.0, Homey
+Self-Hosted Server, Voice PE): *"Installed … set up OpenAI. No errors, but still does not work.
+Devices are not turned on and Say … does not make any sound although the LED ring lights up."* Seven
+times across the day the log ends a turn with
+
+```
+conversation.item.input_audio_transcription.failed
+  code: 'model_not_found'
+  message: 'Project `proj_…` does not have access to model `gpt-4o-transcribe`'
+```
+
+Model access is a **per-project** setting on OpenAI's side (Settings → Project → Limits → Model
+usage), and a project can be allowed the realtime model while being refused the sidecar STT or the
+TTS model. His key was fine — the realtime session connected every time.
+
+**Why that killed everything, and why it was silent — both ours.**
+
+1. Replies are anchored on the sidecar transcript (§ *STT accuracy*): `response.create` is sent
+   **only** from `transcription.completed`. No transcript → the model is never asked → no device is
+   ever switched. Correct diagnosis of *"devices are not turned on"*.
+2. The agent emitted `response.error` for the failure, but the device listened only to `'error'`.
+   Nobody handled it, so every turn hung on the thinking ring until the next wake. No chime, no
+   CONVO line, no notification — a whole day of it with nothing a user could act on.
+3. *"Say plays no sound"* is the same restriction on a second model, `gpt-4o-mini-tts` via
+   `/v1/audio/speech`: `textToSpeech()` never checked `r.ok`, so the error JSON body was returned
+   **as FLAC** and handed to the satellite, which lit the ring and played nothing.
+
+**Fix — `openai-realtime-agent.mts`.** Each stage has a fallback chain, walked on `model_not_found`
+(`isModelNotFound()` matches the code or the *"does not have access to model"* message):
+
+- **STT:** `gpt-4o-transcribe → gpt-4o-mini-transcribe → whisper-1` (`STT_MODELS`, quality order).
+  `handleTranscriptionModelRefused()` (1) moves to the next model with a *partial* `session.update`
+  carrying only `audio.input.transcription` (`transcriptionConfig()`, shared with the full session
+  config); (2) emits `model_unavailable {stage, model, fallback}`; (3) **rescues the failed turn**:
+  the audio item is committed and in the conversation, so a bare `response.create` makes the realtime
+  model answer the audio itself (its own hearing, no text anchor), and the host gets
+  `transcript.done` with the placeholder `TRANSCRIPT_UNAVAILABLE` so its turn machine advances. An
+  idle-timeout commit (room tone, `timeoutCommittedItems`) is not answered. Chain exhausted → the
+  last model stays configured, every turn fails fast and is rescued from audio, `fallback: null`.
+  A `model_not_found` refusal is **not** emitted as `response.error` (that would abort the rescued
+  turn); every *other* transcription failure now is.
+- **TTS:** `gpt-4o-mini-tts-2025-12-15 → tts-1` (`TTS_MODELS`). `textToSpeech()` checks `r.ok`,
+  parses the error body, retries once on the next model (sticky via `ttsModelIndex`; `instructions`
+  only sent to the `gpt-*` family — `tts-1` rejects it), and otherwise **throws** with the server's
+  message, so *Say* reports an error instead of serving an error document as audio.
+
+**Fix — `voice-assistant-device.mts`.** `response.error` is handled: a failed input transcription
+ends the turn (`abortCurrentTurn(..., playError=true)` — error chime, CONVO line) because the turn
+cannot otherwise complete; every other engine error is logged to CONVO only (most are benign
+bookkeeping the agent already copes with — duplicate item ids, empty commits — and aborting on them
+would be a regression). `model_unavailable` writes a CONVO error and sends **one Homey notification
+per refused model** (app-wide `notifiedUnavailableModels`), naming the engine, the stage, the model,
+the fallback (or that none is left) and where to fix it. Contract: `model_unavailable` added to
+`VoiceProviderEvents` for every provider to use.
+
+**Docs.** README troubleshooting: *"The ring lights up, but nothing is ever answered — or Say plays
+no sound (OpenAI)"*. `README.txt` untouched.
+
+**Tests.** `tests/openai-realtime-provider.test.mts`: default model; fallback + host event + rescue
+(partial `session.update`, `response.create` without `conversation.item.create`, no
+`response.error`); the whole chain and behaviour once exhausted; room-tone commit not answered; a
+non-`model_not_found` failure still surfaces as `response.error`. `textToSpeech`: default model with
+instructions; retry on `tts-1` without instructions + sticky; throws on 401 with the server message;
+throws once the chain is exhausted. `tests/voice-assistant-device.test.mts`: a failed transcription
+aborts with the chime (note `playUrl()` wraps the chime in its own `run_start`/`run_end`); other
+errors only log; one notification per model. `MockHomey` now records `notificationsSent`; the device
+harness no longer shadows it with a no-op.
+
+**Not done.** The Gemini and Mistral providers do not walk a fallback chain (their model access
+works differently); they can emit the same `model_unavailable` when a comparable refusal shows up.
+There is no way to reply to a diagnostics-report sender — the fix is the only answer he gets.
+
+**Live-verified 2026-08-31 on the real PE, against a project with `gpt-4o-transcribe` denied.**
+STT: first turn after connect → `[AGENT][WARN] … refused … switching to gpt-4o-mini-transcribe`,
+the CONVO warn, `Heard: "(speech recognition unavailable - answered from the audio)"`, and a
+correct spoken answer — the rescued turn works. TTS (all `gpt-4o-mini-tts*` variants denied,
+`tts-1` allowed): *Say* → `[AGENT][WARN] … refused … switching to tts-1` and the announcement
+plays on the fallback. Testing notes worth keeping:
+
+- **OpenAI's Model-usage block matches exact model ids.** Denying the `gpt-4o-mini-tts` alias
+  did NOT refuse our pinned `gpt-4o-mini-tts-2025-12-15` — `/v1/audio/speech` answered 200 until
+  the dated snapshot itself was added to the deny list. Any future live test must block the
+  snapshot ids the code actually sends, not the alias.
+- **The live test caught Sentry noise, fixed the same evening:** the refusal fired two
+  `captureException`s per turn (raven hit 429 during testing) — the pre-existing
+  `logger.error("Input transcription failed")`, which now only fires for *unhandled* STT failures,
+  and the device's `convo.error(...)` fallback line, now `convo.warn(...)`. A handled, recoverable
+  condition never reports to Sentry (same principle as §15).
+

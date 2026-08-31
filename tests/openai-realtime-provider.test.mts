@@ -284,4 +284,196 @@ describe('OpenAIRealtimeProvider (fake WebSocket harness)', () => {
         await vi.advanceTimersByTimeAsync(6000);
         expect(createdSockets.length).toBe(3);
     });
+
+    /**
+     * Portal report 87154194 (2026-08-22): the user's OpenAI PROJECT was not
+     * allowed to use gpt-4o-transcribe. Replies are anchored on that sidecar
+     * transcript, so every turn died silently on the thinking ring. The agent now
+     * walks a fallback chain and rescues the failed turn from the audio item.
+     */
+    describe('model_not_found on the sidecar STT — fallback chain + turn rescue', () => {
+        const refused = (model: string, item_id = 'item_1') => ({
+            type: 'conversation.item.input_audio_transcription.failed',
+            item_id,
+            content_index: 0,
+            error: {
+                type: 'invalid_request_error',
+                code: 'model_not_found',
+                message: `Project \`proj_x\` does not have access to model \`${model}\``,
+                param: null,
+            },
+        });
+
+        it('starts on gpt-4o-transcribe', async () => {
+            makeProvider();
+            const ws = await connect();
+            const update = ws.parsedSent().find(m => m.type === 'session.update');
+            expect(update.session.audio.input.transcription.model).toBe('gpt-4o-transcribe');
+            expect(provider.sttModel).toBe('gpt-4o-transcribe');
+        });
+
+        it('falls back to the next model, tells the host, and answers the failed turn from the audio', async () => {
+            makeProvider();
+            const ws = await connect();
+            const unavailable = vi.fn();
+            const transcriptDone = vi.fn();
+            const responseError = vi.fn();
+            provider.on('model_unavailable', unavailable);
+            provider.on('transcript.done', transcriptDone);
+            provider.on('response.error', responseError);
+            const sentBefore = ws.sent.length;
+
+            ws.__message(refused('gpt-4o-transcribe'));
+            await tick();
+
+            // 1. later turns use the next model — a partial session.update.
+            const updates = ws.parsedSent().slice(sentBefore).filter(m => m.type === 'session.update');
+            expect(updates).toHaveLength(1);
+            expect(updates[0].session.audio.input.transcription.model).toBe('gpt-4o-mini-transcribe');
+            expect(updates[0].session.audio.input.transcription.language).toBe('en');
+            expect(provider.sttModel).toBe('gpt-4o-mini-transcribe');
+            // 2. the host is told what was refused and what replaced it.
+            expect(unavailable).toHaveBeenCalledWith({ stage: 'stt', model: 'gpt-4o-transcribe', fallback: 'gpt-4o-mini-transcribe' });
+            // 3. THIS turn is rescued: placeholder transcript + a bare response.create
+            //    (no text anchor — the model answers the committed audio itself).
+            expect(transcriptDone).toHaveBeenCalledWith(OpenAIRealtimeProvider.TRANSCRIPT_UNAVAILABLE);
+            const after = ws.parsedSent().slice(sentBefore);
+            expect(after.map(m => m.type)).toContain('response.create');
+            expect(after.map(m => m.type)).not.toContain('conversation.item.create');
+            // And it is NOT surfaced as a response.error — that would abort the rescued turn.
+            expect(responseError).not.toHaveBeenCalled();
+        });
+
+        it('walks the whole chain and keeps rescuing turns once it is exhausted', async () => {
+            makeProvider();
+            const ws = await connect();
+            const unavailable = vi.fn();
+            provider.on('model_unavailable', unavailable);
+
+            ws.__message(refused('gpt-4o-transcribe', 'item_1'));
+            await tick();
+            ws.__message(refused('gpt-4o-mini-transcribe', 'item_2'));
+            await tick();
+            expect(provider.sttModel).toBe('whisper-1');
+
+            const sentBefore = ws.sent.length;
+            ws.__message(refused('whisper-1', 'item_3'));
+            await tick();
+
+            // Chain exhausted: no further session.update, fallback reported as null,
+            // but the turn is still answered from the audio.
+            expect(unavailable).toHaveBeenLastCalledWith({ stage: 'stt', model: 'whisper-1', fallback: null });
+            const after = ws.parsedSent().slice(sentBefore);
+            expect(after.map(m => m.type)).not.toContain('session.update');
+            expect(after.map(m => m.type)).toContain('response.create');
+            expect(provider.sttModel).toBe('whisper-1');
+        });
+
+        it('does not answer a refused transcription of an idle-timeout commit (room tone)', async () => {
+            makeProvider();
+            const ws = await connect();
+            const transcriptDone = vi.fn();
+            provider.on('transcript.done', transcriptDone);
+            // Stream long enough that the timeout is genuine, then let it fire.
+            (provider as any).audioStreamingSinceMs = Date.now() - 20_000;
+            ws.__message({ type: 'input_audio_buffer.timeout_triggered', item_id: 'item_tone' });
+            await tick();
+            const sentBefore = ws.sent.length;
+            transcriptDone.mockClear();
+
+            ws.__message(refused('gpt-4o-transcribe', 'item_tone'));
+            await tick();
+
+            // Fallback still happens, but no response is created for room tone.
+            expect(provider.sttModel).toBe('gpt-4o-mini-transcribe');
+            expect(ws.parsedSent().slice(sentBefore).map(m => m.type)).not.toContain('response.create');
+            expect(transcriptDone).not.toHaveBeenCalled();
+        });
+
+        it('any OTHER transcription failure is surfaced as response.error so the host ends the turn', async () => {
+            makeProvider();
+            const ws = await connect();
+            const responseError = vi.fn();
+            const unavailable = vi.fn();
+            provider.on('response.error', responseError);
+            provider.on('model_unavailable', unavailable);
+
+            ws.__message({
+                type: 'conversation.item.input_audio_transcription.failed',
+                item_id: 'item_1',
+                error: { type: 'server_error', code: 'internal_error', message: 'transcription backend unavailable' },
+            });
+            await tick();
+
+            expect(responseError).toHaveBeenCalledTimes(1);
+            expect(unavailable).not.toHaveBeenCalled();
+            expect(provider.sttModel).toBe('gpt-4o-transcribe');
+        });
+    });
+
+    describe('textToSpeech — HTTP errors and the TTS model fallback', () => {
+        const okFlac = () => new Response(new Uint8Array([0x66, 0x4c, 0x61, 0x43]), { status: 200 });
+        const refusedJson = (model: string) => new Response(JSON.stringify({
+            error: { type: 'invalid_request_error', code: 'model_not_found', message: `Project \`proj_x\` does not have access to model \`${model}\``, param: null },
+        }), { status: 404, headers: { 'content-type': 'application/json' } });
+
+        afterEach(() => vi.unstubAllGlobals());
+
+        it('uses gpt-4o-mini-tts with instructions by default', async () => {
+            makeProvider();
+            const fetchMock = vi.fn(async () => okFlac());
+            vi.stubGlobal('fetch', fetchMock);
+
+            const buf = await provider.textToSpeech('hello');
+
+            expect(buf.toString('latin1')).toBe('fLaC');
+            const body = JSON.parse((fetchMock.mock.calls[0] as any)[1].body);
+            expect(body.model).toBe('gpt-4o-mini-tts-2025-12-15');
+            expect(body.instructions).toBeDefined();
+        });
+
+        it('retries once on tts-1 when the project refuses the model, and tells the host', async () => {
+            makeProvider();
+            const unavailable = vi.fn();
+            provider.on('model_unavailable', unavailable);
+            const fetchMock = vi.fn()
+                .mockImplementationOnce(async () => refusedJson('gpt-4o-mini-tts-2025-12-15'))
+                .mockImplementationOnce(async () => okFlac());
+            vi.stubGlobal('fetch', fetchMock);
+
+            const buf = await provider.textToSpeech('hello');
+
+            expect(buf.toString('latin1')).toBe('fLaC');
+            expect(fetchMock).toHaveBeenCalledTimes(2);
+            const second = JSON.parse((fetchMock.mock.calls[1] as any)[1].body);
+            expect(second.model).toBe('tts-1');
+            // tts-1 does not take steering instructions.
+            expect(second.instructions).toBeUndefined();
+            expect(unavailable).toHaveBeenCalledWith({ stage: 'tts', model: 'gpt-4o-mini-tts-2025-12-15', fallback: 'tts-1' });
+            // Sticky: the next call goes straight to tts-1.
+            expect(provider.ttsModel).toBe('tts-1');
+        });
+
+        it('throws with the server message instead of returning an error body as audio', async () => {
+            makeProvider();
+            vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+                error: { type: 'invalid_request_error', code: 'invalid_api_key', message: 'Incorrect API key provided' },
+            }), { status: 401 })));
+
+            await expect(provider.textToSpeech('hello')).rejects.toThrow(/Incorrect API key provided/);
+        });
+
+        it('throws once the TTS chain is exhausted', async () => {
+            makeProvider();
+            const unavailable = vi.fn();
+            provider.on('model_unavailable', unavailable);
+            vi.stubGlobal('fetch', vi.fn()
+                .mockImplementationOnce(async () => refusedJson('gpt-4o-mini-tts-2025-12-15'))
+                .mockImplementationOnce(async () => refusedJson('tts-1')));
+
+            await expect(provider.textToSpeech('hello')).rejects.toThrow(/tts-1/);
+            expect(unavailable).toHaveBeenLastCalledWith({ stage: 'tts', model: 'tts-1', fallback: null });
+        });
+    });
 });
+

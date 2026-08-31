@@ -726,6 +726,14 @@ entirely on the engine you pick — with the local pipeline, nothing does.
 * **No audio/response:** check the device volume and mute state, and confirm the selected
   engine's API key (or local service hosts) are set — use the settings page's **Test** buttons
   for the local pipeline.
+* **The ring lights up, but nothing is ever answered — or "Say" plays no sound (OpenAI):** your
+  OpenAI *project* may not be allowed to use one of the models the app needs. Model access is a
+  per-project setting on OpenAI's side, and a project can have the realtime model while being
+  refused the speech-recognition model (`gpt-4o-transcribe`) or the speech-output model
+  (`gpt-4o-mini-tts`). The app falls back to another model automatically and sends a Homey
+  notification naming the refused one; to get the best quality back, allow the model at
+  platform.openai.com → **Settings → Project → Limits → Model usage** (or set the project to
+  allow all models).
 * **The tile says the device is unavailable:** that needs *two* links to be up — the satellite and
   the AI engine. The tile now names whichever one is down, so read it first: if it blames the
   engine, the cause is almost always that engine's API key being missing or wrong, which leaves the

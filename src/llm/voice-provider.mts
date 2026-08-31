@@ -57,6 +57,14 @@ export type VoiceProviderEvents = {
     "response.output_item.done": () => void;
     "response.done": () => void;
     "response.error": (msg: any) => void;
+    /**
+     * The provider's account/project refused a model it needs (OpenAI
+     * `model_not_found`: model access is a per-project setting). `fallback` is
+     * the model now in use instead, or null when the chain is exhausted. The
+     * host should tell the user once - this is a settings problem on the
+     * provider's dashboard, not something the app can fix.
+     */
+    model_unavailable: (d: { stage: "stt" | "tts" | "llm"; model: string; fallback: string | null }) => void;
 
     "conversation.item.created": () => void;
 

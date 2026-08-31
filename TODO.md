@@ -1,5 +1,23 @@
 # TODO — single source of truth
 
+## OpenAI model-fallback fix — LIVE-VERIFIED 2026-08-31, awaiting commit approval
+
+The fix for portal report `87154194` is done: built, green (`tsc`/lint clean, 994 tests), and
+**both halves live-verified on the real PE 2026-08-31** — STT refusal → fallback + rescued turn,
+TTS refusal → `tts-1` (details and testing gotchas in [`COMPLETED.md`](./COMPLETED.md) §32).
+The 1.5.4 bump + changelog ride in the same working tree.
+
+- [ ] **Commit on Arve's go-ahead** — suggested subject: `fix(openai): fall back when the
+      project refuses a model, and end the turn instead of hanging`.
+- [ ] **Restore the test project** at platform.openai.com afterwards (the deny list still blocks
+      `gpt-4o-transcribe` and every `gpt-4o-mini-tts*` variant).
+- [ ] Optional follow-up: let the Gemini and Mistral providers emit `model_unavailable` on their
+      equivalent refusals (the device side is provider-neutral already).
+- [ ] Optional follow-up: the Custom pipeline's OpenAI-compatible stages could send the same
+      "your project has no access to model X" Homey notification on a 403 — no auto-fallback
+      (the model is explicit user config there), just the explanation instead of only the error
+      voice. Surfaced by the 2026-08-31 live test, which started on that path by accident.
+
 ## Code quality — long-term (not a release gate)
 
 - [ ] **L1 — split oversized classes / reduce `any` at trust boundaries.** The last open item

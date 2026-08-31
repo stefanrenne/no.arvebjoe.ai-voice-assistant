@@ -54,7 +54,7 @@ function makeFakeHomey(
 ): any {
     const homey: any = new MockHomey();
     for (const [k, v] of Object.entries(globals)) homey.setMockSetting(k, v);
-    homey.notifications = { createNotification: async () => { } };
+    // notifications: MockHomey records them in `notificationsSent`.
     homey.flow = {
         getDeviceTriggerCard: (cardId: string) => ({
             trigger: async (_device: any, tokens: Record<string, any>) => {

@@ -208,6 +208,11 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
   // forgiven (see onAnnounceWatchdogFired); the second aborts the turn.
   private announceMisses = 0;
 
+  // Models the user has already been notified about (model_unavailable). App-wide,
+  // not per device: every satellite shares the same engine project, and one
+  // notification per refused model is plenty.
+  private static readonly notifiedUnavailableModels = new Set<string>();
+
   /**
    * onInit is called when the device is initialized.
    */
@@ -1018,6 +1023,48 @@ export default abstract class VoiceAssistantDevice extends Homey.Device {
     this.provider.on('error', (error: Error) => {
       this.logger.error("Realtime agent error:", error);
       this.abortCurrentTurn(`agent error: ${error.message || 'unknown error'}`, true);
+    });
+
+    // Server-side errors from the engine. Most are benign bookkeeping the agent
+    // already copes with (duplicate item ids, an empty commit), so they are only
+    // surfaced in the CONVO log. ONE kind must end the turn: a failed input
+    // transcription. Replies are anchored on that transcript, so without it no
+    // response is ever created and the turn sits on the thinking ring forever -
+    // portal report 87154194 (2026-08-22) went a whole day like that, silently.
+    // (The agent recovers a model_not_found refusal itself and does not emit it.)
+    this.provider.on('response.error', (msg: any) => {
+      const detail = msg?.error?.message || msg?.error?.code || msg?.type || 'unknown error';
+      if (msg?.type === 'conversation.item.input_audio_transcription.failed') {
+        this.convo.error(`Speech recognition failed - ${detail}`, 'STT');
+        this.abortCurrentTurn(`speech recognition failed: ${detail}`, true);
+        return;
+      }
+      this.convo.warn(`Engine reported an error - ${detail}`, 'LLM');
+    });
+
+    // The engine's project/account is not allowed to use a model the app needs.
+    // That is a dashboard setting on the provider's side (OpenAI: Project ->
+    // Limits -> Model usage), so the only useful thing we can do is say so, once
+    // per model, and name what we fell back to.
+    this.provider.on('model_unavailable', ({ stage, model, fallback }) => {
+      const what = stage === 'stt' ? 'speech recognition' : stage === 'tts' ? 'speech output' : 'the language model';
+      const engine = this.engineLabel();
+      const consequence = fallback
+        ? `Using **${fallback}** instead.`
+        : (stage === 'stt'
+          ? 'No other model is available, so commands are answered from the audio alone.'
+          : 'No other model is available.');
+      // warn, not error: this is a handled condition (the fallback keeps the
+      // turn alive), and Logger.error reports to Sentry — one captureException
+      // per refused turn is exactly the noise COMPLETED.md §15 removed.
+      this.convo.warn(`${engine}: the project has no access to model ${model} (${what}). ${fallback ? `Falling back to ${fallback}.` : 'No fallback left.'}`);
+      if (VoiceAssistantDevice.notifiedUnavailableModels.has(model)) {
+        return;
+      }
+      VoiceAssistantDevice.notifiedUnavailableModels.add(model);
+      this.homey.notifications?.createNotification?.({
+        excerpt: `AI Assistant: your ${engine} project has no access to the model **${model}** (${what}). ${consequence} Allow it in the ${engine} dashboard under Project → Limits → Model usage.`,
+      }).catch?.((err: unknown) => this.logger.error('Failed to send the model-unavailable notification', err));
     });
 
     // The agent websocket closed (idle timeout, network drop, or restart). This

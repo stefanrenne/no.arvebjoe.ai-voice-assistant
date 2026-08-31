@@ -35,6 +35,12 @@ export class MockHomey {
 
     // Homey-instance log sinks (the Logger routes here after setHomey()).
     // Silent so app-boot tests don't spam the runner output.
+    /** Homey notifications the app sent (ManagerNotifications.createNotification). */
+    notificationsSent: Array<{ excerpt: string }> = [];
+    notifications = {
+        createNotification: async (n: { excerpt: string }) => { this.notificationsSent.push(n); },
+    };
+
     log(..._args: any[]): void { }
     error(..._args: any[]): void { }
 

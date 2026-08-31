@@ -444,6 +444,97 @@ export class OpenAIRealtimeProvider extends (EventEmitter as new () => TypedEmit
 
 
     /**
+     * Model access is a per-PROJECT setting on OpenAI's side (Project -> Limits ->
+     * Model usage), and a project can be allowed the realtime model while being
+     * refused the sidecar STT or the TTS model. Portal report 87154194
+     * (2026-08-22): every turn ended in `model_not_found` for gpt-4o-transcribe
+     * and, because replies are anchored on that transcript, the model was never
+     * asked anything - the app looked completely dead, with nothing in the log a
+     * user could act on. So each stage has a fallback chain; on
+     * `model_not_found` we move down it, tell the host (`model_unavailable`),
+     * and keep the turn alive. Order = quality: gpt-4o-transcribe is clearly
+     * better than the whisper family on Norwegian, gpt-4o-mini-tts takes
+     * `instructions`, tts-1 does not.
+     */
+    static readonly STT_MODELS: readonly string[] = ["gpt-4o-transcribe", "gpt-4o-mini-transcribe", "whisper-1"];
+    static readonly TTS_MODELS: readonly string[] = ["gpt-4o-mini-tts-2025-12-15", "tts-1"];
+    private sttModelIndex = 0;
+    private ttsModelIndex = 0;
+
+    /** Transcript stand-in for a turn whose sidecar STT was refused; the reply is made from the audio itself. */
+    static readonly TRANSCRIPT_UNAVAILABLE = "(speech recognition unavailable - answered from the audio)";
+
+    /** The sidecar STT model currently configured on the session. */
+    get sttModel(): string {
+        return OpenAIRealtimeProvider.STT_MODELS[this.sttModelIndex];
+    }
+
+    /** The TTS model textToSpeech() will use next. */
+    get ttsModel(): string {
+        return OpenAIRealtimeProvider.TTS_MODELS[this.ttsModelIndex];
+    }
+
+    /** True for OpenAI's "this project may not use model X" refusal. */
+    private static isModelNotFound(err: any): boolean {
+        if (!err) return false;
+        if (err.code === "model_not_found") return true;
+        const message = String(err.message ?? "");
+        return /does not have access to model/i.test(message);
+    }
+
+    /**
+     * The sidecar STT was refused for the committed audio item. Three things,
+     * in this order:
+     *   1. Move to the next STT model for every LATER turn (a partial
+     *      session.update - only the transcription block changes).
+     *   2. Tell the host which model was refused and what we fell back to, so
+     *      it can notify the user once; null fallback = chain exhausted, in which
+     *      case the configured model stays and every turn recovers via step 3.
+     *   3. Rescue THIS turn: the audio item is committed and in the conversation,
+     *      so a bare response.create makes the realtime model answer the audio
+     *      directly (its own hearing, no text anchor). The host still needs a
+     *      transcript.done to advance its turn machine, so it gets a placeholder.
+     */
+    private handleTranscriptionModelRefused(itemId: string | undefined, error: any): void {
+        const refused = this.sttModel;
+        let fallback: string | null = null;
+        if (this.sttModelIndex + 1 < OpenAIRealtimeProvider.STT_MODELS.length) {
+            this.sttModelIndex++;
+            fallback = this.sttModel;
+            this.logger.warn(`Sidecar STT model ${refused} refused by the project (${error?.message ?? "model_not_found"}) - switching to ${fallback}`);
+            this.send({
+                type: "session.update",
+                session: {
+                    type: "realtime",
+                    audio: { input: { transcription: this.transcriptionConfig() } },
+                },
+            });
+        } else {
+            this.logger.warn(`Sidecar STT model ${refused} refused and no fallback left - answering from the audio alone`);
+        }
+        this.emit("model_unavailable", { stage: "stt", model: refused, fallback });
+
+        // Rescue the current turn from the audio item.
+        if (this.timeoutCommittedItems.has(itemId ?? "")) {
+            // An idle-timeout commit carries room tone, never a command (see
+            // input_audio_buffer.timeout_triggered) - do not answer it.
+            return;
+        }
+        this.emit("transcript.done", OpenAIRealtimeProvider.TRANSCRIPT_UNAVAILABLE);
+        this.createResponse();
+    }
+
+    /** The session's input-transcription block; also re-sent alone on a model fallback. */
+    private transcriptionConfig(): Record<string, any> {
+        const sttPrompt = this.sttVocabularyPrompt();
+        return {
+            model: this.sttModel,
+            language: this.options.languageCode,
+            ...(sttPrompt ? { prompt: sttPrompt } : {}),
+        };
+    }
+
+    /**
      * Direct text-to-speech endpoint call.
      * @param text - The text to convert to speech
      */
@@ -451,23 +542,50 @@ export class OpenAIRealtimeProvider extends (EventEmitter as new () => TypedEmit
 
         this.logger.info(`Converting text to speech: ${text}`);
 
-        const r = await fetch("https://api.openai.com/v1/audio/speech", {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${this.options.apiKey}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                model: "gpt-4o-mini-tts-2025-12-15",
-                voice: this.options.voice,
-                input: text,
-                response_format: "flac", // mp3 | wav | opus | aac | flac | pcm
-                instructions: "Speak in a natural, helpful tone suitable for a smart home assistant."
-            }),
-        });
-        const buf = Buffer.from(await r.arrayBuffer());
+        // One retry, on the next model in the chain, when the project refuses
+        // the current one. Any other failure throws with the server's message
+        // instead of handing the caller an error JSON body as if it were FLAC -
+        // which is how the "Say" card used to light the ring and play nothing.
+        for (;;) {
+            const model = this.ttsModel;
+            const r = await fetch("https://api.openai.com/v1/audio/speech", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${this.options.apiKey}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    model,
+                    voice: this.options.voice,
+                    input: text,
+                    response_format: "flac", // mp3 | wav | opus | aac | flac | pcm
+                    // Only the gpt-4o-*-tts family takes steering instructions.
+                    ...(model.startsWith("gpt-") ? { instructions: "Speak in a natural, helpful tone suitable for a smart home assistant." } : {}),
+                }),
+            });
+            if (r.ok) {
+                return Buffer.from(await r.arrayBuffer());
+            }
 
-        return buf;
+            let error: any = null;
+            try {
+                error = ((await r.json()) as any)?.error ?? null;
+            } catch {
+                // non-JSON body
+            }
+            const detail = error?.message ? String(error.message) : `HTTP ${r.status}`;
+
+            if (OpenAIRealtimeProvider.isModelNotFound(error) && this.ttsModelIndex + 1 < OpenAIRealtimeProvider.TTS_MODELS.length) {
+                this.ttsModelIndex++;
+                this.logger.warn(`TTS model ${model} refused by the project (${detail}) - switching to ${this.ttsModel}`);
+                this.emit("model_unavailable", { stage: "tts", model, fallback: this.ttsModel });
+                continue;
+            }
+            if (OpenAIRealtimeProvider.isModelNotFound(error)) {
+                this.emit("model_unavailable", { stage: "tts", model, fallback: null });
+            }
+            throw new Error(`Text-to-speech failed (${model}): ${detail}`);
+        }
     }
 
 
@@ -797,7 +915,19 @@ export class OpenAIRealtimeProvider extends (EventEmitter as new () => TypedEmit
                 break;
 
             case "conversation.item.input_audio_transcription.failed":
+                if (OpenAIRealtimeProvider.isModelNotFound(msg.error)) {
+                    // Handled here (fallback + rescue); NOT a response.error, or
+                    // the host would abort the very turn we are rescuing. And not
+                    // an error-level log: that reports to Sentry, and a per-turn
+                    // captureException for a condition we recover from is pure
+                    // noise (handleTranscriptionModelRefused warns with the detail).
+                    this.handleTranscriptionModelRefused(msg.item_id, msg.error);
+                    break;
+                }
                 this.logger.error("Input transcription failed", msg.error);
+                // Any other STT failure: the transcript this turn is anchored on
+                // will never come, so the host must end the turn instead of
+                // hanging on the thinking ring.
                 this.emit("response.error", msg);
                 break;
 
@@ -1096,7 +1226,6 @@ export class OpenAIRealtimeProvider extends (EventEmitter as new () => TypedEmit
     private sendSessionUpdate() {
         // tools schema
         const tools = this.sessionToolsArray();
-        const sttPrompt = this.sttVocabularyPrompt();
 
         const vadThreshold = this.numberSetting('openai_vad_threshold', 0.6, 0.1, 0.9);
         const vadSilenceMs = Math.round(this.numberSetting('openai_vad_silence_ms', 600, 200, 2000));
@@ -1120,11 +1249,7 @@ export class OpenAIRealtimeProvider extends (EventEmitter as new () => TypedEmit
                         // NOTE: `delay` is only supported with gpt-realtime-whisper — do not
                         // add it back here. The `prompt` carries domain vocabulary
                         // (device/zone names) so commands transcribe correctly.
-                        transcription: {
-                            model: "gpt-4o-transcribe",
-                            language: this.options.languageCode,
-                            ...(sttPrompt ? { prompt: sttPrompt } : {}),
-                        },
+                        transcription: this.transcriptionConfig(),
                         noise_reduction: {
                             type: "far_field"  // "near_field" for close-mic, "far_field" for room/speakerphone setups
                         },

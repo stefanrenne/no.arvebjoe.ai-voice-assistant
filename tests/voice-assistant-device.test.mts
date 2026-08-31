@@ -1196,4 +1196,78 @@ describe('VoiceAssistantDevice (harness)', () => {
             }
         });
     });
+
+    describe('engine errors — a failed transcription ends the turn, a refused model notifies', () => {
+        // Portal report 87154194 (2026-08-22): replies are anchored on the sidecar
+        // transcript, so when the engine could not transcribe, no response was
+        // ever created and the turn hung on the thinking ring. The agent emits
+        // response.error for that; the device must end the turn, not ignore it.
+        it('aborts the turn with the error sound when the input transcription fails', async () => {
+            const h = await createHarness();
+            // The error chime only plays while the satellite link is up. Set the flag
+            // directly: the 'Healthy' event also schedules a satellite reset whose
+            // run_end would land inside this test's window.
+            (h.device as any).isEspClientHealthy = true;
+            h.esp.emit('starting');
+            h.provider.emit('silence', 'server');
+            expect((h.device as any).turn.state).not.toBe('idle');
+            const before = {
+                plays: h.esp.countOf('playAudioFromUrl'),
+                runEnd: h.esp.countOf('run_end'),
+                pipelineError: h.esp.countOf('pipeline_error'),
+            };
+
+            h.provider.emit('response.error', {
+                type: 'conversation.item.input_audio_transcription.failed',
+                item_id: 'item_1',
+                error: { type: 'server_error', code: 'internal_error', message: 'transcription backend unavailable' },
+            });
+            await h.settle(10);
+
+            expect((h.device as any).turn.state).toBe('idle');
+            // +2: the abort's own run_end, plus playUrl()'s run_start/run_end around the chime.
+            expect(h.esp.countOf('run_end')).toBe(before.runEnd + 2);
+            expect(h.esp.countOf('pipeline_error')).toBe(before.pipelineError + 1);
+            // The user hears that it failed instead of waiting on the ring.
+            expect(h.esp.countOf('playAudioFromUrl')).toBe(before.plays + 1);
+            // And the next wake goes through.
+            h.esp.emit('starting');
+            expect((h.device as any).turn.isListening).toBe(true);
+        });
+
+        it('only logs other engine errors — they must not abort a turn', async () => {
+            const h = await createHarness();
+            h.esp.emit('starting');
+            h.provider.emit('silence', 'server');
+
+            h.provider.emit('response.error', {
+                type: 'error',
+                error: { type: 'invalid_request_error', code: 'item_create_duplicate_item_id', message: 'duplicate' },
+            });
+            await h.settle(10);
+
+            expect((h.device as any).turn.state).not.toBe('idle');
+            expect(h.esp.countOf('run_end')).toBe(0);
+            expect(h.esp.countOf('pipeline_error')).toBe(0);
+        });
+
+        it('sends one Homey notification per refused model, naming the fallback', async () => {
+            const h = await createHarness();
+            h.provider.emit('model_unavailable', { stage: 'stt', model: 'gpt-4o-transcribe', fallback: 'gpt-4o-mini-transcribe' });
+            h.provider.emit('model_unavailable', { stage: 'stt', model: 'gpt-4o-transcribe', fallback: 'gpt-4o-mini-transcribe' });
+            await h.settle(10);
+
+            const sent = (h.homey as any).notificationsSent as Array<{ excerpt: string }>;
+            expect(sent).toHaveLength(1);
+            expect(sent[0].excerpt).toContain('gpt-4o-transcribe');
+            expect(sent[0].excerpt).toContain('gpt-4o-mini-transcribe');
+            expect(sent[0].excerpt).toContain('Model usage');
+            // A different model gets its own notification.
+            h.provider.emit('model_unavailable', { stage: 'tts', model: 'gpt-4o-mini-tts-2025-12-15', fallback: null });
+            await h.settle(10);
+            expect(sent).toHaveLength(2);
+            expect(sent[1].excerpt).toContain('No other model is available');
+        });
+    });
 });
+
