@@ -1,22 +1,22 @@
 # TODO — single source of truth
 
-## OpenAI model-fallback fix — LIVE-VERIFIED 2026-08-31, awaiting commit approval
+## Release 1.5.4 — committed, not yet published
 
-The fix for portal report `87154194` is done: built, green (`tsc`/lint clean, 994 tests), and
-**both halves live-verified on the real PE 2026-08-31** — STT refusal → fallback + rescued turn,
-TTS refusal → `tts-1` (details and testing gotchas in [`COMPLETED.md`](./COMPLETED.md) §32).
-The 1.5.4 bump + changelog ride in the same working tree.
+The OpenAI model-fallback fix (portal report `87154194`) is done, live-verified on the real PE
+2026-08-31 and committed (`d10e968` + bump `eda732a`); full write-up and testing gotchas in
+[`COMPLETED.md`](./COMPLETED.md) §32.
 
-- [ ] **Commit on Arve's go-ahead** — suggested subject: `fix(openai): fall back when the
-      project refuses a model, and end the turn instead of hanging`.
-- [ ] **Restore the test project** at platform.openai.com afterwards (the deny list still blocks
-      `gpt-4o-transcribe` and every `gpt-4o-mini-tts*` variant).
-- [ ] Optional follow-up: let the Gemini and Mistral providers emit `model_unavailable` on their
-      equivalent refusals (the device side is provider-neutral already).
-- [ ] Optional follow-up: the Custom pipeline's OpenAI-compatible stages could send the same
-      "your project has no access to model X" Homey notification on a 403 — no auto-fallback
-      (the model is explicit user config there), just the explanation instead of only the error
-      voice. Surfaced by the 2026-08-31 live test, which started on that path by accident.
+- [ ] **Publish + certify 1.5.4** (`homey app publish` — the tree already validates at publish
+      level; the `homey:manager:api` permission warning is expected).
+
+## Model refusals — optional follow-ups (from the 1.5.4 work, not started)
+
+- [ ] Let the Gemini and Mistral providers emit `model_unavailable` on their equivalent
+      refusals (the device side is provider-neutral already).
+- [ ] The Custom pipeline's OpenAI-compatible stages could send the same "your project has no
+      access to model X" Homey notification on a 403 — no auto-fallback (the model is explicit
+      user config there), just the explanation instead of only the error voice. Surfaced by the
+      2026-08-31 live test, which started on that path by accident.
 
 ## Code quality — long-term (not a release gate)
 
@@ -45,29 +45,6 @@ The 1.5.4 bump + changelog ride in the same working tree.
       rewritten alongside. Users now have a manual escape hatch (switching the tile's *Start
       conversation* off cancels the turn), so this is a robustness item, not an emergency.
 
-## Homey developer portal reports (seen 2026-08-15)
-
-**Second portal report (log ID `6abc4a3e-7738-4bf3-91a3-84c72ca24c27`, 2026-08-12) — not a crash.**
-A user-submitted diagnostic log; user message: *"Pas de connexion"*. The only captured exception is
-an Improv BLE connect failure (the dropped-link blind spot, since fixed — [`COMPLETED.md`](./COMPLETED.md) §20). Voice PE at 192.168.1.81, Wi-Fi *SFRAD*.
-
-**The log cannot answer the user's own complaint, and that is the finding.** He paired the same
-device (`20f83b0a7655`) **six times** in 20 minutes — manual entry at 12:59, 13:04, 13:18, mDNS list
-at 13:05, 13:07, 13:12 — and *every one succeeded*: `Manual entry … matched: Home Assistant Voice
-0a7655`, then `Paired device connected — playing welcome sound`, which fires on the ESP
-**`capabilities`** event (`voice-assistant-device.mts:781`), i.e. after the full ESPHome handshake,
-and which then plays a sound. So the satellite link **and** playback demonstrably worked every time,
-and "no connection" is something else — most likely the engine side, exactly as the *Diagnosability*
-section above predicts. It cannot be confirmed from this log, because `Voice_Assistant_Device`
-(`:100`), `ESP` (`:145`), `PE` (`:149`) and `AGENT` (`openai-realtime-agent.mts:114`) are all
-constructed with `disabled: true` — the four loggers that would say whether the agent ever connected
-are the four that never print. Only `CONVO`, `APP`, `PAIR`, `IMPROV_*`, `DEVICEMANAGER` and
-`APIHELPER` reach a submitted log. Six re-pairings is the user-side cost of that blind spot.
-
-The one ESP-link error in the whole capture is a single `TCP connection error Error: read ETIMEDOUT`
-at 12:41:46, 18 minutes before the stdout window even starts — not enough to build anything on, but
-worth remembering if he sends a second log.
-
 ## Forum: pairing probe rebooted the satellite — one open question
 
 Fixed (full write-up: [`COMPLETED.md`](./COMPLETED.md) §22). The pairing probe asked for the
@@ -85,116 +62,24 @@ affected) and 26.6.0 (2026.6.2, already safe upstream) all pair, and a command w
         telling anyone this is solved.
       **Most likely explanation, no test needed:** his *original* report was "stuck Unavailable
       **despite successful pairing**" — a different symptom from the pairing timeout, and quite
-      possibly the availability/API-key confusion in the section below. The follow-up may simply
-      have merged his two symptoms into one firmware list.
+      possibly the availability/API-key confusion archived in
+      [`COMPLETED.md`](./COMPLETED.md) §33. The follow-up may simply have merged his two symptoms
+      into one firmware list.
 
-## Diagnosability — "Unavailable / Connected: no" says nothing about *what* failed
+## Diagnosability — one item left after the Dump-log work
 
-**Field report 2026-08-15 (forum), Voice PE firmware 26.6.0, app v1.4.11, Homey Pro Early 2023,
-no encryption, BLE+Improv pairing.** Tile stuck *Unavailable*, Debug tab *"Connected: no"*, while
-the same tab shows the device as a usable voice satellite, paired, probe accessible. Port 6053
-verified open from another host; the same device works against a local HA Core over the native
-ESPHome integration. Root cause **not established** — but the reply he was given was that **1.4.12
-does not fix it**, and triage should start from the two items below rather than from the network.
-
-Ruled out from the 1.4.11 → 1.4.12 diff (checked the whole `src/` diff, `5d34acd..HEAD`):
-
-- The `object_id` / API-1.14 fix (`29338cf`) only affects **volume, mute and the media-player
-  key**, never whether the client connects — `Healthy` is emitted right after `HelloResponse`,
-  before the entity list (`esp-voice-assistant-client.mts:975`). And it was **not even active for
-  him**: 26.6.0 still sends `object_id` to a client advertising 1.6, which is what 1.4.11 did.
-  The only other change in that commit is the Hello bump itself.
-- The `Beam lock released` loop (audio URL) and the `client has not subscribed to actions` spam
-  (`SubscribeHomeassistantServicesRequest`) are both **already in 1.4.11** — see
-  [`COMPLETED.md`](./COMPLETED.md) §17. Everything else in 1.4.12 is MP3 for the Flow URL card,
-  the sound-effect tag, the reachable-IP fix and the LED palette.
-
-**Leading hypothesis: the engine, not the device.** The Debug tab's `Connected` field is the
-paired device's *availability*, which is `isAgentHealthy && isEspClientHealthy`
-(`voice-assistant-device.mts:1786`, mirrored into the seen-devices list at `:1800`). A missing or
-invalid API key therefore produces this exact picture — probe accessible, star lit, tile
-Unavailable, "Connected: no" — while the ESP link is perfectly healthy: `missing_api_key` returns
-before the websocket is opened (`openai-realtime-agent.mts:270`, same in the Gemini and local
-providers), so `open` never fires and `isAgentHealthy` stays false forever. It also explains why
-the device is fine under Home Assistant, which needs no key of ours. **To confirm, ask for:**
-whether he got the Homey notification *"Please set api key in app settings"*
-(`voice-assistant-device.mts:846`); which engine is selected and whether that engine's key is
-filled in; and the startup log — expect `Connecting to <ip>:6053` + `ESP Voice Client healthy`
-to appear while `Agent connection opened` / `Agent connection healthy` do not.
-
-**Correction to that last ask (2026-08-15): those lines never reach a user's log.** All four of
-them come from loggers constructed `disabled: true` — `Voice_Assistant_Device`
-(`voice-assistant-device.mts:100`), `ESP` (`:145`), `PE` (`:149`), `AGENT`
-(`openai-realtime-agent.mts:114`). They mirror into remote syslog at DEBUG, which a reporter
-without a collector does not have. Asking for the startup log gets a log that is silent on exactly
-the question. The second portal report (see *Crash reports* above) is this failure mode in
-practice: a user wrote *"Pas de connexion"* and paired the same device six times, and the log he
-submitted proves the ESP handshake and playback worked while saying nothing about the agent.
-
-**The two fixes this motivated are done (2026-08-18 — `setUnavailable()` names the failing link,
-and the Debug list shows *Device connected* / *Engine connected* separately;
-[`COMPLETED.md`](./COMPLETED.md) §23-24), as is the logging gap in the correction above
-([`COMPLETED.md`](./COMPLETED.md) §21).** What remains open is only the original report itself: its
-root cause was never established, and the reporter was never asked the questions above. If he
-resurfaces, the tile and the Debug tab now answer them for him.
-
-## Getting a full log out of a user — "Dump log" to a userdata file (design settled 2026-08-21)
-
-**The problem is the channel, not the logging.** Homey's app-level diagnostics report — Settings
-(cog) → **Apps** → *AI Voice Assistant* → **Create Diagnostics Report**, which is the only one that
-reaches us; the *More → Settings → General* one goes to Athom support and users routinely send that
-one instead — submits only *"a limited amount of recent logs"* and has to be created **immediately
-after reproducing the issue**
-([Homey support](https://support.homey.app/hc/en-us/articles/360013177034-Create-a-diagnostics-report),
-[SharpTools](https://help.sharptools.io/article/120-how-to-submit-homey-diagnostics)). The window is
-short by design, and `verbose_logging` (§21) makes it *worse*: ESP/PE/AGENT chatter on a live audio
-pipeline pushes the connect and handshake lines out of the buffer before the user presses the button.
-"Turn on verbose, use it a while, then send a log" cannot work.
-
-The app cannot help from inside that flow: there is **no diagnostics hook in the SDK** — `App` in
-`@types/homey/lib/App.d.ts` exposes only `homey`, `manifest`, `id`, `sdk`, `onInit`, `onUninit`, and
-nothing anywhere adds context to the payload or triggers a report. What SharpTools does — and what
-first looked like a *customizable* Homey dialog — is a **parallel channel of their own**: a button in
-their own settings page that uploads a snapshot to their servers and shows the user a key to quote.
-
-      Notes for when this is built:
-      - **The buffer belongs in `Logger.write()` (`logger.mts:177`)** — the single choke point every
-        line already passes through, verbose ones included, so this stays contained.
-      - **Redact at write time, not at dump time.** Verbose output carries STT transcripts — what
-        people said in their own homes — plus hosts and keys. A dump is worth far less than a privacy
-        incident, and the page should show what is about to be handed over.
-      - The userdata path is **unauthenticated**: unguessable filename, and a short TTL through the
-        existing scheduled deletion. It stays on the LAN unless the user chooses to send it.
-      - Pair it with a clipboard/textarea copy in the same card for desktop users (`my.homey.app` is
-        HTTPS so `navigator.clipboard` works there; the mobile webview needs the hidden-textarea
-        fallback).
-      - The new API route goes in `.homeycompose/app.json` under `api`, never `app.json`.
+The 2026-08-15 "Unavailable / Connected: no" triage and the "Pas de connexion" portal-log analysis
+are archived in [`COMPLETED.md`](./COMPLETED.md) §33 (their fixes: §21, §23, §24); the Dump-log
+design and its rejected alternatives in §34 (shipped: §27). Neither reporter's root cause was ever
+established — if either resurfaces, the tile and the Debug tab now answer the questions themselves.
 
 - [ ] **Dump a compact snapshot into the app log automatically, so unprompted reports are not a dead
-      loss.** Whatever we build, some users will just press *Create Diagnostics Report* without
-      reading anything. A short dense block — ESP connect/handshake outcome, provider selected and
-      whether it ever opened, last error per subsystem, sanitized config — written on every session
-      end and every connect failure keeps the tail of the app log useful inside Homey's narrow
-      window. This is the fix for the second portal report (above), which arrived with a user message
-      and a log that could not answer it.
-
-**Rejected, with reasons** (2026-08-21 brainstorm — do not re-litigate without new information):
-
-- **`mailto:` with the log in the body** — practical URL caps are ~2 KB, so it carries a snapshot at
-  best, and settings pages run in a webview where `mailto:` frequently does nothing.
-- **Prefilled GitHub issue** (`?body=`) — the same URL-length wall in the single-digit KB range, plus
-  it needs an account most Homey users do not have. Fine as a secondary "file a proper issue" button.
-- **Sentry as the transport** — `homey-log` 2.1.2 wraps **raven**, the legacy SDK, which has **no
-  attachment support**, so the log would have to ride inside the event body where Sentry truncates
-  it; and `captureMessage(message)` takes no per-call options
-  (`node_modules/homey-log/lib/Log.js:126`), so there is no fingerprint control — every submission
-  becomes its own issue — while its in-process de-dupe silently drops a repeat submission. Only ever
-  viable for a compact snapshot, and only once a DSN exists.
-- **Faking a crash to smuggle the log into an exception** — right instinct (reuse the pipe), wrong
-  mechanism: `captureMessage` at info level is the honest version, and it is already in `logger.mts`.
-  Faking exceptions corrupts crash metrics and alerting, and message-based grouping spawns a new
-  issue per report. Faking it into *Athom's* crash feed is worse still — that means deliberately
-  crashing the app on a user's Homey, killing their voice pipeline, to file a bug report.
+      loss.** Some users just press *Create Diagnostics Report* without reading anything. A short
+      dense block — ESP connect/handshake outcome, provider selected and whether it ever opened,
+      last error per subsystem, sanitized config — written on every session end and every connect
+      failure keeps the tail of the app log useful inside Homey's narrow submission window. This is
+      the fix for the "Pas de connexion" portal report ([`COMPLETED.md`](./COMPLETED.md) §33), which
+      arrived with a user message and a log that could not answer it.
 
 ## ReSpeaker XVF3800 driver — needs hardware verification
 
@@ -206,8 +91,8 @@ each choice: [`docs/respeaker-xvf3800/README.md`](./docs/respeaker-xvf3800/READM
 "seems to be working". Encouraging but NOT yet a tick for anything below: he confirmed nothing
 item by item, so treat these as still open until he answers specifics. His board has **no
 speaker**, which is why he cannot verify anything on the playback side at all — he wants the
-reply handed to a Sonos speaker as a URL instead (see *Reply audio as a URL for speakerless
-devices* under "High value, more work"). Ask him explicitly about mic levels at `mic_gain` 0,
+reply handed to a Sonos speaker as a URL instead (shipped 2026-08-10:
+[`COMPLETED.md`](./COMPLETED.md) §31). Ask him explicitly about mic levels at `mic_gain` 0,
 the listed device name, the mute switch, and whether his unit carries an API encryption key.
 
 **Second report 2026-08-10 (forum post #60), with full app + ESPHome logs.** Three of the four

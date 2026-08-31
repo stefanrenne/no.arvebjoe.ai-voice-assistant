@@ -1627,7 +1627,7 @@ after his network — an SSH session, a port check from another host, and a whol
 install to prove the device worked — for what is most likely a missing or wrong API key.
 `missing_api_key` returns before the websocket is even opened, so `open` never fires,
 `isAgentHealthy` stays false forever, and the ESP link is perfectly healthy the entire time.
-Background: `TODO.md` § *Diagnosability*.
+Background: §33.
 
 **Shape.** `unavailableReason()` returns the message matching whichever flag is false — engine down
 (named, plus "check that engine's API key"), device down (plus "same network as Homey"), or both.
@@ -1879,8 +1879,7 @@ sank the untyped listing does not apply: the union is still built from typed que
 **Problem.** Homey's *Create Diagnostics Report* submits only a short tail of recent lines and must
 be created right after the failure; `verbose_logging` made that channel worse (ESP/PE/AGENT chatter
 pushed the connect/handshake lines out first), and the SDK has no diagnostics hook. Full design and
-the rejected alternatives (mailto, prefilled GitHub issue, Sentry transport, fake crash) are in
-TODO.md → "Getting a full log out of a user".
+the rejected alternatives (mailto, prefilled GitHub issue, Sentry transport, fake crash) are in §34.
 
 **What shipped.**
 - `src/helpers/log-buffer.mts` — a 2000-line ring buffer every `Logger` writes into from `info()` /
@@ -1924,7 +1923,8 @@ TODO.md → "Getting a full log out of a user".
 
 **Gotchas.** The userdata URL is unauthenticated but LAN-only; the datetime filename is guessable
 by design (Arve's call — it is the user's own network), the TTL is the actual bound. The homey-log /
-`HOMEY_LOG_URL` question and the automatic compact snapshot remain open in TODO.md.
+`HOMEY_LOG_URL` question was settled in §30 (env.json now set on the publishing machine);
+the automatic compact snapshot remains open in TODO.md.
 Live-verified on Arve's Homey 2026-08-27 (183 lines, 178 of them from quieted loggers with verbose
 off; leak sweep clean). Tests: `tests/log-dump.test.mts` (19 cases).
 
@@ -2261,4 +2261,114 @@ plays on the fallback. Testing notes worth keeping:
   `logger.error("Input transcription failed")`, which now only fires for *unhandled* STT failures,
   and the device's `convo.error(...)` fallback line, now `convo.warn(...)`. A handled, recoverable
   condition never reports to Sentry (same principle as §15).
+
+Committed 2026-09-01 as `d10e968`; released as **1.5.4** (bump `eda732a`).
+
+## 33. Diagnosability triage — the 2026-08-15 "Unavailable / Connected: no" report and the "Pas de connexion" portal log (archived from TODO.md 2026-09-01)
+
+The analysis below drove three shipped fixes — verbose logging for the quieted subsystems (§21),
+`setUnavailable()` naming the failing link (§23) and the Debug list splitting *Device connected* /
+*Engine connected* (§24) — and stays archived here as their background. **Neither report's root
+cause was ever established, and neither reporter answered follow-ups**; if either resurfaces, the
+tile and the Debug tab now answer the questions we could not ask. Nothing further is actionable.
+
+**Field report 2026-08-15 (forum), Voice PE firmware 26.6.0, app v1.4.11, Homey Pro Early 2023,
+no encryption, BLE+Improv pairing.** Tile stuck *Unavailable*, Debug tab *"Connected: no"*, while
+the same tab shows the device as a usable voice satellite, paired, probe accessible. Port 6053
+verified open from another host; the same device works against a local HA Core over the native
+ESPHome integration. The reply he was given was that 1.4.12 does not fix it.
+
+Ruled out from the 1.4.11 → 1.4.12 diff (checked the whole `src/` diff, `5d34acd..HEAD`):
+
+- The `object_id` / API-1.14 fix (`29338cf`) only affects **volume, mute and the media-player
+  key**, never whether the client connects — `Healthy` is emitted right after `HelloResponse`,
+  before the entity list (`esp-voice-assistant-client.mts:975`). And it was **not even active for
+  him**: 26.6.0 still sends `object_id` to a client advertising 1.6, which is what 1.4.11 did.
+  The only other change in that commit is the Hello bump itself.
+- The `Beam lock released` loop (audio URL) and the `client has not subscribed to actions` spam
+  (`SubscribeHomeassistantServicesRequest`) are both **already in 1.4.11** — see §17. Everything
+  else in 1.4.12 is MP3 for the Flow URL card, the sound-effect tag, the reachable-IP fix and the
+  LED palette.
+
+**Leading hypothesis: the engine, not the device.** The Debug tab's `Connected` field was the
+paired device's *availability*, `isAgentHealthy && isEspClientHealthy` — two independent links
+behind one word. A missing or invalid API key produces this exact picture — probe accessible, star
+lit, tile Unavailable, "Connected: no" — while the ESP link is perfectly healthy: `missing_api_key`
+returns before the websocket is opened (same in the Gemini and local providers), so `open` never
+fires and `isAgentHealthy` stays false forever. It also explains why the device is fine under Home
+Assistant, which needs no key of ours. The questions that would have confirmed it (did he get the
+*"Please set api key in app settings"* notification; which engine is selected and is its key
+filled in) were never answered — and the startup log could not have answered them anyway: the four
+loggers that would say whether the agent ever connected (`Voice_Assistant_Device`, `ESP`, `PE`,
+`AGENT`) were all constructed `disabled: true`, mirroring only into remote syslog at DEBUG, which
+a reporter without a collector does not have. That logging gap is what §21 closed.
+
+**The blind spot in practice — second portal report (log ID
+`6abc4a3e-7738-4bf3-91a3-84c72ca24c27`, 2026-08-12), not a crash.** A user-submitted diagnostic
+log; user message: *"Pas de connexion"*. The only captured exception is an Improv BLE connect
+failure (the dropped-link blind spot, since fixed — §20). Voice PE at 192.168.1.81, Wi-Fi *SFRAD*.
+**The log cannot answer the user's own complaint, and that is the finding.** He paired the same
+device (`20f83b0a7655`) **six times** in 20 minutes — manual entry at 12:59, 13:04, 13:18, mDNS
+list at 13:05, 13:07, 13:12 — and *every one succeeded*: `Manual entry … matched: Home Assistant
+Voice 0a7655`, then `Paired device connected — playing welcome sound`, which fires on the ESP
+`capabilities` event, i.e. after the full ESPHome handshake, and then plays a sound. So the
+satellite link **and** playback demonstrably worked every time, and "no connection" is something
+else — most likely the engine side, exactly as the hypothesis above predicts. Only `CONVO`, `APP`,
+`PAIR`, `IMPROV_*`, `DEVICEMANAGER` and `APIHELPER` reached a submitted log then; six re-pairings
+is the user-side cost of that blind spot. The one ESP-link error in the whole capture is a single
+`TCP connection error Error: read ETIMEDOUT` at 12:41:46, 18 minutes before the stdout window even
+starts — not enough to build anything on, but worth remembering if he sends a second log. This
+report is the motivating case for the *automatic compact snapshot* item still open in TODO.md.
+
+## 34. "Dump log" design decisions and rejected alternatives (settled 2026-08-21; archived from TODO.md 2026-09-01)
+
+The design background for §27, which shipped 2026-08-27. Everything in the "notes for when this is
+built" list below was implemented as designed; the rejected list stands — do not re-litigate
+without new information.
+
+**The problem was the channel, not the logging.** Homey's app-level diagnostics report — Settings
+(cog) → **Apps** → *AI Voice Assistant* → **Create Diagnostics Report**, the only one that reaches
+us; the *More → Settings → General* one goes to Athom support and users routinely send that one
+instead — submits only *"a limited amount of recent logs"* and has to be created **immediately
+after reproducing the issue**
+([Homey support](https://support.homey.app/hc/en-us/articles/360013177034-Create-a-diagnostics-report),
+[SharpTools](https://help.sharptools.io/article/120-how-to-submit-homey-diagnostics)). The window
+is short by design, and `verbose_logging` (§21) makes it *worse*: ESP/PE/AGENT chatter on a live
+audio pipeline pushes the connect and handshake lines out of the buffer before the user presses the
+button. "Turn on verbose, use it a while, then send a log" cannot work. And the app cannot help
+from inside that flow: there is **no diagnostics hook in the SDK** — `App` in
+`@types/homey/lib/App.d.ts` exposes only `homey`, `manifest`, `id`, `sdk`, `onInit`, `onUninit`,
+and nothing anywhere adds context to the payload or triggers a report. What SharpTools does — and
+what first looked like a *customizable* Homey dialog — is a **parallel channel of their own**: a
+button in their own settings page that uploads a snapshot to their servers and shows the user a
+key to quote.
+
+Design notes, all implemented in §27: the buffer lives at the `Logger` choke point every line
+already passes through, verbose ones included; **redaction happens at write time, not dump time**
+(verbose output carries STT transcripts — what people said in their own homes — plus hosts and
+keys; a dump is worth far less than a privacy incident, and the page shows what is handed over);
+the userdata path is unauthenticated, so a short TTL bounds it and it stays on the LAN unless the
+user sends it; a clipboard/textarea copy sits in the same card (`navigator.clipboard` on HTTPS
+`my.homey.app`, hidden-textarea fallback for the mobile webview); the API route went into
+`.homeycompose/app.json` under `api`.
+
+**Rejected, with reasons** (2026-08-21 brainstorm — do not re-litigate without new information):
+
+- **`mailto:` with the log in the body** — practical URL caps are ~2 KB, so it carries a snapshot
+  at best, and settings pages run in a webview where `mailto:` frequently does nothing.
+- **Prefilled GitHub issue** (`?body=`) — the same URL-length wall in the single-digit KB range,
+  plus it needs an account most Homey users do not have. Fine as a secondary "file a proper issue"
+  button.
+- **Sentry as the transport** — `homey-log` 2.1.2 wraps **raven**, the legacy SDK, which has **no
+  attachment support**, so the log would have to ride inside the event body where Sentry truncates
+  it; and `captureMessage(message)` takes no per-call options
+  (`node_modules/homey-log/lib/Log.js:126`), so there is no fingerprint control — every submission
+  becomes its own issue — while its in-process de-dupe silently drops a repeat submission. Only
+  ever viable for a compact snapshot, and only once a DSN exists.
+- **Faking a crash to smuggle the log into an exception** — right instinct (reuse the pipe), wrong
+  mechanism: `captureMessage` at info level is the honest version, and it is already in
+  `logger.mts`. Faking exceptions corrupts crash metrics and alerting, and message-based grouping
+  spawns a new issue per report. Faking it into *Athom's* crash feed is worse still — that means
+  deliberately crashing the app on a user's Homey, killing their voice pipeline, to file a bug
+  report.
 
