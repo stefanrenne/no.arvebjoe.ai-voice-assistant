@@ -28,3 +28,7 @@ vitest.config.*
 
 # Homey Emulator (dev-only, never ship)
 emulator/
+
+
+# Spikes (dev-only experiments, never ship)
+spikes/

@@ -4,5 +4,5 @@
     "allowJs": true,
     "outDir": ".homeybuild/"
   },
-  "exclude": ["emulator", ".homeybuild", "node_modules"]
+  "exclude": ["emulator", "spikes", ".homeybuild", "node_modules"]
 }
