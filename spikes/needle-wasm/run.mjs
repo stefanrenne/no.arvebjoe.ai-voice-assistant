@@ -2,12 +2,14 @@
 // accuracy, the confidence-threshold trade-off and latency.
 //
 //   node spikes/needle-wasm/run.mjs [--lang en,nl,no] [--threshold 0.7]
-//                                   [--tools all|name,name] [--no-facts] [--no-guards] [--quiet]
+//                                   [--model needle2|needle3] [--tools all|name,name] [--no-facts] [--no-guards] [--quiet]
 //
 // The number that matters is WRONG: a call the fast path would have executed
 // that differs from the expected one. A miss only costs an LLM round trip; a
 // wrong execution switches off the wrong light.
 import { parseArgs } from 'node:util';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { NeedleEngine, decide } from './needle-engine.mjs';
 import { DEFAULT_TOOLS, buildTools, systemFacts } from './homey-tools.mjs';
 import { LANGUAGES } from './cases.mjs';
@@ -22,6 +24,8 @@ const { values: opts } = parseArgs({
         // Per-case output and the per-language summary use guards unless disabled.
         'no-guards': { type: 'boolean', default: false },
         quiet: { type: 'boolean', default: false },
+        // needle2 -> ./engine, anything else -> ./engine-<model> (see fetch-engine.mjs)
+        model: { type: 'string', default: 'needle2' },
     },
 });
 const threshold = Number(opts.threshold);
@@ -51,8 +55,10 @@ const pct = (xs, p) => xs.slice().sort((a, b) => a - b)[Math.min(xs.length - 1, 
 const MARK = { hit: '✓ hit  ', pass: '✓ pass ', miss: '· miss ', wrong: '✗ WRONG' };
 
 const rssBefore = process.memoryUsage().rss;
-const engine = await NeedleEngine.start();
-console.log(`engine loaded in ${engine.loadMs.toFixed(0)} ms (worker thread)\n`);
+const engineDir = join(dirname(fileURLToPath(import.meta.url)), opts.model === 'needle2' ? 'engine' : `engine-${opts.model}`);
+const engine = await NeedleEngine.start(engineDir);
+console.log(`${engine.cactName} loaded in ${engine.loadMs.toFixed(0)} ms (worker thread), WASM heap ${engine.heapMb.toFixed(1)} MB\n`);
+let peakHeap = engine.heapMb;
 
 const all = [];
 for (const lang of opts.lang.split(',')) {
@@ -62,9 +68,11 @@ for (const lang of opts.lang.split(',')) {
     // A positive case for a tool that is not loaded is out of scope for this run.
     const cases = allCases.filter((c) => c.calls.every((f) => names.has(f.name)));
     const init = await engine.init(opts['no-facts'] ? '' : systemFacts(lang), tools);
+    peakHeap = Math.max(peakHeap, init.heapMb);
     console.log(`── ${lang}: ${tools.length} tools, ${cases.length} cases, init ${init.ms.toFixed(0)} ms, ${init.prefixTokens} prefix tokens`);
     for (const c of cases) {
-        const { envelope, ms } = await engine.complete(c.q);
+        const { envelope, ms, heapMb } = await engine.complete(c.q);
+        peakHeap = Math.max(peakHeap, heapMb);
         const row = { lang, ...c, envelope, ms };
         all.push(row);
         if (opts.quiet) continue;
@@ -100,5 +108,6 @@ for (const lang of new Set(all.map((r) => r.lang))) {
 
 const lat = all.map((r) => r.ms);
 console.log(`\n── latency per turn: p50 ${pct(lat, 0.5).toFixed(0)} ms, p95 ${pct(lat, 0.95).toFixed(0)} ms, max ${Math.max(...lat).toFixed(0)} ms`);
+console.log(`── WASM heap peak: ${peakHeap.toFixed(1)} MB`);
 console.log(`── RSS growth: ${((process.memoryUsage().rss - rssBefore) / 1048576).toFixed(0)} MB`);
 await engine.stop();

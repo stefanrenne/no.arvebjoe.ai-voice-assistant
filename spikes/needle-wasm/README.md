@@ -104,7 +104,7 @@ The remaining 11 are failures guards cannot see:
 - [ ] Grow the case set for the allow-list languages (≥ 50 each, real transcripts from the "What did I just say?" recordings, including STT errors and missing punctuation). 17 cases per language is enough to rank languages, not to certify one.
 - [ ] Decide the decoy-tool question: does a `play_music` slot (or another absorber) beat a plain 5-tool set once the case set is bigger?
 - [ ] Only then: design the integration (pre-stage in `local-pipeline-provider.mts`, gated setting, snapshot from `DeviceManager`, re-init on zone change, template replies, execute via `ToolManager` handlers).
-- [ ] Watch Needle 3: it accepts audio input (`needle_complete` with a `needle_audio` struct), which could run the fast path before or instead of STT.
+- [x] ~~Watch Needle 3~~ — measured 2026-09-22, see the Needle 3 section. The published model is text-only; better accuracy, same speed, 2.5x the memory.
 
 ## Measuring on a real Homey — RESULT: the app crashed (2026-09-16)
 
@@ -159,6 +159,113 @@ Still open, in order of attractiveness:
 1. **Drop the fast path.** With ~75% coverage in only 3 of 12 languages, a 2.2 s turn on the target hardware and a 46 MB footprint, there is no combination left that beats simply calling the LLM. This is now the recommended outcome.
 2. **LAN sidecar** — Needle on a machine outside Homey, like the existing Whisper/Piper/Ollama backends. The CPU problem goes away and so does the memory problem, but it needs a second machine to reach a latency win that a local LLM on that same machine would also deliver, with far better quality.
 3. **Separate Homey (Python) app** — a companion app gets its own memory budget, but not its own CPU. The 2.2 s stands. Not worth two apps.
-4. **Revisit only if the hardware or the model changes** — a Needle build with SIMD/threads enabled (this WASM build gets ~15 tok/s where the Mac gets 130–250), or Needle 3 replacing STT instead of adding a stage before it.
+4. **Revisit only if the hardware or the model changes** — a Needle build with SIMD/threads enabled (this WASM build gets ~15 tok/s where the Mac gets 130–250), or a native engine that memory-maps the weights. (Needle 3 was measured on 2026-09-22 — see the section below; it is not audio-capable, so it does not replace STT.)
 
 The harness that produced this is kept in `homey-bench/` (`needle-bench.mts` + `needle-bench-worker.mts`, outside `src/` so nothing builds or ships). To run it again: copy both into `src/debug/`, call `runNeedleBench` from `onInit` gated on `Homey.env.NEEDLE_BENCH === '1'` (the module export — `this.homey.env` is undefined there), put `{ "NEEDLE_BENCH": "1" }` in `env.json`, and `homey app run --remote`. Note that `process.memoryUsage()` throws `ENOENT uv_resident_set_memory` inside the app sandbox, so memory has to be read from Homey Developer Tools.
+
+## Needle 3 (2026-09-22)
+
+Same spike, same 180 cases, same guards — only the model changed:
+
+```bash
+node spikes/needle-wasm/fetch-engine.mjs needle3   # -> ./engine-needle3 (gitignored)
+node spikes/needle-wasm/run.mjs --model needle3
+```
+
+**What Needle 3 actually is.** 121M parameters (most of them in the engram lookup, "the arithmetic of a 50M model"), a 35 MB `.cact`, a 1024-token window, and a new `needle_embed()` for sentence embeddings. The published model is **text-only** (`"modalities": ["text"]`, and the WASM `needle_complete` takes no audio). The audio path in the Python package exists, but there is no audio-capable Needle 3 to point it at — earlier notes in this README that suggested Needle 3 could replace STT were wrong. It also ships as a *ladder*: `needle build --layers N` slices any 2–20-layer subnetwork, but only after LoRA fine-tuning and as a 4-bit export, so the shipped calibrated confidence no longer applies.
+
+### Accuracy: clearly better
+
+| All languages, threshold 0.7 | hit | pass | miss | WRONG |
+| --- | --- | --- | --- | --- |
+| Needle 2, engine gate only | 55 | 42 | 17 | 66 |
+| **Needle 3, engine gate only** | 59 | 60 | 22 | **39** |
+| Needle 2, + guards | 51 | 77 | 41 | 11 |
+| **Needle 3, + guards** | 53 | 79 | 37 | **11** |
+
+The model alone makes 40% fewer wrong calls; with guards the total ties, but the good languages got better and the spread moved:
+
+| | Needle 2 | Needle 3 |
+| --- | --- | --- |
+| clean (0 wrong, ≥ 6/8 coverage) | en, nl, pl | **en, nl, de, fr, it** |
+| en / nl / de / fr coverage | 6 / 6 / 5 / 7 of 8 | **7 / 7 / 7 / 7 of 8** |
+| still off | no, ru, ko | no, ru, **da, sv** (worse), ko |
+
+New failure modes in Needle 3, none of them caught by the guards:
+
+- **Out-of-range escapes into another tool** (4 of 11): "set the bedroom to 45 degrees" is refused by the thermostat grammar (max 30), so the model lands on `control_lights(Sovrum, on, brightness_percent: 45)` at 0.97–1.00. It turns a light on in response to a heating request.
+- **Parallel commands come back half** (3 of 11): only the second call, so the guard's single-call rule sees one call and lets it through.
+- The "play jazz → lights on" problem is mostly gone (only ko remains).
+
+### Speed and memory: no better, and memory is much worse
+
+| Mac, WASM | Needle 2 | Needle 3 |
+| --- | --- | --- |
+| per turn p50 / p95 | 525 ms / 1.9 s | 531 ms / 1.3 s |
+| init (5 tools) | 2.3–2.9 s | 2.1–2.8 s |
+| **WASM heap after load** | 31.6 MB | **81.0 MB** |
+| **WASM heap peak** | 45.9 MB | **116.8 MB** |
+
+Per-turn compute is the same as Needle 2, so the Homey would land at the same ~2 s per turn. And the heap is 2.5x larger: Needle 2's 46 MB already crashed the app, and 117 MB on its own is close to the whole ~150 MB per-app budget, so Needle 3 in WASM would not even fit in a dedicated companion app.
+
+### Verdict
+
+Needle 3 is a better model and a worse fit for a Homey. It would be the right choice on a LAN sidecar, where memory is free and a faster CPU makes the 0.5 s latency real. The native engine is the one thing that could change the Homey picture: the `.cact` format is designed to be memory-mapped and read in place, so a native build need not copy 35 MB into a heap the way WASM must. That, plus native speed, is still the single open measurement.
+
+## Needle 3 native on a real Homey (2026-09-22)
+
+The WASM route is dead on memory; the native route was the open question. Result: **it runs, it coexists, it is ~1.1 s per turn.**
+
+### Getting a native runner to start
+
+Cactus' `linux-arm64/needle` runner is dynamically linked against glibc and asks for `/lib/ld-linux-aarch64.so.1`. The Homey app container has **no dynamic loader at all** (Node reports glibc 2.36 but no loader exists on any standard path), so `spawn` fails with `ENOENT` on a file that is there. The fix is `homey-bench/static-runner/`: a ~100-line C wrapper around Cactus' `libneedle.a`, **statically linked** (libc, libc++, libc++abi) in an arm64 Docker container. It speaks a line protocol over stdio and memory-maps the `.cact`. `/userdata` allows exec; the shipped binary loses its exec bit, so the bench copies and chmods it.
+
+### Memory: solved
+
+The runner reports `peak_ram_mb` ≈ 92 MB, but it is a **separate process**, and Homey did not count it against the app: with the runner loaded for 90 s, a full voice turn (tool call, LLM reply, TTS) completed and the app stayed up. Needle 2 in WASM, inside the Node process, got the app killed at 46 MB of heap.
+
+### Speed: ~1.1 s per turn at full depth
+
+| engine threads | init | per turn p50 | min | max |
+| --- | --- | --- | --- | --- |
+| 1 | 8.0 s | 2.38 s | 1.03 s | 2.60 s |
+| 2 | 3.8 s | 1.44 s | 0.59 s | 1.51 s |
+| 4 | 2.7 s | **1.16 s** | 0.43 s | 1.51 s |
+| auto (= 4) | 2.7 s | **1.15 s** | 0.56 s | 1.22 s |
+| *Needle 2 WASM, for reference* | *14.5–16 s* | *2.2 s* | *1.36 s* | *16 s* |
+
+- The Homey exposes **4 real cores with no per-app CPU quota**: a fixed CPU loop takes the same time on 1 thread and on 4 concurrent threads (1077 vs 1088 ms). The engine's own thread choice (4) is therefore right, and the `--wrap=sysconf` thread override in the static runner is not needed here — it only matters under a quota, where the engine's spin-waiting workers made it up to 35x slower in Docker.
+- **One Homey core is ~4.5x slower than an M2 core** (same loop: ~1050 vs ~260 ms). That, not the sandbox, sets the ceiling. 2 → 4 threads only buys 1.24x.
+- Decode 40–66 tok/s, prefill 90–120 tok/s. Every turn also decodes the engine's `reasoning` string before the call; there is no switch for it in the C API.
+
+### Does 1.1 s help?
+
+- **Cloud speech-to-speech (OpenAI Realtime): no, never.** In the logs the realtime model has already executed `set_device_capability` *before the user finished speaking*. Nothing that starts after the transcript can beat that.
+- **Custom pipeline with a local LLM: possibly.** An Ollama turn on modest hardware takes 1–5 s, so a ~1 s answer for ~75% of simple commands in the clean languages (en, nl, de, fr, it) is a real, if modest, win.
+
+### The remaining lever: depth
+
+Needle 3 is trained so that every depth from 2 to 20 layers is a usable model, and the engram lookup (most of the parameters) costs almost nothing per token — so compute per token scales roughly with depth. At 8 layers a turn should land around 0.4–0.5 s on this Homey. Unknowns: accuracy at reduced depth without fine-tuning (Cactus says it drops, and recovers when fine-tuned — which in turn removes the calibrated confidence the guards rely on), and how to get depth onto the Homey: Cactus' runner has `--depth`, but the public C API does not, so either a sliced `.cact` from `needle build --layers N` or Cactus' own runner started through a bundled glibc loader.
+
+### Depth measured: no free lunch (2026-09-22)
+
+`run-native.mjs` runs the same 180 cases through Cactus' native runner in an arm64 Linux container. Two findings first:
+
+- **The runner's `--depth` flag does nothing** with the published `needle3.cact`: identical answers and no speed trend at any value from 2 to 20. Depth has to come from a sliced archive, `needle build --layers N` (needs `cactus-needle[train]`, i.e. JAX; builds in ~15 s from the auto-downloaded 230 MB base checkpoint).
+- Sliced rungs are exported as **4-bit (W4A8)**, not the published 2-bit: L16 is 51 MB, L12 39 MB, L8 27 MB, L4 15 MB — L16 is *bigger and slower* than the full published model.
+
+Threshold 0.7, guards on, base weights (no fine-tuning), Mac/Docker timing:
+
+| model | hit | pass | miss | **WRONG** | p50 | est. Homey p50 | clean languages |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| published (20 layers, 2-bit) | 53 | 78 | 36 | **13** | 165 ms | ~1.15 s (measured) | en, nl, de, fr |
+| L16 (4-bit) | 47 | 70 | 36 | **27** | 192 ms | ~1.3 s | en |
+| L12 (4-bit) | 54 | 71 | 34 | **21** | 117 ms | ~0.8 s | none |
+| L8 (4-bit) | 26 | 80 | 50 | **24** | 71 ms | ~0.5 s | none |
+| L4 (4-bit) | 5 | 82 | 84 | **9** | 62 ms | ~0.45 s | none |
+
+(Homey estimate = Mac time × the measured 7x Homey/Mac ratio for the published model.)
+
+Every rung below full depth roughly **doubles the wrong executions** and loses every clean language; L8 halves coverage on top, and L4 barely acts at all (its low WRONG count is just refusing nearly everything). Cactus says the lost accuracy comes back with fine-tuning on the product's tools, but here that is doubly awkward: the zone and device enums are different in every home, so a tune would have to learn the *shape* of the tools rather than their values, and tuned weights lose the calibrated confidence (the engine's own gate) that half the safety story relies on.
+
+**So the published full-depth model at ~1.15 s is the best Needle can do on a Homey Pro.** Speed through depth costs exactly the accuracy that made Needle 3 worth trying.

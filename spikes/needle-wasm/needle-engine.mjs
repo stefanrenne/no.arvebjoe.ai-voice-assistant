@@ -28,6 +28,8 @@ export class NeedleEngine {
             msg.ok ? p.resolve(msg) : p.reject(new Error(msg.error));
         });
         engine.loadMs = ready.ms;
+        engine.cactName = ready.cactName;
+        engine.heapMb = ready.heapMb;
         return engine;
     }
 

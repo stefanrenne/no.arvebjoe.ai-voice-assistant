@@ -4,14 +4,17 @@ import { mkdir, writeFile, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const REPO = 'https://huggingface.co/Cactus-Compute/needle2/resolve/main';
-const ENGINE_DIR = join(dirname(fileURLToPath(import.meta.url)), 'engine');
+// `node fetch-engine.mjs [needle2|needle3]` — needle2 lands in ./engine (the
+// original spike), any other model in ./engine-<model>.
+const MODEL = process.argv[2] ?? 'needle2';
+const REPO = `https://huggingface.co/Cactus-Compute/${MODEL}/resolve/main`;
+const ENGINE_DIR = join(dirname(fileURLToPath(import.meta.url)), MODEL === 'needle2' ? 'engine' : `engine-${MODEL}`);
 
 // needle.js is CommonJS; the repo is "type": "module", so it must be .cjs.
 const FILES = [
     ['wasm/needle.js', 'needle.cjs'],
     ['wasm/needle.wasm', 'needle.wasm'],
-    ['needle2.cact', 'needle2.cact'],
+    [`${MODEL}.cact`, `${MODEL}.cact`],
     ['config.json', 'config.json'],
 ];
 

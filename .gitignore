@@ -18,4 +18,4 @@
 /docs/music-assistant/music-assistant-data/
 
 # Spike engine downloads (Needle WASM + weights, fetched by fetch-engine.mjs)
-/spikes/*/engine/
+/spikes/*/engine*/

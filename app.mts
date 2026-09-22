@@ -98,6 +98,19 @@ export default class AiVoiceAssistantApp extends Homey.App implements AppService
     await this.deviceManager.init();
     await this.deviceManager.fetchData();
 
+    // TEMPORARY spike measurement (spikes/needle-wasm/README.md): Needle 3's
+    // native runner on this Homey. Set { "NEEDLE_BENCH": "1" } in env.json.
+    // Read from the Homey module export — this.homey.env is undefined here.
+    const env = (Homey as any).env ?? {};
+    if (env.NEEDLE_BENCH === '1') {
+      import('./src/debug/needle3-native-bench.mjs')
+        .then(({ runNeedle3NativeBench }) => runNeedle3NativeBench((line) => this.homey.log(line), {
+          keepSeconds: Number(env.NEEDLE_BENCH_KEEP ?? 0),
+          threads: String(env.NEEDLE_BENCH_THREADS ?? '1,2,4,0').split(',').map((t: string) => Number(t.trim())),
+        }))
+        .catch((err) => this.homey.log(`[needle3] failed: ${err?.stack ?? err}`));
+    }
+
     this.logger.info('AI voice assistant initialized successfully');
   }
 
